@@ -1,0 +1,395 @@
+/**
+ * Right Panel Component
+ * Target info and current turn details
+ */
+
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Chip,
+  Stack,
+  Paper,
+} from '@mui/material';
+import { useCombat } from '../../context/CombatContext';
+import { TargetCoverPanel } from '../combat/TargetCoverPanel';
+import { AllVehiclesStatsPanel } from '../combat/VehicleStatsPanel';
+import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
+
+export function RightPanel() {
+  const { state, currentTurnVehicle } = useCombat();
+
+  return (
+    <Box
+      component="aside"
+      sx={{
+        gridArea: 'panel',
+        bgcolor: 'background.paper',
+        borderLeft: 1,
+        borderColor: 'divider',
+        p: 2,
+        overflow: 'auto',
+      }}
+    >
+      {/* Current Turn Info - Show during combat */}
+      {state.phase === 'combat' && (
+        <Card sx={{ mb: 2 }}>
+          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              Current Turn
+            </Typography>
+            <CurrentTurnInfo />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Target Cover Info - Show during combat when a vehicle is active */}
+      {state.phase === 'combat' && currentTurnVehicle && (
+        <Card sx={{ mb: 2 }}>
+          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              Target Cover Status
+            </Typography>
+            <TargetCoverPanel attackerVehicle={currentTurnVehicle} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Vehicle Stats - Show during combat */}
+      {state.phase === 'combat' && state.vehicles.length > 0 && (
+        <Card>
+          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              Vehicle Stats
+            </Typography>
+            <Box sx={{ maxHeight: 450, overflow: 'auto' }}>
+              <AllVehiclesStatsPanel />
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+    </Box>
+  );
+}
+
+// Calculate effective speed accounting for mishap effects
+function getEffectiveSpeed(vehicle: { currentSpeed: number; activeMishaps: Array<{ mechanicalEffect?: { speedReduction?: number } }> }): number {
+  let speed = vehicle.currentSpeed;
+  for (const mishap of vehicle.activeMishaps) {
+    if (mishap.mechanicalEffect?.speedReduction) {
+      speed -= mishap.mechanicalEffect.speedReduction;
+    }
+  }
+  return Math.max(0, speed);
+}
+
+function CurrentTurnInfo() {
+  const { state, currentTurnCreature, currentTurnVehicle, currentTurnDriver } = useCombat();
+
+  // Vehicle turn - show vehicle and crew info
+  if (currentTurnVehicle) {
+    const vehicleCrew = state.crewAssignments
+      .filter((a) => a.vehicleId === currentTurnVehicle.id)
+      .map((a) => {
+        const creature = state.creatures.find((c) => c.id === a.creatureId);
+        const zone = currentTurnVehicle.template.zones.find((z) => z.id === a.zoneId);
+        // Find weapon at this zone
+        const weapon = currentTurnVehicle.weapons.find((w) => w.zoneId === a.zoneId);
+        return { creature, zone, weapon, isDriver: creature?.id === currentTurnDriver?.id };
+      })
+      .filter((c) => c.creature);
+
+    const borderColor = currentTurnVehicle.type === 'party' ? factionColors.party : factionColors.enemy;
+    const effectiveSpeed = getEffectiveSpeed(currentTurnVehicle);
+    const hasSpeedReduction = effectiveSpeed < currentTurnVehicle.currentSpeed;
+
+    return (
+      <Box>
+        {/* Vehicle Info */}
+        <Paper
+          sx={{
+            p: 1,
+            mb: 1,
+            bgcolor: withOpacity(borderColor, 0.1),
+            borderLeft: 3,
+            borderColor: borderColor,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography fontWeight={600}>{currentTurnVehicle.name}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              HP: {currentTurnVehicle.currentHp}/{currentTurnVehicle.template.maxHp}
+            </Typography>
+            {hasSpeedReduction ? (
+              <Typography variant="caption" component="span">
+                <Box component="span" color="text.secondary">Speed: </Box>
+                <Box component="span" sx={{ color: 'warning.main', fontWeight: 600 }}>
+                  {effectiveSpeed} ft
+                </Box>
+                <Box component="span" sx={{ color: 'text.disabled', textDecoration: 'line-through', ml: 0.5 }}>
+                  {currentTurnVehicle.currentSpeed}
+                </Box>
+              </Typography>
+            ) : (
+              <Typography variant="caption" color="text.secondary">
+                Speed: {currentTurnVehicle.currentSpeed} ft
+              </Typography>
+            )}
+          </Box>
+        </Paper>
+
+        {/* Driver */}
+        {currentTurnDriver && (
+          <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
+            <Box component="span" color="text.secondary">Driver: </Box>
+            <Box component="span" fontWeight={600}>{currentTurnDriver.name}</Box>
+            <Box component="span" color="text.secondary"> (Init: {currentTurnDriver.initiative})</Box>
+          </Typography>
+        )}
+
+        {/* Crew List */}
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+          Crew ({vehicleCrew.length}):
+        </Typography>
+        <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
+          <Stack spacing={0.5}>
+            {vehicleCrew.map(({ creature, zone, weapon, isDriver }) => (
+              <Paper
+                key={creature!.id}
+                sx={{
+                  p: 1,
+                  bgcolor: '#242424',
+                  borderLeft: weapon ? 2 : 0,
+                  borderColor: weapon ? 'warning.main' : undefined,
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Box>
+                    <Typography variant="body2">
+                      {creature!.name}
+                      {isDriver && (
+                        <Typography component="span" variant="body2" color="text.secondary"> (Driver)</Typography>
+                      )}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {zone?.name || 'Unassigned'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="caption" fontFamily="monospace">
+                      HP: {creature!.currentHp}/{creature!.statblock.maxHp}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" fontFamily="monospace" sx={{ display: 'block' }}>
+                      AC: {creature!.statblock.ac}
+                    </Typography>
+                  </Box>
+                </Box>
+                {/* Weapon info for manned weapon stations */}
+                {weapon && (
+                  <Box
+                    sx={{
+                      mt: 0.5,
+                      pt: 0.5,
+                      borderTop: 1,
+                      borderColor: 'divider',
+                    }}
+                  >
+                    <Typography variant="caption" color="warning.main" fontWeight={600}>
+                      ⚔ {weapon.name}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1.5, mt: 0.25, flexWrap: 'wrap' }}>
+                      <Typography variant="caption" fontFamily="monospace" color="text.secondary">
+                        +{weapon.attackBonus} to hit
+                      </Typography>
+                      <Typography variant="caption" fontFamily="monospace" sx={{ color: 'error.light' }}>
+                        {weapon.damage}
+                      </Typography>
+                      {weapon.range && (
+                        <Typography variant="caption" fontFamily="monospace" color="text.secondary">
+                          {weapon.range}
+                        </Typography>
+                      )}
+                    </Box>
+                    {weapon.specialEffect && (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, fontStyle: 'italic' }}>
+                        {weapon.specialEffect}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+              </Paper>
+            ))}
+          </Stack>
+        </Box>
+
+        {/* Movement-based Damage Traits (Driver abilities) */}
+        {(() => {
+          // Filter traits that deal damage on movement (for driver reference)
+          const movementDamageTraits = (currentTurnVehicle.template.traits || []).filter((trait) => {
+            const desc = trait.description.toLowerCase();
+            // Look for traits that mention damage and movement-related keywords
+            return desc.includes('damage') && (
+              desc.includes('move') ||
+              desc.includes('within') ||
+              desc.includes('space of')
+            );
+          });
+
+          if (movementDamageTraits.length === 0) return null;
+
+          // Extract damage from description (e.g., "13 (2d10 + 2) slashing damage")
+          const extractDamage = (desc: string): string | null => {
+            const match = desc.match(/(\d+)\s*\(([^)]+)\)\s*(\w+)\s*damage/i);
+            if (match) {
+              return `${match[1]} (${match[2]}) ${match[3]}`;
+            }
+            return null;
+          };
+
+          // Extract DC from description
+          const extractDC = (desc: string): string | null => {
+            const match = desc.match(/DC\s*(\d+)\s*(\w+)/i);
+            if (match) {
+              return `DC ${match[1]} ${match[2]}`;
+            }
+            return null;
+          };
+
+          return (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                Movement Damage (Driver):
+              </Typography>
+              <Stack spacing={0.5}>
+                {movementDamageTraits.map((trait) => {
+                  const damage = extractDamage(trait.description);
+                  const dc = extractDC(trait.description);
+                  return (
+                    <Paper
+                      key={trait.name}
+                      sx={{
+                        p: 1,
+                        bgcolor: withOpacity('#3b82f6', 0.1),
+                        borderLeft: 2,
+                        borderColor: 'info.main',
+                      }}
+                    >
+                      <Typography variant="body2" fontWeight={600} color="info.main">
+                        {trait.name}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1.5, mt: 0.25, flexWrap: 'wrap' }}>
+                        {damage && (
+                          <Typography variant="caption" fontFamily="monospace" sx={{ color: 'error.light' }}>
+                            {damage}
+                          </Typography>
+                        )}
+                        {dc && (
+                          <Typography variant="caption" fontFamily="monospace" color="text.secondary">
+                            {dc} save
+                          </Typography>
+                        )}
+                      </Box>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          display: 'block',
+                          mt: 0.5,
+                          fontSize: '0.65rem',
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {trait.description.length > 150
+                          ? trait.description.substring(0, 150) + '...'
+                          : trait.description}
+                      </Typography>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            </Box>
+          );
+        })()}
+
+        {/* Active Mishaps */}
+        {currentTurnVehicle.activeMishaps.length > 0 && (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+              Active Mishaps:
+            </Typography>
+            <Stack spacing={0.5}>
+              {currentTurnVehicle.activeMishaps.map((mishap) => (
+                <Paper
+                  key={mishap.id}
+                  sx={{
+                    p: 1,
+                    bgcolor: withOpacity('#f59e0b', 0.1),
+                    borderLeft: 2,
+                    borderColor: 'warning.main',
+                  }}
+                >
+                  <Typography variant="body2" fontWeight={600}>{mishap.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">{mishap.effect}</Typography>
+                </Paper>
+              ))}
+            </Stack>
+          </Box>
+        )}
+      </Box>
+    );
+  }
+
+  // Creature turn (independent creature not on a vehicle)
+  if (!currentTurnCreature) {
+    return <Typography variant="body2" color="text.secondary">No active turn</Typography>;
+  }
+
+  const assignment = state.crewAssignments.find(
+    (a) => a.creatureId === currentTurnCreature.id
+  );
+  const vehicle = assignment
+    ? state.vehicles.find((v) => v.id === assignment.vehicleId)
+    : null;
+  const zone = vehicle?.template.zones.find((z) => z.id === assignment?.zoneId);
+
+  const coverColor = zone ? coverColors[zone.cover as keyof typeof coverColors] : undefined;
+
+  return (
+    <Box>
+      <Typography variant="subtitle1" fontWeight={600}>{currentTurnCreature.name}</Typography>
+      <Typography variant="caption" color="text.secondary">
+        HP: {currentTurnCreature.currentHp}/{currentTurnCreature.statblock.maxHp} |
+        AC: {currentTurnCreature.statblock.ac}
+      </Typography>
+      {vehicle && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+          On {vehicle.name}
+          {zone && ` • ${zone.name}`}
+        </Typography>
+      )}
+      {zone && coverColor && (
+        <Box sx={{ mt: 1 }}>
+          <Chip
+            label={formatCover(zone.cover)}
+            size="small"
+            sx={{
+              bgcolor: withOpacity(coverColor, 0.2),
+              color: coverColor,
+            }}
+          />
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+function formatCover(cover: string): string {
+  const labels: Record<string, string> = {
+    none: 'No Cover',
+    half: 'Half Cover (+2 AC)',
+    three_quarters: '3/4 Cover (+5 AC)',
+    full: 'Full Cover',
+  };
+  return labels[cover] || cover;
+}
