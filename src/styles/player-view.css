@@ -3,10 +3,32 @@
  * Full-screen VTT display for external monitors
  */
 
+/* Ensure full viewport coverage - override index.css */
+html, body {
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+#root {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  display: block !important;
+}
+
 /* Container fills viewport */
 .player-view-container {
-  width: 100vw;
-  height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: #0a0a0a;
   display: flex;
   flex-direction: column;
@@ -15,6 +37,7 @@
 
 /* Status bar at top */
 .player-view-status {
+  flex: 0 0 40px;
   height: 40px;
   background: rgba(0, 0, 0, 0.8);
   border-bottom: 1px solid #333;
@@ -27,7 +50,10 @@
 
 /* Map area */
 .player-view-map {
-  flex: 1;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  min-width: 0;
   position: relative;
   background: #111;
   overflow: hidden;

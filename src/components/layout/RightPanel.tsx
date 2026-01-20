@@ -18,7 +18,24 @@ import { AllVehiclesStatsPanel } from '../combat/VehicleStatsPanel';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
 
 export function RightPanel() {
-  const { state, currentTurnVehicle } = useCombat();
+  const { state, currentTurnVehicle, currentTurnCreature } = useCombat();
+
+  // For cover calculations, find the vehicle the current creature is on (if any)
+  const currentCreatureAssignment = currentTurnCreature
+    ? state.crewAssignments.find((a) => a.creatureId === currentTurnCreature.id)
+    : null;
+  const creatureVehicle = currentCreatureAssignment
+    ? state.vehicles.find((v) => v.id === currentCreatureAssignment.vehicleId)
+    : null;
+
+  // The "attacker" for cover purposes - either the current turn vehicle, or the vehicle the creature is on
+  const attackerVehicle = currentTurnVehicle || creatureVehicle;
+
+  // For creatures on foot - they can attack vehicles, so show cover panel if they have a position
+  const creatureOnFoot = currentTurnCreature && !creatureVehicle && currentTurnCreature.position;
+
+  // Determine attacker's faction for creatures on foot
+  const attackerFaction = currentTurnCreature?.statblock.type === 'pc' ? 'party' : 'enemy';
 
   return (
     <Box
@@ -44,14 +61,23 @@ export function RightPanel() {
         </Card>
       )}
 
-      {/* Target Cover Info - Show during combat when a vehicle is active */}
-      {state.phase === 'combat' && currentTurnVehicle && (
+      {/* Target Cover Info - Show during combat when attacker has a vehicle or is on foot with a position */}
+      {state.phase === 'combat' && (attackerVehicle || creatureOnFoot) && (
         <Card sx={{ mb: 2 }}>
           <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Target Cover Status
+              {currentTurnCreature && creatureVehicle && (
+                <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                  (from {creatureVehicle.name})
+                </Typography>
+              )}
             </Typography>
-            <TargetCoverPanel attackerVehicle={currentTurnVehicle} />
+            {attackerVehicle ? (
+              <TargetCoverPanel attackerVehicle={attackerVehicle} />
+            ) : creatureOnFoot && currentTurnCreature ? (
+              <TargetCoverPanel attackerCreature={currentTurnCreature} attackerFaction={attackerFaction} />
+            ) : null}
           </CardContent>
         </Card>
       )}
@@ -63,7 +89,7 @@ export function RightPanel() {
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Vehicle Stats
             </Typography>
-            <Box sx={{ maxHeight: 450, overflow: 'auto' }}>
+            <Box sx={{ maxHeight: 700, overflow: 'auto' }}>
               <AllVehiclesStatsPanel />
             </Box>
           </CardContent>
@@ -154,21 +180,28 @@ function CurrentTurnInfo() {
         </Typography>
         <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
           <Stack spacing={0.5}>
-            {vehicleCrew.map(({ creature, zone, weapon, isDriver }) => (
+            {vehicleCrew.map(({ creature, zone, weapon, isDriver }) => {
+              const isAlive = creature!.currentHp > 0;
+              const showWeapon = weapon && isAlive;
+              return (
               <Paper
                 key={creature!.id}
                 sx={{
                   p: 1,
                   bgcolor: '#242424',
-                  borderLeft: weapon ? 2 : 0,
-                  borderColor: weapon ? 'warning.main' : undefined,
+                  borderLeft: showWeapon ? 2 : 0,
+                  borderColor: showWeapon ? 'warning.main' : undefined,
+                  opacity: isAlive ? 1 : 0.5,
                 }}
               >
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <Box>
                     <Typography variant="body2">
                       {creature!.name}
-                      {isDriver && (
+                      {!isAlive && (
+                        <Typography component="span" variant="body2" color="error.main"> (DEAD)</Typography>
+                      )}
+                      {isDriver && isAlive && (
                         <Typography component="span" variant="body2" color="text.secondary"> (Driver)</Typography>
                       )}
                     </Typography>
@@ -177,7 +210,7 @@ function CurrentTurnInfo() {
                     </Typography>
                   </Box>
                   <Box sx={{ textAlign: 'right' }}>
-                    <Typography variant="caption" fontFamily="monospace">
+                    <Typography variant="caption" fontFamily="monospace" sx={{ color: isAlive ? 'inherit' : 'error.main' }}>
                       HP: {creature!.currentHp}/{creature!.statblock.maxHp}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" fontFamily="monospace" sx={{ display: 'block' }}>
@@ -185,8 +218,8 @@ function CurrentTurnInfo() {
                     </Typography>
                   </Box>
                 </Box>
-                {/* Weapon info for manned weapon stations */}
-                {weapon && (
+                {/* Weapon info for manned weapon stations - only show if crew is alive */}
+                {showWeapon && (
                   <Box
                     sx={{
                       mt: 0.5,
@@ -199,9 +232,15 @@ function CurrentTurnInfo() {
                       ⚔ {weapon.name}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1.5, mt: 0.25, flexWrap: 'wrap' }}>
-                      <Typography variant="caption" fontFamily="monospace" color="text.secondary">
-                        +{weapon.attackBonus} to hit
-                      </Typography>
+                      {weapon.attackBonus !== undefined ? (
+                        <Typography variant="caption" fontFamily="monospace" color="text.secondary">
+                          +{weapon.attackBonus} to hit
+                        </Typography>
+                      ) : weapon.saveDC !== undefined ? (
+                        <Typography variant="caption" fontFamily="monospace" color="text.secondary">
+                          DC {weapon.saveDC} {weapon.saveType?.toUpperCase()} save
+                        </Typography>
+                      ) : null}
                       <Typography variant="caption" fontFamily="monospace" sx={{ color: 'error.light' }}>
                         {weapon.damage}
                       </Typography>
@@ -219,7 +258,8 @@ function CurrentTurnInfo() {
                   </Box>
                 )}
               </Paper>
-            ))}
+            );
+            })}
           </Stack>
         </Box>
 

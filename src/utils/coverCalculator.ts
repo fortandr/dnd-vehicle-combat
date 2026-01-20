@@ -250,3 +250,52 @@ export function getArcDisplayName(arc: AttackArc): string {
       return 'Starboard';
   }
 }
+
+/**
+ * Calculate effective cover for an attack from a position (creature on foot)
+ * @param attackerPosition - Position of the attacker on the map
+ * @param targetVehicle - Vehicle the target is on
+ * @param targetZone - Zone the target creature is in
+ */
+export function calculateCoverFromPosition(
+  attackerPosition: Position,
+  targetVehicle: Vehicle,
+  targetZone: VehicleZone
+): CoverResult {
+  // Calculate angle from attacker's position to target's vehicle
+  const attackAngle = calculateAngle(attackerPosition, targetVehicle.position);
+
+  // Determine which arc the attack is coming from (from target's perspective)
+  const attackArc = getAttackArc(attackAngle, targetVehicle.facing);
+
+  // Check if zone is visible from this arc
+  const isVisible = isZoneVisibleFromArc(targetZone, attackArc);
+
+  // Base cover from the zone
+  const baseCover = targetZone.cover;
+  const baseACBonus = getCoverACBonus(baseCover);
+
+  // If not visible from this arc, target has full cover
+  if (!isVisible) {
+    return {
+      baseCover,
+      effectiveCover: 'full',
+      acBonus: Infinity,
+      attackArc,
+      isVisible: false,
+      reason: `Target in ${targetZone.name} is not visible from the ${attackArc} (blocked by vehicle structure)`,
+    };
+  }
+
+  // Visible from this arc - use zone's base cover
+  return {
+    baseCover,
+    effectiveCover: baseCover,
+    acBonus: baseACBonus,
+    attackArc,
+    isVisible: true,
+    reason: baseCover === 'none'
+      ? `Target in ${targetZone.name} is fully exposed (attacking from ${getArcDisplayName(attackArc)})`
+      : `Target in ${targetZone.name} has ${formatCover(baseCover)} from station (attacking from ${getArcDisplayName(attackArc)})`,
+  };
+}

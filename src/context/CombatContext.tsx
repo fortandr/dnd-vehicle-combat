@@ -135,14 +135,102 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
     // ========== Encounter Management ==========
     case 'LOAD_ENCOUNTER': {
       // Migrate vehicles to add isSwappableStation flag to harpoon weapons
+      // Also mark vehicles at 0 HP as inoperative
       const migratedVehicles = (action.payload.vehicles || []).map((vehicle) => ({
         ...vehicle,
+        // Mark as inoperative if at 0 HP but not already marked
+        isInoperative: vehicle.isInoperative ?? (vehicle.currentHp === 0),
         weapons: vehicle.weapons.map((weapon) => ({
           ...weapon,
           // Mark harpoon weapons as swappable if not already set
           isSwappableStation: weapon.isSwappableStation ?? weapon.id.includes('harpoon') ?? weapon.name.toLowerCase().includes('harpoon'),
         })),
       }));
+
+      // Find vehicles that are at 0 HP (destroyed) - we need to eject their crew
+      const destroyedVehicleIds = migratedVehicles
+        .filter((v) => v.currentHp === 0 || v.isInoperative)
+        .map((v) => v.id);
+
+      // Get incoming crew assignments and creatures
+      let migratedCrewAssignments = action.payload.crewAssignments || [];
+      let migratedCreatures = action.payload.creatures || [];
+      let migratedInitiativeOrder = action.payload.initiativeOrder || [];
+      const ejectedCreatures: Creature[] = [];
+
+      // Remove destroyed vehicles from initiative order
+      if (destroyedVehicleIds.length > 0) {
+        migratedInitiativeOrder = migratedInitiativeOrder.filter(
+          (id) => !destroyedVehicleIds.includes(id)
+        );
+      }
+
+      // For each destroyed vehicle, eject crew and place them on the map
+      if (destroyedVehicleIds.length > 0) {
+        const crewToEject = migratedCrewAssignments.filter((a) =>
+          destroyedVehicleIds.includes(a.vehicleId)
+        );
+
+        if (crewToEject.length > 0) {
+          // Update creatures with positions near their destroyed vehicles
+          migratedCreatures = migratedCreatures.map((creature) => {
+            const assignment = crewToEject.find((a) => a.creatureId === creature.id);
+            if (!assignment) return creature;
+
+            const vehicle = migratedVehicles.find((v) => v.id === assignment.vehicleId);
+            if (!vehicle) return creature;
+
+            // Only set position if creature doesn't already have one
+            if (creature.position) return creature;
+
+            // Spread creatures around the vehicle in a circle
+            const vehicleCrew = crewToEject.filter((a) => a.vehicleId === vehicle.id);
+            const crewIndex = vehicleCrew.indexOf(assignment);
+            const angle = (crewIndex / vehicleCrew.length) * 2 * Math.PI;
+            const offset = 15;
+            const newPosition = {
+              x: vehicle.position.x + Math.cos(angle) * offset,
+              y: vehicle.position.y + Math.sin(angle) * offset,
+            };
+
+            const updatedCreature = { ...creature, position: newPosition };
+            ejectedCreatures.push(updatedCreature);
+            return updatedCreature;
+          });
+
+          // Remove crew assignments for destroyed vehicles
+          migratedCrewAssignments = migratedCrewAssignments.filter(
+            (a) => !destroyedVehicleIds.includes(a.vehicleId)
+          );
+
+          // Add ejected creatures to initiative order (if combat is active)
+          if (action.payload.phase === 'combat' && ejectedCreatures.length > 0) {
+            migratedInitiativeOrder = insertCreaturesIntoInitiative(
+              migratedInitiativeOrder,
+              ejectedCreatures,
+              migratedCreatures,
+              migratedVehicles
+            );
+          }
+        }
+      }
+
+      // Safety net: Ensure any creature with a position (on battlefield) that isn't
+      // assigned to a vehicle is in the initiative order during combat
+      if (action.payload.phase === 'combat') {
+        const assignedCreatureIds = new Set(migratedCrewAssignments.map((a) => a.creatureId));
+        const creaturesOnBattlefield = migratedCreatures.filter(
+          (c) => c.position && !assignedCreatureIds.has(c.id) && !migratedInitiativeOrder.includes(c.id)
+        );
+        if (creaturesOnBattlefield.length > 0) {
+          migratedInitiativeOrder = insertCreaturesIntoInitiative(
+            migratedInitiativeOrder,
+            creaturesOnBattlefield,
+            migratedCreatures,
+            migratedVehicles
+          );
+        }
+      }
 
       // Merge with initial state to ensure all required fields exist
       return {
@@ -159,9 +247,9 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         },
         // Ensure arrays exist with migrations applied
         vehicles: migratedVehicles,
-        creatures: action.payload.creatures || [],
-        crewAssignments: action.payload.crewAssignments || [],
-        initiativeOrder: action.payload.initiativeOrder || [],
+        creatures: migratedCreatures,
+        crewAssignments: migratedCrewAssignments,
+        initiativeOrder: migratedInitiativeOrder,
         actionLog: action.payload.actionLog || [],
       };
     }
@@ -246,13 +334,92 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         ),
       };
 
-    case 'UPDATE_VEHICLE':
+    case 'UPDATE_VEHICLE': {
+      const vehicle = state.vehicles.find((v) => v.id === action.payload.id);
+      if (!vehicle) return state;
+
+      const updates = action.payload.updates;
+      const newHp = updates.currentHp !== undefined ? updates.currentHp : vehicle.currentHp;
+      // Eject crew if vehicle is at 0 HP and not already marked inoperative
+      // This handles both new damage and legacy vehicles already at 0 HP
+      const shouldEjectCrew = newHp === 0 && !vehicle.isInoperative;
+
+      // If vehicle becomes inoperative, eject all crew
+      let updatedCreatures = state.creatures;
+      let updatedCrewAssignments = state.crewAssignments;
+      let updatedInitiativeOrder = state.initiativeOrder;
+      let updatedCurrentTurnIndex = state.currentTurnIndex;
+      const logEntries: LogEntry[] = [];
+      const ejectedCreatures: Creature[] = [];
+
+      if (shouldEjectCrew) {
+        const vehicleCrew = state.crewAssignments.filter((a) => a.vehicleId === vehicle.id);
+
+        // Remove destroyed vehicle from initiative order and adjust turn index
+        const vehicleIndex = updatedInitiativeOrder.indexOf(vehicle.id);
+        if (vehicleIndex !== -1) {
+          updatedInitiativeOrder = updatedInitiativeOrder.filter((id) => id !== vehicle.id);
+          // If the destroyed vehicle was at or before current turn, adjust index
+          if (vehicleIndex <= state.currentTurnIndex) {
+            updatedCurrentTurnIndex = Math.max(0, state.currentTurnIndex - 1);
+          }
+        }
+
+        if (vehicleCrew.length > 0) {
+          updatedCreatures = state.creatures.map((creature) => {
+            const assignment = vehicleCrew.find((a) => a.creatureId === creature.id);
+            if (!assignment) return creature;
+
+            const crewIndex = vehicleCrew.indexOf(assignment);
+            const angle = (crewIndex / vehicleCrew.length) * 2 * Math.PI;
+            const offset = 15;
+            const newPosition = {
+              x: vehicle.position.x + Math.cos(angle) * offset,
+              y: vehicle.position.y + Math.sin(angle) * offset,
+            };
+
+            const updatedCreature = { ...creature, position: newPosition };
+            ejectedCreatures.push(updatedCreature);
+            return updatedCreature;
+          });
+
+          updatedCrewAssignments = state.crewAssignments.filter((a) => a.vehicleId !== vehicle.id);
+
+          // Add ejected creatures to initiative order (if in combat)
+          if (state.phase === 'combat' && ejectedCreatures.length > 0) {
+            updatedInitiativeOrder = insertCreaturesIntoInitiative(
+              updatedInitiativeOrder,
+              ejectedCreatures,
+              updatedCreatures,
+              state.vehicles
+            );
+          }
+
+          logEntries.push(
+            createLogEntry(
+              state.round,
+              'system',
+              `${vehicle.name} is destroyed! All crew ejected.`,
+              `${vehicleCrew.length} creature(s) placed on the battlefield and added to initiative`
+            )
+          );
+        }
+      }
+
       return {
         ...state,
         vehicles: state.vehicles.map((v) =>
-          v.id === action.payload.id ? { ...v, ...action.payload.updates } : v
+          v.id === action.payload.id
+            ? { ...v, ...updates, isInoperative: shouldEjectCrew ? true : v.isInoperative }
+            : v
         ),
+        creatures: updatedCreatures,
+        crewAssignments: updatedCrewAssignments,
+        initiativeOrder: updatedInitiativeOrder,
+        currentTurnIndex: updatedCurrentTurnIndex,
+        actionLog: logEntries.length > 0 ? [...state.actionLog, ...logEntries] : state.actionLog,
       };
+    }
 
     case 'SWAP_VEHICLE_WEAPON':
       return {
@@ -311,13 +478,43 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         ),
       };
 
-    case 'UPDATE_CREATURE':
+    case 'UPDATE_CREATURE': {
+      const creature = state.creatures.find((c) => c.id === action.payload.id);
+      if (!creature) return state;
+
+      const updates = action.payload.updates;
+      const newHp = updates.currentHp !== undefined ? updates.currentHp : creature.currentHp;
+
+      // Check if creature just died (HP going to 0 from > 0)
+      const justDied = newHp === 0 && creature.currentHp > 0;
+      const logEntries: LogEntry[] = [];
+
+      // If creature died while on a vehicle, log that station is unmanned
+      // (Body stays at station - crew assignment remains, but weapon ranges won't show)
+      if (justDied) {
+        const assignment = state.crewAssignments.find((a) => a.creatureId === creature.id);
+        if (assignment) {
+          const vehicle = state.vehicles.find((v) => v.id === assignment.vehicleId);
+          const zone = vehicle?.template.zones.find((z) => z.id === assignment.zoneId);
+          logEntries.push(
+            createLogEntry(
+              state.round,
+              'system',
+              `${creature.name} is incapacitated at their station`,
+              zone ? `${zone.name} on ${vehicle?.name} is now unmanned` : undefined
+            )
+          );
+        }
+      }
+
       return {
         ...state,
         creatures: state.creatures.map((c) =>
-          c.id === action.payload.id ? { ...c, ...action.payload.updates } : c
+          c.id === action.payload.id ? { ...c, ...updates } : c
         ),
+        actionLog: logEntries.length > 0 ? [...state.actionLog, ...logEntries] : state.actionLog,
       };
+    }
 
     // ========== Crew Assignments ==========
     case 'ASSIGN_CREW':
@@ -330,13 +527,84 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         crewAssignments: [...filteredAssignments, action.payload],
       };
 
-    case 'UNASSIGN_CREW':
+    case 'UNASSIGN_CREW': {
+      // Find the current assignment to get the vehicle
+      const currentAssignment = state.crewAssignments.find(
+        (a) => a.creatureId === action.payload.creatureId
+      );
+
+      if (!currentAssignment) {
+        return {
+          ...state,
+          crewAssignments: state.crewAssignments.filter(
+            (a) => a.creatureId !== action.payload.creatureId
+          ),
+        };
+      }
+
+      const vehicle = state.vehicles.find((v) => v.id === currentAssignment.vehicleId);
+      const creature = state.creatures.find((c) => c.id === action.payload.creatureId);
+
+      if (!vehicle || !creature) {
+        return {
+          ...state,
+          crewAssignments: state.crewAssignments.filter(
+            (a) => a.creatureId !== action.payload.creatureId
+          ),
+        };
+      }
+
+      // Place creature 15ft from vehicle at a random angle
+      const angle = Math.random() * 2 * Math.PI;
+      const offset = 15;
+      const newPosition = {
+        x: vehicle.position.x + Math.cos(angle) * offset,
+        y: vehicle.position.y + Math.sin(angle) * offset,
+      };
+
+      // Update creature with position
+      const updatedCreature = { ...creature, position: newPosition };
+      const updatedCreatures = state.creatures.map((c) =>
+        c.id === creature.id ? updatedCreature : c
+      );
+
+      // Add to initiative order if in combat
+      // Insert IMMEDIATELY after current turn so they can act this round
+      // (On next round, NEXT_ROUND will re-sort to proper initiative order)
+      let updatedInitiativeOrder = state.initiativeOrder;
+      if (state.phase === 'combat' && !state.initiativeOrder.includes(creature.id)) {
+        // Insert right after the current turn index
+        const insertIndex = state.currentTurnIndex + 1;
+        updatedInitiativeOrder = [
+          ...state.initiativeOrder.slice(0, insertIndex),
+          creature.id,
+          ...state.initiativeOrder.slice(insertIndex),
+        ];
+      }
+
+      // Create log entry
+      const logEntries: LogEntry[] = [];
+      if (state.phase === 'combat') {
+        logEntries.push(
+          createLogEntry(
+            state.round,
+            'movement',
+            `${creature.name} exits ${vehicle.name}`,
+            'Acts immediately after current turn, then normal initiative next round'
+          )
+        );
+      }
+
       return {
         ...state,
+        creatures: updatedCreatures,
         crewAssignments: state.crewAssignments.filter(
           (a) => a.creatureId !== action.payload.creatureId
         ),
+        initiativeOrder: updatedInitiativeOrder,
+        actionLog: logEntries.length > 0 ? [...state.actionLog, ...logEntries] : state.actionLog,
       };
+    }
 
     // ========== Environment ==========
     case 'SET_ENVIRONMENT':
@@ -441,13 +709,36 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
 
     // ========== Combat Flow ==========
     case 'NEXT_TURN': {
-      const nextIndex = state.currentTurnIndex + 1;
+      // Find the next valid turn, skipping destroyed vehicles and dead NPCs
+      let nextIndex = state.currentTurnIndex + 1;
+
+      while (nextIndex < state.initiativeOrder.length) {
+        const candidateId = state.initiativeOrder[nextIndex];
+        const candidateVehicle = state.vehicles.find((v) => v.id === candidateId);
+        const candidateCreature = state.creatures.find((c) => c.id === candidateId);
+
+        // Skip destroyed vehicles
+        if (candidateVehicle && (candidateVehicle.isInoperative || candidateVehicle.currentHp === 0)) {
+          nextIndex++;
+          continue;
+        }
+
+        // Skip dead NPCs (but not PCs - they might need death saves)
+        if (candidateCreature && candidateCreature.currentHp === 0 && candidateCreature.statblock.type !== 'pc') {
+          nextIndex++;
+          continue;
+        }
+
+        // Found a valid turn
+        break;
+      }
+
       if (nextIndex >= state.initiativeOrder.length) {
-        // End of round
+        // End of round - no more valid turns
         return state; // Handle via NEXT_ROUND
       }
+
       const nextId = state.initiativeOrder[nextIndex];
-      // Check if it's a vehicle or creature
       const nextVehicle = state.vehicles.find((v) => v.id === nextId);
       const nextCreature = state.creatures.find((c) => c.id === nextId);
 
@@ -496,11 +787,21 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
           .filter((m) => m.duration !== 'rounds' || (m.roundsRemaining ?? 1) > 0),
       }));
 
+      // Re-sort initiative order to put creatures back in proper initiative positions
+      // (This handles creatures that exited vehicles mid-round and were inserted after current turn)
+      const resortedInitiativeOrder = rebuildInitiativeOrder(
+        state.initiativeOrder,
+        state.vehicles,
+        state.creatures,
+        state.crewAssignments
+      );
+
       return {
         ...state,
         round: newRound,
         currentTurnIndex: 0,
         vehicles: updatedVehicles,
+        initiativeOrder: resortedInitiativeOrder,
         actionLog: [
           ...state.actionLog,
           createLogEntry(newRound, 'round_start', `Round ${newRound} begins`),
@@ -559,20 +860,95 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
       if (!vehicle) return state;
 
       const newHp = Math.max(0, vehicle.currentHp - action.payload.amount);
+      // Eject crew if vehicle reaches 0 HP and not already marked inoperative
+      const shouldEjectCrew = newHp === 0 && !vehicle.isInoperative;
+
+      // If vehicle becomes inoperative, eject all crew
+      let updatedCreatures = state.creatures;
+      let updatedCrewAssignments = state.crewAssignments;
+      let updatedInitiativeOrder = state.initiativeOrder;
+      let updatedCurrentTurnIndex = state.currentTurnIndex;
+      const logEntries: LogEntry[] = [
+        createLogEntry(
+          state.round,
+          'damage',
+          `${vehicle.name} takes ${action.payload.amount} damage`,
+          action.payload.source
+        ),
+      ];
+      const ejectedCreatures: Creature[] = [];
+
+      if (shouldEjectCrew) {
+        // Find all crew on this vehicle
+        const vehicleCrew = state.crewAssignments.filter((a) => a.vehicleId === vehicle.id);
+
+        // Remove destroyed vehicle from initiative order and adjust turn index
+        const vehicleIndex = updatedInitiativeOrder.indexOf(vehicle.id);
+        if (vehicleIndex !== -1) {
+          updatedInitiativeOrder = updatedInitiativeOrder.filter((id) => id !== vehicle.id);
+          // If the destroyed vehicle was at or before current turn, adjust index
+          if (vehicleIndex <= state.currentTurnIndex) {
+            updatedCurrentTurnIndex = Math.max(0, state.currentTurnIndex - 1);
+          }
+        }
+
+        if (vehicleCrew.length > 0) {
+          // Give each crew member a position near the vehicle (spread them out)
+          updatedCreatures = state.creatures.map((creature) => {
+            const assignment = vehicleCrew.find((a) => a.creatureId === creature.id);
+            if (!assignment) return creature;
+
+            // Spread creatures around the vehicle in a circle
+            const crewIndex = vehicleCrew.indexOf(assignment);
+            const angle = (crewIndex / vehicleCrew.length) * 2 * Math.PI;
+            const offset = 15; // 15 feet from vehicle center
+            const newPosition = {
+              x: vehicle.position.x + Math.cos(angle) * offset,
+              y: vehicle.position.y + Math.sin(angle) * offset,
+            };
+
+            const updatedCreature = { ...creature, position: newPosition };
+            ejectedCreatures.push(updatedCreature);
+            return updatedCreature;
+          });
+
+          // Remove all crew assignments for this vehicle
+          updatedCrewAssignments = state.crewAssignments.filter((a) => a.vehicleId !== vehicle.id);
+
+          // Add ejected creatures to initiative order (if in combat)
+          if (state.phase === 'combat' && ejectedCreatures.length > 0) {
+            updatedInitiativeOrder = insertCreaturesIntoInitiative(
+              updatedInitiativeOrder,
+              ejectedCreatures,
+              updatedCreatures,
+              state.vehicles
+            );
+          }
+
+          // Add log entry for vehicle destruction
+          logEntries.push(
+            createLogEntry(
+              state.round,
+              'system',
+              `${vehicle.name} is destroyed! All crew ejected.`,
+              `${vehicleCrew.length} creature(s) placed on the battlefield and added to initiative`
+            )
+          );
+        }
+      }
+
       return {
         ...state,
         vehicles: state.vehicles.map((v) =>
-          v.id === action.payload.vehicleId ? { ...v, currentHp: newHp } : v
+          v.id === action.payload.vehicleId
+            ? { ...v, currentHp: newHp, isInoperative: shouldEjectCrew ? true : v.isInoperative }
+            : v
         ),
-        actionLog: [
-          ...state.actionLog,
-          createLogEntry(
-            state.round,
-            'damage',
-            `${vehicle.name} takes ${action.payload.amount} damage`,
-            action.payload.source
-          ),
-        ],
+        creatures: updatedCreatures,
+        crewAssignments: updatedCrewAssignments,
+        initiativeOrder: updatedInitiativeOrder,
+        currentTurnIndex: updatedCurrentTurnIndex,
+        actionLog: [...state.actionLog, ...logEntries],
       };
     }
 
@@ -613,6 +989,35 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
       }
       newHp = Math.max(0, newHp - remaining);
 
+      // Check if creature just died (went to 0 HP from > 0)
+      const justDied = newHp === 0 && creature.currentHp > 0;
+      const logEntries: LogEntry[] = [
+        createLogEntry(
+          state.round,
+          'damage',
+          `${creature.name} takes ${action.payload.amount} damage`,
+          action.payload.source
+        ),
+      ];
+
+      // If creature died while on a vehicle, log that station is unmanned
+      // (Body stays at station - crew assignment remains, but weapon ranges won't show)
+      if (justDied) {
+        const assignment = state.crewAssignments.find((a) => a.creatureId === creature.id);
+        if (assignment) {
+          const vehicle = state.vehicles.find((v) => v.id === assignment.vehicleId);
+          const zone = vehicle?.template.zones.find((z) => z.id === assignment.zoneId);
+          logEntries.push(
+            createLogEntry(
+              state.round,
+              'system',
+              `${creature.name} is incapacitated at their station`,
+              zone ? `${zone.name} on ${vehicle?.name} is now unmanned` : undefined
+            )
+          );
+        }
+      }
+
       return {
         ...state,
         creatures: state.creatures.map((c) =>
@@ -620,15 +1025,7 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
             ? { ...c, currentHp: newHp, tempHp: newTempHp }
             : c
         ),
-        actionLog: [
-          ...state.actionLog,
-          createLogEntry(
-            state.round,
-            'damage',
-            `${creature.name} takes ${action.payload.amount} damage`,
-            action.payload.source
-          ),
-        ],
+        actionLog: [...state.actionLog, ...logEntries],
       };
     }
 
@@ -766,6 +1163,114 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
 // ==========================================
 // Helper Functions
 // ==========================================
+
+/**
+ * Insert creatures into the initiative order based on their initiative values.
+ * Maintains sorted order (highest first).
+ */
+function insertCreaturesIntoInitiative(
+  currentOrder: string[],
+  creaturesToAdd: Creature[],
+  allCreatures: Creature[],
+  allVehicles: Vehicle[]
+): string[] {
+  if (creaturesToAdd.length === 0) return currentOrder;
+
+  // Build a map of ID -> initiative for existing entries
+  const getInitiative = (id: string): number => {
+    const creature = allCreatures.find((c) => c.id === id);
+    if (creature) return creature.initiative || 0;
+    // For vehicles, we'd need driver initiative, but ejected creatures are creatures
+    return 0;
+  };
+
+  // Start with current order
+  const newOrder = [...currentOrder];
+
+  // Insert each creature at the correct position
+  for (const creature of creaturesToAdd) {
+    // Skip if already in the order
+    if (newOrder.includes(creature.id)) continue;
+
+    const creatureInit = creature.initiative || 0;
+
+    // Find the right position (after all entries with higher or equal initiative)
+    let insertIndex = newOrder.length;
+    for (let i = 0; i < newOrder.length; i++) {
+      const existingInit = getInitiative(newOrder[i]);
+      if (creatureInit > existingInit) {
+        insertIndex = i;
+        break;
+      }
+    }
+
+    newOrder.splice(insertIndex, 0, creature.id);
+  }
+
+  return newOrder;
+}
+
+/**
+ * Rebuild the initiative order from scratch, sorting all participants by initiative.
+ * Used at the start of each round to ensure proper turn order after mid-round changes.
+ * Filters out destroyed vehicles and dead NPCs.
+ */
+function rebuildInitiativeOrder(
+  currentOrder: string[],
+  vehicles: Vehicle[],
+  creatures: Creature[],
+  crewAssignments: CrewAssignment[]
+): string[] {
+  type InitiativeEntry = { id: string; initiative: number; name: string };
+  const initiativeEntries: InitiativeEntry[] = [];
+
+  // Get all creature IDs that are assigned to ANY vehicle (they act on vehicle's turn)
+  const crewCreatureIds = new Set(crewAssignments.map((a) => a.creatureId));
+
+  // Only include IDs that are in the current order (don't add new ones)
+  const currentOrderSet = new Set(currentOrder);
+
+  // Add vehicles that are in the current order (skip destroyed vehicles)
+  for (const vehicle of vehicles) {
+    if (!currentOrderSet.has(vehicle.id)) continue;
+    // Skip destroyed/inoperative vehicles
+    if (vehicle.isInoperative || vehicle.currentHp === 0) continue;
+
+    const driver = findVehicleDriver(vehicle, crewAssignments, creatures);
+    // Use driver's initiative, or -100 if no driver (acts last)
+    const initiative = driver ? driver.initiative : -100;
+
+    initiativeEntries.push({
+      id: vehicle.id,
+      initiative,
+      name: vehicle.name,
+    });
+  }
+
+  // Add creatures that are NOT assigned to any vehicle AND are in the current order
+  for (const creature of creatures) {
+    if (!currentOrderSet.has(creature.id)) continue;
+    if (crewCreatureIds.has(creature.id)) continue; // Skip crew members
+    // Skip dead NPCs (but keep PCs for death saves)
+    if (creature.currentHp === 0 && creature.statblock.type !== 'pc') continue;
+
+    initiativeEntries.push({
+      id: creature.id,
+      initiative: creature.initiative || 0,
+      name: creature.name,
+    });
+  }
+
+  // Sort by initiative (descending), then alphabetically for ties
+  initiativeEntries.sort((a, b) => {
+    if (b.initiative !== a.initiative) {
+      return b.initiative - a.initiative;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  return initiativeEntries.map((e) => e.id);
+}
 
 function createLogEntry(
   round: number,

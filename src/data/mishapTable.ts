@@ -22,6 +22,7 @@ export const MISHAP_TABLE: Mishap[] = [
     duration: 'until_repaired',
     repairDC: 15,
     repairAbility: 'dex',
+    stackable: false, // Engine is already on fire
     mechanicalEffect: {
       recurringDamage: '3d6 fire',
     },
@@ -35,6 +36,7 @@ export const MISHAP_TABLE: Mishap[] = [
     duration: 'until_repaired',
     repairDC: 15,
     repairAbility: 'str',
+    stackable: false, // Already auto-failing DEX
     mechanicalEffect: {
       autoFailDexChecks: true,
     },
@@ -48,6 +50,7 @@ export const MISHAP_TABLE: Mishap[] = [
     duration: 'until_repaired',
     repairDC: 15,
     repairAbility: 'str',
+    stackable: true, // Speed reduction stacks until vehicle can't move
     mechanicalEffect: {
       speedReduction: 30,
     },
@@ -61,6 +64,7 @@ export const MISHAP_TABLE: Mishap[] = [
     duration: 'until_repaired',
     repairDC: 20,
     repairAbility: 'str',
+    stackable: true, // Can disable multiple weapons
     mechanicalEffect: {
       disableWeapons: ['random'],
     },
@@ -74,6 +78,7 @@ export const MISHAP_TABLE: Mishap[] = [
     duration: 'until_repaired',
     repairDC: 15,
     repairAbility: 'dex',
+    stackable: false, // Helm already obscured
     mechanicalEffect: {
       zoneObscured: 'helm',
     },
@@ -87,6 +92,7 @@ export const MISHAP_TABLE: Mishap[] = [
     duration: 'until_repaired',
     repairDC: 15,
     repairAbility: 'str',
+    stackable: true, // Damage threshold reduction stacks
     mechanicalEffect: {
       damageThresholdReduction: 10,
     },
@@ -100,6 +106,7 @@ export const MISHAP_TABLE: Mishap[] = [
     duration: 'until_repaired',
     repairDC: 20,
     repairAbility: 'dex',
+    stackable: false, // Already have disadvantage
     mechanicalEffect: {
       disadvantageOnAllChecks: true,
     },
@@ -112,6 +119,7 @@ export const MISHAP_TABLE: Mishap[] = [
     effect: "The vehicle flips over, falls prone, and comes to a dead stop in an unoccupied space. Any unsecured creature holding on to the outside of the vehicle must succeed on a DC 20 Strength saving throw or be thrown off, landing prone in a random unoccupied space within 20 feet of the overturned vehicle. Creatures inside the vehicle fall prone and must succeed on a DC 15 Strength saving throw or take 10 (3d6) bludgeoning damage.",
     duration: 'until_repaired',
     // No repair DC - cannot be repaired normally
+    stackable: false, // Vehicle already flipped
     mechanicalEffect: {
       vehicleProne: true,
       crewSaveOnFlip: { dc: 15, damage: '3d6 bludgeoning' },
@@ -191,4 +199,128 @@ export function getMishapRollRange(mishap: Mishap): string {
     return `${mishap.rollMin}`;
   }
   return `${mishap.rollMin}-${mishap.rollMax}`;
+}
+
+/**
+ * Vehicle state needed to determine if stackable mishaps would have effect
+ */
+export interface VehicleMishapState {
+  currentSpeed: number; // Base speed before mishap reductions
+  damageThreshold: number; // Base damage threshold before mishap reductions
+  weaponCount: number; // Total number of weapons on the vehicle
+  activeMishaps: Mishap[];
+}
+
+/**
+ * Check if a stackable mishap would still have an effect on the vehicle
+ */
+function wouldStackableMishapHaveEffect(mishap: Mishap, vehicleState: VehicleMishapState): boolean {
+  const { currentSpeed, damageThreshold, weaponCount, activeMishaps } = vehicleState;
+
+  switch (mishap.id) {
+    case 'mishap_furnace_rupture': {
+      // Calculate current speed reduction from active Furnace Ruptures
+      const currentSpeedReduction = activeMishaps
+        .filter((m) => m.name === 'Furnace Rupture')
+        .reduce((sum, m) => sum + (m.mechanicalEffect?.speedReduction || 0), 0);
+      // Another Furnace Rupture would have effect if speed isn't already 0
+      return currentSpeed - currentSpeedReduction > 0;
+    }
+
+    case 'mishap_shedding_armor': {
+      // Calculate current damage threshold reduction from active Shedding Armor
+      const currentThresholdReduction = activeMishaps
+        .filter((m) => m.name === 'Shedding Armor')
+        .reduce((sum, m) => sum + (m.mechanicalEffect?.damageThresholdReduction || 0), 0);
+      // Another Shedding Armor would have effect if threshold isn't already 0
+      return damageThreshold - currentThresholdReduction > 0;
+    }
+
+    case 'mishap_weapon_malfunction': {
+      // Count how many Weapon Malfunctions are already active
+      const disabledWeaponCount = activeMishaps
+        .filter((m) => m.name === 'Weapon Malfunction')
+        .length;
+      // Another Weapon Malfunction would have effect if there are still functioning weapons
+      return weaponCount - disabledWeaponCount > 0;
+    }
+
+    default:
+      // Unknown stackable mishap - assume it has effect
+      return true;
+  }
+}
+
+/**
+ * Roll a mishap for a vehicle, rerolling if:
+ * - It's a non-stackable mishap that's already active, OR
+ * - It's a stackable mishap that would have no effect (e.g., speed already 0)
+ *
+ * @param vehicleState - The vehicle's current state for determining mishap effects
+ * @param maxAttempts - Maximum reroll attempts (default 20, should be plenty)
+ * @returns Object with roll, mishap, and rerollCount, or null if no valid mishaps available
+ */
+export function rollMishapForVehicle(
+  vehicleState: VehicleMishapState,
+  maxAttempts: number = 20
+): { roll: number; mishap: Mishap; rerollCount: number } | null {
+  const { activeMishaps } = vehicleState;
+
+  // Get IDs of all currently active NON-STACKABLE mishaps
+  const activeNonStackableIds = new Set(
+    activeMishaps
+      .filter((m) => {
+        // Find the base mishap definition to check if it's stackable
+        const baseMishap = MISHAP_TABLE.find((tableEntry) => m.name === tableEntry.name);
+        return baseMishap && !baseMishap.stackable;
+      })
+      .map((m) => {
+        // Extract base ID by matching on name
+        const baseId = MISHAP_TABLE.find((tableEntry) => m.name === tableEntry.name)?.id;
+        return baseId || m.id;
+      })
+  );
+
+  // Build set of unavailable mishaps (non-stackable already active, or stackable with no effect)
+  const unavailableMishapIds = new Set<string>();
+
+  for (const mishap of MISHAP_TABLE) {
+    if (!mishap.stackable) {
+      // Non-stackable: unavailable if already active
+      if (activeNonStackableIds.has(mishap.id)) {
+        unavailableMishapIds.add(mishap.id);
+      }
+    } else {
+      // Stackable: unavailable if it would have no effect
+      if (!wouldStackableMishapHaveEffect(mishap, vehicleState)) {
+        unavailableMishapIds.add(mishap.id);
+      }
+    }
+  }
+
+  // Check if all mishaps are unavailable
+  const availableMishaps = MISHAP_TABLE.filter((m) => !unavailableMishapIds.has(m.id));
+  if (availableMishaps.length === 0) {
+    return null;
+  }
+
+  let rerollCount = 0;
+  let roll: number;
+  let mishap: Mishap;
+
+  do {
+    roll = Math.floor(Math.random() * 20) + 1;
+    mishap = getMishapResult(roll);
+
+    // Check if this mishap is available
+    if (!unavailableMishapIds.has(mishap.id)) {
+      return { roll, mishap, rerollCount };
+    }
+
+    rerollCount++;
+  } while (rerollCount < maxAttempts);
+
+  // Failsafe: If we've rerolled too many times, pick a random available mishap
+  const fallbackMishap = availableMishaps[Math.floor(Math.random() * availableMishaps.length)];
+  return { roll, mishap: fallbackMishap, rerollCount };
 }

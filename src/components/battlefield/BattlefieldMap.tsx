@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useCombat } from '../../context/CombatContext';
-import { Vehicle, Position, ScaleName, Creature } from '../../types';
+import { Vehicle, Position, ScaleName, Creature, CrewAssignment } from '../../types';
 import { SCALES, formatDistance, getScaleForDistance, calculateMovementPerRound } from '../../data/scaleConfig';
 import { useBroadcastSource } from '../../hooks/useBroadcastChannel';
 
@@ -27,7 +27,7 @@ interface BattlefieldMapProps {
 }
 
 export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
-  const { state, updateVehiclePosition, updateVehicleFacing, setScale, setBackgroundImage, dispatch, currentTurnVehicle } = useCombat();
+  const { state, updateVehiclePosition, updateVehicleFacing, setScale, setBackgroundImage, dispatch, currentTurnVehicle, currentTurnCreature } = useCombat();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showBackgroundControls, setShowBackgroundControls] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -284,15 +284,24 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
 
   // Get the minimum engagement distance between any party and enemy vehicle
   // This determines movement scale for ALL vehicles (once engaged, everyone is committed)
+  // Also considers creatures on the battlefield (ejected crew, etc.)
   const getMinEngagementDistance = useCallback((): number => {
-    const partyVehicles = state.vehicles.filter(v => v.type === 'party');
-    const enemyVehicles = state.vehicles.filter(v => v.type === 'enemy');
+    // Filter out destroyed/inoperative vehicles
+    const partyVehicles = state.vehicles.filter(v => v.type === 'party' && !v.isInoperative && v.currentHp > 0);
+    const enemyVehicles = state.vehicles.filter(v => v.type === 'enemy' && !v.isInoperative && v.currentHp > 0);
 
-    if (partyVehicles.length === 0 || enemyVehicles.length === 0) {
-      return Infinity;
-    }
+    // Get creatures on the battlefield (not assigned to vehicles)
+    const assignedCreatureIds = new Set(state.crewAssignments.map(a => a.creatureId));
+    const partyCreatures = state.creatures.filter(c =>
+      c.statblock.type === 'pc' && c.position && !assignedCreatureIds.has(c.id) && c.currentHp > 0
+    );
+    const enemyCreatures = state.creatures.filter(c =>
+      c.statblock.type !== 'pc' && c.position && !assignedCreatureIds.has(c.id) && c.currentHp > 0
+    );
 
     let minDistance = Infinity;
+
+    // Vehicle to vehicle distances
     for (const pv of partyVehicles) {
       for (const ev of enemyVehicles) {
         const dist = Math.sqrt(
@@ -302,8 +311,42 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
         minDistance = Math.min(minDistance, dist);
       }
     }
+
+    // Party vehicle to enemy creature distances
+    for (const pv of partyVehicles) {
+      for (const ec of enemyCreatures) {
+        const dist = Math.sqrt(
+          Math.pow(ec.position!.x - pv.position.x, 2) +
+          Math.pow(ec.position!.y - pv.position.y, 2)
+        );
+        minDistance = Math.min(minDistance, dist);
+      }
+    }
+
+    // Enemy vehicle to party creature distances
+    for (const ev of enemyVehicles) {
+      for (const pc of partyCreatures) {
+        const dist = Math.sqrt(
+          Math.pow(pc.position!.x - ev.position.x, 2) +
+          Math.pow(pc.position!.y - ev.position.y, 2)
+        );
+        minDistance = Math.min(minDistance, dist);
+      }
+    }
+
+    // Party creature to enemy creature distances
+    for (const pc of partyCreatures) {
+      for (const ec of enemyCreatures) {
+        const dist = Math.sqrt(
+          Math.pow(ec.position!.x - pc.position!.x, 2) +
+          Math.pow(ec.position!.y - pc.position!.y, 2)
+        );
+        minDistance = Math.min(minDistance, dist);
+      }
+    }
+
     return minDistance;
-  }, [state.vehicles]);
+  }, [state.vehicles, state.creatures, state.crewAssignments]);
 
   // Get the scale to use for movement calculations
   // Uses the MINIMUM engagement distance so all vehicles use the same movement rules
@@ -371,15 +414,27 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   };
 
   const distances = getDistances();
-  const primaryDistance = distances.length > 0 ? distances[0].distance : 0;
+  // Get minimum distance for scale determination (closest engagement drives the scale)
+  const minEngagementDist = getMinEngagementDistance();
 
-  // Check if scale should change based on distance
+  // Auto-update scale based on MINIMUM distance between any party and enemy
+  // Only auto-scale DOWN (to closer range) - never auto-scale UP during combat
+  // The DM should manually change to farther scales if needed
+  const scaleOrder: ScaleName[] = ['point_blank', 'tactical', 'approach', 'strategic'];
+
   useEffect(() => {
-    if (primaryDistance > 0) {
-      const suggestedScale = getScaleForDistance(primaryDistance);
-      // Could auto-transition or show prompt
+    if (minEngagementDist > 0 && minEngagementDist !== Infinity) {
+      const suggestedScale = getScaleForDistance(minEngagementDist);
+      const currentScaleIndex = scaleOrder.indexOf(state.scale);
+      const suggestedScaleIndex = scaleOrder.indexOf(suggestedScale);
+
+      // Only auto-scale if the suggested scale is CLOSER (lower index) than current
+      // This prevents jarring scale-ups when combat spreads out
+      if (suggestedScaleIndex < currentScaleIndex) {
+        setScale(suggestedScale);
+      }
     }
-  }, [primaryDistance]);
+  }, [minEngagementDist, state.scale, setScale]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, delta } = event;
@@ -409,8 +464,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
           type: 'UPDATE_CREATURE',
           payload: { id: creatureId, updates: { position: newPosition } },
         });
-        // Auto-fit after creature reposition
-        setTimeout(() => handleFitAll(), 50);
+        // Note: Don't auto-fit during setup - it interferes with dragging
         return;
       }
 
@@ -478,9 +532,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
         type: 'UPDATE_CREATURE',
         payload: { id: creatureId, updates: { position: newPosition } },
       });
-
-      // Auto-fit after creature reposition
-      setTimeout(() => handleFitAll(), 50);
+      // Note: Don't auto-fit during combat - it's disorienting when the view keeps re-centering
       return;
     }
 
@@ -489,7 +541,30 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     if (!vehicle) return;
 
     // Convert screen delta to world delta (feet)
-    const worldDelta = screenDeltaToWorld(delta);
+    let worldDelta = screenDeltaToWorld(delta);
+
+    // Check for Locked Steering mishap - if active, constrain to straight line movement
+    const hasLockedSteering = vehicle.activeMishaps.some(
+      (m) => m.name === 'Locked Steering'
+    );
+
+    if (hasLockedSteering) {
+      // Project movement onto the vehicle's facing direction
+      // Facing is in degrees: 0 = north (up/-Y), 90 = east (+X), 180 = south (+Y), 270 = west (-X)
+      const facingRad = (vehicle.facing - 90) * (Math.PI / 180); // Convert to standard math angle
+      const facingX = Math.cos(facingRad);
+      const facingY = Math.sin(facingRad);
+
+      // Dot product to get projection length (can be negative for reverse movement)
+      const projectionLength = worldDelta.x * facingX + worldDelta.y * facingY;
+
+      // Constrain delta to only the facing direction
+      worldDelta = {
+        x: projectionLength * facingX,
+        y: projectionLength * facingY,
+      };
+    }
+
     const feetMoved = Math.sqrt(worldDelta.x * worldDelta.x + worldDelta.y * worldDelta.y);
 
     // During setup phase, allow free movement (constrained to image bounds)
@@ -499,8 +574,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
         y: vehicle.position.y + worldDelta.y,
       });
       updateVehiclePosition(vehicle.id, newPosition);
-      // Auto-fit after vehicle reposition
-      setTimeout(() => handleFitAll(), 50);
+      // Note: Don't auto-fit during setup - it interferes with dragging
       return;
     }
 
@@ -644,7 +718,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     if (e.target === mapRef.current || (e.target as HTMLElement).closest('.battlefield-map') === mapRef.current) {
       // Check if clicking on a token or control - if so, don't pan
       const target = e.target as HTMLElement;
-      if (target.closest('.vehicle-token') || target.closest('.rotate-btn') || target.closest('[data-draggable]')) {
+      if (target.closest('.vehicle-token') || target.closest('.creature-token') || target.closest('.rotate-btn') || target.closest('[data-draggable]')) {
         return;
       }
       setIsPanning(true);
@@ -1000,12 +1074,12 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
         </div>
 
         <div className="flex items-center gap-sm">
-          {/* Distance Display */}
-          {primaryDistance > 0 && (
+          {/* Distance Display - shows minimum engagement distance */}
+          {minEngagementDist > 0 && minEngagementDist !== Infinity && (
             <div className="distance-display">
-              <span className="text-xs text-muted">Distance:</span>
+              <span className="text-xs text-muted">Closest:</span>
               <span className="font-mono font-bold">
-                {formatDistance(primaryDistance)}
+                {formatDistance(minEngagementDist)}
               </span>
             </div>
           )}
@@ -1268,6 +1342,17 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
             />
           )}
 
+          {/* Movement Range Indicator - shows remaining movement for current turn creature */}
+          {state.phase === 'combat' && currentTurnCreature && currentTurnCreature.position && (
+            <CreatureMovementRangeIndicator
+              creature={currentTurnCreature}
+              screenPosition={worldToScreen(currentTurnCreature.position)}
+              remainingMovement={getCreatureRemainingMovement(currentTurnCreature)}
+              maxMovement={getCreatureMaxMovement(currentTurnCreature)}
+              pixelsPerFoot={pixelsPerFoot}
+            />
+          )}
+
           {/* Vehicle Tokens */}
           {state.vehicles.map((vehicle) => {
             const screenPos = worldToScreen(vehicle.position);
@@ -1287,6 +1372,8 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                 onRotate={updateVehicleFacing}
                 disabled={isDisabled}
                 isCurrentTurn={isThisVehicleTurn}
+                crewAssignments={state.crewAssignments}
+                creatures={state.creatures}
               />
             );
           })}
@@ -1300,6 +1387,9 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
             })
             .map((creature) => {
               const screenPos = worldToScreen(creature.position!);
+              const isThisCreatureTurn = currentTurnCreature?.id === creature.id;
+              // In combat mode, only the current turn creature can be moved (or always allow in setup)
+              const canDrag = state.phase !== 'combat' || isThisCreatureTurn;
               return (
                 <CreatureToken
                   key={creature.id}
@@ -1309,6 +1399,8 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                   remainingMovement={getCreatureRemainingMovement(creature)}
                   maxMovement={getCreatureMaxMovement(creature)}
                   showMovement={state.phase === 'combat'}
+                  isCurrentTurn={isThisCreatureTurn}
+                  disabled={!canDrag}
                 />
               );
             })}
@@ -1495,6 +1587,8 @@ interface VehicleTokenProps {
   onRotate: (vehicleId: string, newFacing: number) => void;
   disabled?: boolean; // Disable dragging (e.g., not this vehicle's turn)
   isCurrentTurn?: boolean; // Highlight as current turn
+  crewAssignments: CrewAssignment[];
+  creatures: Creature[];
 }
 
 function VehicleToken({
@@ -1508,12 +1602,15 @@ function VehicleToken({
   onRotate,
   disabled = false,
   isCurrentTurn = false,
+  crewAssignments,
+  creatures,
 }: VehicleTokenProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const isInoperative = vehicle.isInoperative || vehicle.currentHp === 0;
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: vehicle.id,
-      disabled: disabled,
+      disabled: disabled || isInoperative, // Can't move inoperative vehicles
     });
 
   // Calculate token size based on actual vehicle dimensions in feet
@@ -1523,17 +1620,25 @@ function VehicleToken({
   // Minimum 24px for visibility at extreme zoom out, no max so vehicles scale properly
   const tokenSize = Math.max(24, scaledSize);
 
-  // Calculate weapon ranges per arc direction
-  const weaponRangesByArc = getWeaponRangesByArc(vehicle);
+  // Calculate weapon ranges per arc direction (only for manned weapons)
+  const weaponRangesByArc = getWeaponRangesByArc(vehicle, crewAssignments, creatures);
   const maxWeaponRange = Math.max(weaponRangesByArc.front, weaponRangesByArc.rear, weaponRangesByArc.left, weaponRangesByArc.right);
+
+  // z-index priority: dragging > hovered > current turn > default
+  const getZIndex = () => {
+    if (isDragging) return 1000;
+    if (isHovered) return 100;
+    if (isCurrentTurn) return 50;
+    return 1;
+  };
 
   const style = {
     position: 'absolute' as const,
     left: screenPosition.x - tokenSize / 2,
-    top: screenPosition.y - tokenSize * 0.3,
+    top: screenPosition.y - tokenSize / 2,
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 1000 : isHovered ? 100 : 1,
+    zIndex: getZIndex(),
   };
 
   const handleRotateLeft = (e: React.MouseEvent) => {
@@ -1560,7 +1665,8 @@ function VehicleToken({
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Weapon Range Arcs - drawn behind the token, showing range per direction */}
-      {maxWeaponRange > 0 && (
+      {/* Don't show weapon ranges for inoperative vehicles */}
+      {maxWeaponRange > 0 && !isInoperative && (
         <WeaponRangeArcs
           weaponRanges={weaponRangesByArc}
           pixelsPerFoot={pixelsPerFoot}
@@ -1570,9 +1676,9 @@ function VehicleToken({
         />
       )}
 
-      {/* Rotation Controls - only show on hover and when not disabled */}
+      {/* Rotation Controls - only show on hover and when not disabled/inoperative */}
       {/* Wrapper div keeps hover state when moving to buttons */}
-      {!disabled && (
+      {!disabled && !isInoperative && (
         <div
           style={{
             position: 'absolute',
@@ -1610,21 +1716,21 @@ function VehicleToken({
       {/* Draggable Token */}
       <div ref={setNodeRef} {...listeners} {...attributes}>
         <div
-          className={`vehicle-token ${isDragging ? 'dragging' : ''} ${isCurrentTurn ? 'current-turn' : ''}`}
+          className={`vehicle-token ${isDragging ? 'dragging' : ''} ${isCurrentTurn ? 'current-turn' : ''} ${isInoperative ? 'inoperative' : ''}`}
           style={{
             width: tokenSize,
             height: tokenSize,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            cursor: disabled ? 'default' : isDragging ? 'grabbing' : 'grab',
+            cursor: disabled || isInoperative ? 'default' : isDragging ? 'grabbing' : 'grab',
             position: 'relative',
             transform: `rotate(${vehicle.facing}deg)`,
             transformOrigin: 'center center',
-            opacity: disabled ? 0.6 : 1,
-            filter: disabled ? 'saturate(0.5)' : 'none',
+            opacity: isInoperative ? 0.5 : disabled ? 0.6 : 1,
+            filter: isInoperative ? 'grayscale(1) brightness(0.6)' : disabled ? 'saturate(0.5)' : 'none',
           }}
-          title={`${vehicle.name}\nHP: ${vehicle.currentHp}/${vehicle.template.maxHp}\nFacing: ${vehicle.facing}°${disabled ? '\n(Not this vehicle\'s turn)' : ''}`}
+          title={`${vehicle.name}${isInoperative ? ' (DESTROYED)' : ''}\nHP: ${vehicle.currentHp}/${vehicle.template.maxHp}\nFacing: ${vehicle.facing}°${disabled && !isInoperative ? '\n(Not this vehicle\'s turn)' : ''}`}
         >
           {/* Vehicle Icon - includes all visual elements */}
           <VehicleIcon
@@ -1634,7 +1740,7 @@ function VehicleToken({
           />
 
           {/* Mishap indicator - counter-rotate to stay readable */}
-          {vehicle.activeMishaps.length > 0 && (
+          {vehicle.activeMishaps.length > 0 && !isInoperative && (
             <div
               style={{
                 position: 'absolute',
@@ -1654,6 +1760,33 @@ function VehicleToken({
               }}
             >
               !
+            </div>
+          )}
+
+          {/* Destroyed indicator - large X overlay */}
+          {isInoperative && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transform: `rotate(${-vehicle.facing}deg)`,
+                pointerEvents: 'none',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: Math.max(tokenSize * 0.6, 20),
+                  fontWeight: 'bold',
+                  color: '#dc2626',
+                  textShadow: '0 0 4px #000, 0 0 8px #000',
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </span>
             </div>
           )}
         </div>
@@ -1678,7 +1811,7 @@ function VehicleToken({
           style={{
             fontSize: 10,
             fontWeight: 'bold',
-            color: 'var(--color-text-primary)',
+            color: isInoperative ? '#dc2626' : 'var(--color-text-primary)',
             textAlign: 'center',
             whiteSpace: 'nowrap',
             textShadow: '0 1px 2px rgba(0,0,0,0.9)',
@@ -1690,24 +1823,40 @@ function VehicleToken({
           {vehicle.name}
         </div>
 
-        {/* HP bar */}
-        <div
-          style={{
-            width: tokenSize * 0.8,
-            height: 4,
-            background: 'rgba(0,0,0,0.6)',
-            borderRadius: 2,
-            overflow: 'hidden',
-          }}
-        >
+        {/* HP bar or DESTROYED label */}
+        {isInoperative ? (
           <div
             style={{
-              width: `${hpPercent}%`,
-              height: '100%',
-              background: hpPercent > 50 ? '#22c55e' : hpPercent > 25 ? '#f59e0b' : '#ef4444',
+              fontSize: 8,
+              fontWeight: 'bold',
+              color: '#dc2626',
+              textShadow: '0 1px 2px rgba(0,0,0,0.9)',
+              background: 'rgba(0,0,0,0.75)',
+              padding: '1px 4px',
+              borderRadius: 2,
             }}
-          />
-        </div>
+          >
+            DESTROYED
+          </div>
+        ) : (
+          <div
+            style={{
+              width: tokenSize * 0.8,
+              height: 4,
+              background: 'rgba(0,0,0,0.6)',
+              borderRadius: 2,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${hpPercent}%`,
+                height: '100%',
+                background: hpPercent > 50 ? '#22c55e' : hpPercent > 25 ? '#f59e0b' : '#ef4444',
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2118,11 +2267,9 @@ function MovementRangeIndicator({
   // Don't render if no movement remaining or radius too small to see
   if (remainingMovement <= 0 || radiusPixels < 5) return null;
 
-  const borderColor = vehicle.type === 'party' ? '#22c55e' : '#ff4500';
-  const fillColor = vehicle.type === 'party' ? 'rgba(34, 197, 94, 0.08)' : 'rgba(255, 69, 0, 0.08)';
-
-  // Calculate percentage used for the label
-  const percentRemaining = Math.round((remainingMovement / maxMovement) * 100);
+  // Use cyan/blue for movement range - distinct from weapon range (green/orange faction colors)
+  const movementColor = '#38bdf8'; // Sky blue - clearly different from weapon arcs
+  const fillColor = 'rgba(56, 189, 248, 0.06)';
 
   return (
     <svg
@@ -2136,41 +2283,150 @@ function MovementRangeIndicator({
         zIndex: 0,
       }}
     >
-      {/* Outer circle showing max movement (faded) */}
+      <defs>
+        {/* Glow filter for movement range */}
+        <filter id="movementGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      {/* Outer circle showing max movement (faded, dashed) */}
       {maxRadiusPixels > radiusPixels && (
         <circle
           cx={screenPosition.x}
           cy={screenPosition.y}
           r={maxRadiusPixels}
           fill="none"
-          stroke={borderColor}
+          stroke={movementColor}
           strokeWidth={1}
           strokeDasharray="4 4"
-          opacity={0.2}
+          opacity={0.25}
         />
       )}
 
-      {/* Inner circle showing remaining movement */}
+      {/* Inner circle showing remaining movement - SOLID line, not dashed */}
       <circle
         cx={screenPosition.x}
         cy={screenPosition.y}
         r={radiusPixels}
         fill={fillColor}
-        stroke={borderColor}
-        strokeWidth={2}
-        strokeDasharray="8 4"
-        opacity={0.6}
+        stroke={movementColor}
+        strokeWidth={2.5}
+        opacity={0.8}
+        filter="url(#movementGlow)"
       />
 
       {/* Label showing remaining movement */}
       <text
         x={screenPosition.x}
-        y={screenPosition.y - radiusPixels - 8}
+        y={screenPosition.y - radiusPixels - 10}
         textAnchor="middle"
-        fill={borderColor}
+        fill={movementColor}
         fontSize="11"
         fontWeight="bold"
         fontFamily="var(--font-mono)"
+        filter="url(#movementGlow)"
+      >
+        {Math.round(remainingMovement)} ft remaining
+      </text>
+    </svg>
+  );
+}
+
+// ==========================================
+// Creature Movement Range Indicator
+// ==========================================
+
+interface CreatureMovementRangeIndicatorProps {
+  creature: Creature;
+  screenPosition: Position;
+  remainingMovement: number;
+  maxMovement: number;
+  pixelsPerFoot: number;
+}
+
+function CreatureMovementRangeIndicator({
+  creature,
+  screenPosition,
+  remainingMovement,
+  maxMovement,
+  pixelsPerFoot,
+}: CreatureMovementRangeIndicatorProps) {
+  // Convert remaining movement (in feet) to screen pixels
+  const radiusPixels = remainingMovement * pixelsPerFoot;
+  const maxRadiusPixels = maxMovement * pixelsPerFoot;
+
+  // Don't render if no movement remaining or radius too small to see
+  if (remainingMovement <= 0 || radiusPixels < 5) return null;
+
+  // Use a different color for creature movement (green for PCs, purple for NPCs)
+  const isPC = creature.statblock.type === 'pc';
+  const movementColor = isPC ? '#22c55e' : '#a855f7'; // Green for PC, purple for NPC
+  const fillColor = isPC ? 'rgba(34, 197, 94, 0.06)' : 'rgba(168, 85, 247, 0.06)';
+
+  return (
+    <svg
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+        zIndex: 0,
+      }}
+    >
+      <defs>
+        {/* Glow filter for creature movement range */}
+        <filter id="creatureMovementGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      {/* Outer circle showing max movement (faded, dashed) */}
+      {maxRadiusPixels > radiusPixels && (
+        <circle
+          cx={screenPosition.x}
+          cy={screenPosition.y}
+          r={maxRadiusPixels}
+          fill="none"
+          stroke={movementColor}
+          strokeWidth={1}
+          strokeDasharray="4 4"
+          opacity={0.25}
+        />
+      )}
+
+      {/* Inner circle showing remaining movement - SOLID line */}
+      <circle
+        cx={screenPosition.x}
+        cy={screenPosition.y}
+        r={radiusPixels}
+        fill={fillColor}
+        stroke={movementColor}
+        strokeWidth={2.5}
+        opacity={0.8}
+        filter="url(#creatureMovementGlow)"
+      />
+
+      {/* Label showing remaining movement */}
+      <text
+        x={screenPosition.x}
+        y={screenPosition.y - radiusPixels - 10}
+        textAnchor="middle"
+        fill={movementColor}
+        fontSize="11"
+        fontWeight="bold"
+        fontFamily="var(--font-mono)"
+        filter="url(#creatureMovementGlow)"
       >
         {Math.round(remainingMovement)} ft remaining
       </text>
@@ -2189,12 +2445,15 @@ interface CreatureTokenProps {
   remainingMovement?: number;
   maxMovement?: number;
   showMovement?: boolean;
+  isCurrentTurn?: boolean;
+  disabled?: boolean;
   onPositionUpdate?: (creatureId: string, newPosition: Position) => void;
 }
 
-function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovement = 0, maxMovement = 0, showMovement = false, onPositionUpdate }: CreatureTokenProps) {
+function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovement = 0, maxMovement = 0, showMovement = false, isCurrentTurn = false, disabled = false, onPositionUpdate }: CreatureTokenProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `creature-${creature.id}`,
+    disabled: disabled,
   });
 
   // Creature size in feet based on D&D size category
@@ -2214,17 +2473,43 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
   const isAlive = creature.currentHp > 0;
   const isPC = creature.statblock.type === 'pc';
 
+  // Current turn creature should be on top of all other tokens
+  const getZIndex = () => {
+    if (isDragging) return 1000;
+    if (isCurrentTurn) return 100; // Above vehicles (typically 10-20) and other creatures
+    return 5;
+  };
+
   const style = {
     position: 'absolute' as const,
     left: screenPosition.x - tokenSize / 2,
     top: screenPosition.y - tokenSize / 2,
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 1000 : 5,
+    zIndex: getZIndex(),
+  };
+
+  // Determine border color based on turn and PC/NPC status
+  const getBorderColor = () => {
+    if (!isAlive) return '#666';
+    if (isCurrentTurn) return '#ff4500'; // Orange highlight for current turn
+    return isPC ? 'var(--color-health)' : '#a855f7';
+  };
+
+  // Stop event propagation to prevent map panning when interacting with token
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="creature-token"
+      {...listeners}
+      {...attributes}
+      onMouseDown={handleMouseDown}
+    >
       {/* Token circle */}
       <div
         style={{
@@ -2232,7 +2517,8 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
           height: tokenSize,
           borderRadius: '50%',
           background: isAlive ? 'var(--color-bg-secondary)' : '#333',
-          border: `3px solid ${isAlive ? (isPC ? 'var(--color-health)' : '#a855f7') : '#666'}`,
+          border: `${isCurrentTurn ? 4 : 3}px solid ${getBorderColor()}`,
+          boxShadow: isCurrentTurn ? '0 0 12px rgba(255, 69, 0, 0.6)' : 'none',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -2240,9 +2526,9 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
           fontWeight: 'bold',
           color: isAlive ? 'var(--color-text-primary)' : '#666',
           opacity: isAlive ? 1 : 0.6,
-          cursor: isDragging ? 'grabbing' : 'grab',
+          cursor: disabled ? 'not-allowed' : isDragging ? 'grabbing' : 'grab',
         }}
-        title={`${creature.name}\nHP: ${creature.currentHp}/${creature.statblock.maxHp}\nAC: ${creature.statblock.ac}`}
+        title={`${creature.name}\nHP: ${creature.currentHp}/${creature.statblock.maxHp}\nAC: ${creature.statblock.ac}${isCurrentTurn ? '\n(Current Turn)' : ''}`}
       >
         {creature.name.charAt(0).toUpperCase()}
       </div>
@@ -2394,13 +2680,29 @@ function getMaxWeaponRange(vehicle: Vehicle): number {
 /**
  * Get max weapon range per arc direction
  * Returns { front, rear, left, right } with the max range for each direction
+ * Only includes ranges for weapons that have a living crew member manning them
  */
-function getWeaponRangesByArc(vehicle: Vehicle): Record<'front' | 'rear' | 'left' | 'right', number> {
+function getWeaponRangesByArc(
+  vehicle: Vehicle,
+  crewAssignments: CrewAssignment[],
+  creatures: Creature[]
+): Record<'front' | 'rear' | 'left' | 'right', number> {
   const ranges = { front: 0, rear: 0, left: 0, right: 0 };
 
   if (!vehicle.weapons || vehicle.weapons.length === 0) return ranges;
 
+  // Get all crew assigned to this vehicle
+  const vehicleCrew = crewAssignments.filter((a) => a.vehicleId === vehicle.id);
+
   for (const weapon of vehicle.weapons) {
+    // Check if this weapon's zone is manned by a living creature
+    const crewAtStation = vehicleCrew.find((a) => a.zoneId === weapon.zoneId);
+    if (!crewAtStation) continue; // No one at this station
+
+    const crewMember = creatures.find((c) => c.id === crewAtStation.creatureId);
+    if (!crewMember || crewMember.currentHp === 0) continue; // Crew member is dead or not found
+
+    // Station is manned by living crew - include this weapon's range
     const range = parseWeaponRange(weapon.range);
     const arcs = weapon.visibleFromArcs || ['front', 'rear', 'left', 'right'];
 

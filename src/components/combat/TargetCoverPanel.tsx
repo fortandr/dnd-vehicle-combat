@@ -11,23 +11,31 @@ import {
   Stack,
 } from '@mui/material';
 import { useCombat } from '../../context/CombatContext';
-import { Vehicle, Creature, VehicleZone } from '../../types';
+import { Vehicle, Creature, VehicleZone, Position } from '../../types';
 import {
   calculateCover,
+  calculateCoverFromPosition,
   getArcDisplayName,
   CoverResult,
 } from '../../utils/coverCalculator';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
 
 interface TargetCoverPanelProps {
-  attackerVehicle: Vehicle;
+  attackerVehicle?: Vehicle;
+  attackerCreature?: Creature;
+  attackerFaction?: 'party' | 'enemy';
 }
 
-export function TargetCoverPanel({ attackerVehicle }: TargetCoverPanelProps) {
+export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFaction }: TargetCoverPanelProps) {
   const { state } = useCombat();
 
+  // Determine which faction we're attacking (opposite of attacker)
+  const targetFaction = attackerVehicle
+    ? (attackerVehicle.type === 'party' ? 'enemy' : 'party')
+    : (attackerFaction === 'party' ? 'enemy' : 'party');
+
   const opposingVehicles = state.vehicles.filter(
-    (v) => v.type !== attackerVehicle.type
+    (v) => v.type === targetFaction
   );
 
   const targetsByVehicle = opposingVehicles.map((targetVehicle) => {
@@ -38,7 +46,14 @@ export function TargetCoverPanel({ attackerVehicle }: TargetCoverPanelProps) {
         const zone = targetVehicle.template.zones.find((z) => z.id === a.zoneId);
         if (!creature || !zone) return null;
 
-        const cover = calculateCover(attackerVehicle, targetVehicle, zone);
+        // Calculate cover from vehicle or from creature position
+        const cover = attackerVehicle
+          ? calculateCover(attackerVehicle, targetVehicle, zone)
+          : attackerCreature?.position
+            ? calculateCoverFromPosition(attackerCreature.position, targetVehicle, zone)
+            : null;
+
+        if (!cover) return null;
 
         return { creature, zone, cover };
       })
@@ -55,10 +70,15 @@ export function TargetCoverPanel({ attackerVehicle }: TargetCoverPanelProps) {
     );
   }
 
+  const attackerName = attackerVehicle?.name || attackerCreature?.name || 'Unknown';
+
   return (
     <Box>
       <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-        Attacking from: <Box component="span" fontWeight={600}>{attackerVehicle.name}</Box>
+        Attacking from: <Box component="span" fontWeight={600}>{attackerName}</Box>
+        {attackerCreature && !attackerVehicle && (
+          <Box component="span" color="text.disabled"> (on foot)</Box>
+        )}
       </Typography>
 
       <Stack spacing={2}>

@@ -6,41 +6,42 @@
 import { useRef, useEffect, useState } from 'react';
 import { useBroadcastReceiver, BattlefieldSyncState } from '../../hooks/useBroadcastChannel';
 import { SCALES } from '../../data/scaleConfig';
-import { Vehicle, Creature, Position, VehicleWeapon } from '../../types';
+import { Vehicle, Creature, Position, VehicleWeapon, CrewAssignment } from '../../types';
 
 export function PlayerViewMap() {
   const { state, isConnected } = useBroadcastReceiver();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<HTMLDivElement>(null);
-  // Account for 40px status bar in initial height
-  const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight - 40 });
+  // Use document dimensions to get accurate viewport size without scrollbars
+  const [dimensions, setDimensions] = useState({
+    width: document.documentElement.clientWidth,
+    height: document.documentElement.clientHeight - 40
+  });
 
-  // Update dimensions on resize, initial mount, and when state changes
+  // Update dimensions on resize
   useEffect(() => {
     const updateDimensions = () => {
-      // Use window dimensions - the container should be 100vw x 100vh
-      // Status bar is 40px, so map height is window height - 40
-      const newWidth = window.innerWidth;
-      const newHeight = window.innerHeight - 40; // Account for status bar
-      setDimensions({ width: newWidth, height: newHeight });
+      // Use clientWidth/clientHeight which excludes scrollbars
+      const width = document.documentElement.clientWidth;
+      const height = document.documentElement.clientHeight - 40; // Account for 40px status bar
+      setDimensions({ width, height });
     };
 
-    // Initial measurement after a short delay to ensure layout is complete
     updateDimensions();
-    const timeoutId = setTimeout(updateDimensions, 100);
-
     window.addEventListener('resize', updateDimensions);
+    // Also listen for orientation changes on mobile
+    window.addEventListener('orientationchange', updateDimensions);
     return () => {
       window.removeEventListener('resize', updateDimensions);
-      clearTimeout(timeoutId);
+      window.removeEventListener('orientationchange', updateDimensions);
     };
-  }, [state?.backgroundImage]);
+  }, []);
 
   if (!isConnected || !state) {
     return (
       <div className="player-view-waiting">
         <div className="waiting-content">
-          <h1>Avernus Combat</h1>
+          <h1>5e Vehicular Combat</h1>
           <p>Waiting for connection from DM screen...</p>
           <p className="text-muted">Open the main combat tracker to sync</p>
         </div>
@@ -61,6 +62,30 @@ export function PlayerViewMap() {
     x: width / 2 + state.panOffset.x,
     y: height / 2 + state.panOffset.y,
   };
+
+  // Calculate minimum scale multiplier to ensure background fills viewport
+  // This preserves the coordinate system while ensuring no black edges
+  const getBackgroundScaleMultiplier = () => {
+    const bg = state.backgroundImage;
+    if (!bg || !bg.naturalWidth || !bg.naturalHeight) return 1;
+
+    const feetPerPixel = bg.feetPerPixel || 1;
+    const bgScale = bg.scale || 1;
+
+    // Calculate current rendered size of the image
+    const baseScale = feetPerPixel * pixelsPerFoot * bgScale;
+    const currentImageWidth = bg.naturalWidth * baseScale;
+    const currentImageHeight = bg.naturalHeight * baseScale;
+
+    // Calculate multiplier needed to fill viewport (like CSS cover)
+    const scaleToFillWidth = width / currentImageWidth;
+    const scaleToFillHeight = height / currentImageHeight;
+
+    // Use the larger multiplier to ensure full coverage, minimum 1 (don't shrink)
+    return Math.max(scaleToFillWidth, scaleToFillHeight, 1);
+  };
+
+  const bgScaleMultiplier = getBackgroundScaleMultiplier();
 
   // Convert world position (feet) to screen position (pixels)
   const worldToScreen = (pos: Position) => ({
@@ -122,6 +147,10 @@ export function PlayerViewMap() {
       <div
         ref={mapRef}
         className="player-view-map"
+        style={{
+          width: `${width}px`,
+          height: `${height}px`,
+        }}
       >
         {/* Background Image */}
         {state.backgroundImage && (
@@ -133,7 +162,8 @@ export function PlayerViewMap() {
               left: mapCenter.x + state.backgroundImage.position.x * pixelsPerFoot,
               top: mapCenter.y + state.backgroundImage.position.y * pixelsPerFoot,
               // Scale image: feetPerPixel converts image pixels to feet, pixelsPerFoot converts feet to screen pixels
-              transform: `translate(-50%, -50%) scale(${(state.backgroundImage.feetPerPixel || 1) * pixelsPerFoot * state.backgroundImage.scale})`,
+              // Apply bgScaleMultiplier to ensure image always fills viewport (like CSS cover)
+              transform: `translate(-50%, -50%) scale(${(state.backgroundImage.feetPerPixel || 1) * pixelsPerFoot * state.backgroundImage.scale * bgScaleMultiplier})`,
               opacity: state.backgroundImage.opacity,
               pointerEvents: 'none',
               maxWidth: 'none',
@@ -164,7 +194,8 @@ export function PlayerViewMap() {
           const scaledSize = vehicleFeet * pixelsPerFoot;
           const tokenSize = Math.max(24, scaledSize); // Min 24px for visibility, no max
           const borderColor = vehicle.type === 'party' ? 'var(--color-health)' : 'var(--color-fire)';
-          const weaponRangesByArc = getWeaponRangesByArc(vehicle);
+          const isInoperative = vehicle.isInoperative || vehicle.currentHp === 0;
+          const weaponRangesByArc = getWeaponRangesByArc(vehicle, state.crewAssignments, state.creatures);
           const maxWeaponRange = Math.max(
             weaponRangesByArc.front,
             weaponRangesByArc.rear,
@@ -183,8 +214,8 @@ export function PlayerViewMap() {
                 transform: 'translate(-50%, -50%)',
               }}
             >
-              {/* Weapon Range Arcs */}
-              {maxWeaponRange > 0 && (
+              {/* Weapon Range Arcs - only show for operational vehicles with manned weapons */}
+              {maxWeaponRange > 0 && !isInoperative && (
                 <PlayerViewWeaponRangeArcs
                   weaponRanges={weaponRangesByArc}
                   pixelsPerFoot={pixelsPerFoot}
@@ -422,12 +453,31 @@ function parseWeaponRange(range?: string): number {
   return 0;
 }
 
-function getWeaponRangesByArc(vehicle: Vehicle): Record<'front' | 'rear' | 'left' | 'right', number> {
+/**
+ * Get max weapon range per arc direction
+ * Only includes ranges for weapons that have a living crew member manning them
+ */
+function getWeaponRangesByArc(
+  vehicle: Vehicle,
+  crewAssignments: CrewAssignment[],
+  creatures: Creature[]
+): Record<'front' | 'rear' | 'left' | 'right', number> {
   const ranges = { front: 0, rear: 0, left: 0, right: 0 };
 
   if (!vehicle.weapons || vehicle.weapons.length === 0) return ranges;
 
+  // Get all crew assigned to this vehicle
+  const vehicleCrew = crewAssignments.filter((a) => a.vehicleId === vehicle.id);
+
   for (const weapon of vehicle.weapons) {
+    // Check if this weapon's zone is manned by a living creature
+    const crewAtStation = vehicleCrew.find((a) => a.zoneId === weapon.zoneId);
+    if (!crewAtStation) continue; // No one at this station
+
+    const crewMember = creatures.find((c) => c.id === crewAtStation.creatureId);
+    if (!crewMember || crewMember.currentHp === 0) continue; // Crew member is dead or not found
+
+    // Station is manned by living crew - include this weapon's range
     const range = parseWeaponRange(weapon.range);
     const arcs = weapon.visibleFromArcs || ['front', 'rear', 'left', 'right'];
 

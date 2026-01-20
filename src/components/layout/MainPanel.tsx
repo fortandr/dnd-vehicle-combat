@@ -331,7 +331,7 @@ export function MainPanel() {
       {state.vehicles.length === 0 && (
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <Typography variant="h5" gutterBottom>
-            Welcome to Avernus Vehicle Combat
+            Welcome to 5e Vehicular Combat
           </Typography>
           <Typography color="text.secondary" sx={{ mb: 3 }}>
             Set up your encounter by adding vehicles and assigning crew.

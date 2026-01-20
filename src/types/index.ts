@@ -158,7 +158,9 @@ export interface WeaponTemplate {
   id: string;
   name: string;
   damage: string; // e.g., "6d10 bludgeoning"
-  attackBonus: number;
+  attackBonus?: number; // For attack roll weapons
+  saveDC?: number; // For save-based weapons (e.g., Buzz Saw)
+  saveType?: AbilityName; // Which save (dex, str, etc.)
   range?: string; // e.g., "120 ft" or "melee"
   properties?: string[]; // e.g., "requires 2 crew"
   specialEffect?: string;
@@ -216,6 +218,8 @@ export interface Vehicle {
   // Upgrades
   armorUpgradeId?: string; // ID of armor upgrade (default: 'none')
   gadgetIds?: string[]; // IDs of installed magical gadgets
+  // Status
+  isInoperative?: boolean; // True when HP reaches 0 - crew ejected, vehicle disabled
 }
 
 // ==========================================
@@ -243,6 +247,7 @@ export interface Mishap {
   repairDC?: number; // DC to repair, undefined = cannot be repaired
   repairAbility?: AbilityName; // Ability used to repair (str or dex)
   mechanicalEffect?: MishapMechanicalEffect;
+  stackable?: boolean; // If true, this mishap can occur multiple times (e.g., Furnace Rupture stacks speed reduction)
 }
 
 export interface MishapMechanicalEffect {

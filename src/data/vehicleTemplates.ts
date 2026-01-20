@@ -226,10 +226,11 @@ const BUZZ_SAW: WeaponTemplate = {
   id: 'buzz_saw',
   name: 'Buzz Saw',
   damage: '3d10+3 slashing',
-  attackBonus: 8,
+  saveDC: 13,
+  saveType: 'dex',
   range: 'melee (5 ft)',
-  properties: ['Magical', 'Driver can attack while driving'],
-  specialEffect: 'If the Buzz Killer moves at least 40 feet in a straight line toward a target and then hits, the target takes an extra 9 (2d8) slashing damage (Aggressive Charge).',
+  properties: ['Magical', 'Movement-based attack', 'Driver can attack while driving'],
+  specialEffect: 'When the Buzz Killer moves through a creature\'s space, the creature must make a DEX save or take damage. If the Buzz Killer moves at least 40 feet in a straight line before hitting, the target takes an extra 9 (2d8) slashing damage (Aggressive Charge).',
   crewRequired: 0, // Part of Helm action
 };
 

@@ -76,13 +76,16 @@ export function Header() {
       .map(a => state.creatures.find(c => c.id === a.creatureId))
       .filter((c): c is NonNullable<typeof c> => c !== undefined);
 
-    const driversWithoutDex = drivers.filter(c => {
-      const dex = c.statblock.abilities?.dex;
-      return dex === undefined || dex === null || dex <= 0;
+    const driversWithoutDexSave = drivers.filter(c => {
+      // Check savingThrows.dex first, fall back to calculating from abilities.dex
+      const dexSave = c.statblock.savingThrows?.dex;
+      const dexAbility = c.statblock.abilities?.dex;
+      // Valid if they have an explicit dex save OR a dex ability score to calculate from
+      return dexSave === undefined && (dexAbility === undefined || dexAbility === null);
     });
 
-    if (driversWithoutDex.length > 0) {
-      errors.push(`Drivers missing DEX score: ${driversWithoutDex.map(c => c.name).join(', ')}`);
+    if (driversWithoutDexSave.length > 0) {
+      errors.push(`Drivers missing DEX Save: ${driversWithoutDexSave.map(c => c.name).join(', ')}`);
     }
 
     // Check 3: Each vehicle with crew should have a driver
@@ -183,7 +186,7 @@ export function Header() {
           {/* Left side - Title and encounter name */}
           <Stack direction="row" spacing={2} alignItems="center">
             <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 700 }}>
-              Avernus Combat
+              5e Vehicular Combat
             </Typography>
             <Divider orientation="vertical" flexItem />
             <Stack direction="row" spacing={1} alignItems="center">

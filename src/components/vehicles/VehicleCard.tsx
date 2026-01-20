@@ -164,6 +164,19 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
             </Typography>
           </Box>
           <Stack direction="row" spacing={0.5} alignItems="center">
+            {(vehicle.isInoperative || vehicle.currentHp === 0) && (
+              <Chip
+                label="DESTROYED"
+                size="small"
+                color="error"
+                sx={{
+                  height: 24,
+                  fontWeight: 700,
+                  bgcolor: 'error.main',
+                  color: 'error.contrastText',
+                }}
+              />
+            )}
             {vehicle.activeMishaps.map((mishap) => (
               <Chip
                 key={mishap.id}
@@ -628,13 +641,31 @@ interface CrewZoneProps {
 function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
   const { state, assignCrew, dispatch } = useCombat();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [moveMenuAnchor, setMoveMenuAnchor] = useState<null | HTMLElement>(null);
+  const [selectedCreatureId, setSelectedCreatureId] = useState<string | null>(null);
 
   const coverColor = coverColors[zone.cover as keyof typeof coverColors];
+
+  // Get the vehicle to access its zones
+  const vehicle = state.vehicles.find((v) => v.id === vehicleId);
 
   const assignedCreatureIds = state.crewAssignments.map((a) => a.creatureId);
   const unassignedCreatures = state.creatures.filter(
     (c) => !assignedCreatureIds.includes(c.id)
   );
+
+  // Get other zones on this vehicle that the selected creature could move to
+  const otherZones = vehicle?.template.zones.filter((z) => z.id !== zone.id) || [];
+
+  // Check if a zone has capacity for another crew member
+  const getZoneAvailableCapacity = (zoneId: string): number => {
+    const zoneTemplate = vehicle?.template.zones.find((z) => z.id === zoneId);
+    if (!zoneTemplate) return 0;
+    const currentAssignments = state.crewAssignments.filter(
+      (a) => a.vehicleId === vehicleId && a.zoneId === zoneId
+    ).length;
+    return zoneTemplate.capacity - currentAssignments;
+  };
 
   const handleAssign = (creatureId: string) => {
     const assignment: CrewAssignment = {
@@ -646,8 +677,83 @@ function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
     setAnchorEl(null);
   };
 
-  const handleUnassign = (creatureId: string) => {
-    dispatch({ type: 'UNASSIGN_CREW', payload: { creatureId } });
+  const handleCreatureClick = (e: React.MouseEvent<HTMLElement>, creatureId: string) => {
+    setSelectedCreatureId(creatureId);
+    setMoveMenuAnchor(e.currentTarget);
+  };
+
+  const handleMoveToZone = (targetZoneId: string) => {
+    if (!selectedCreatureId) return;
+    // Directly reassign to new zone - ASSIGN_CREW already handles removing old assignment
+    const assignment: CrewAssignment = {
+      creatureId: selectedCreatureId,
+      vehicleId,
+      zoneId: targetZoneId,
+    };
+    assignCrew(assignment);
+    setMoveMenuAnchor(null);
+    setSelectedCreatureId(null);
+  };
+
+  const handleExitVehicle = () => {
+    if (!selectedCreatureId) return;
+    dispatch({ type: 'UNASSIGN_CREW', payload: { creatureId: selectedCreatureId } });
+    setMoveMenuAnchor(null);
+    setSelectedCreatureId(null);
+  };
+
+  // Remove a dead body from the station (just removes assignment, doesn't place on map)
+  const handleRemoveBody = () => {
+    if (!selectedCreatureId) return;
+    // Just remove the crew assignment - the creature stays in the creatures list but with no assignment
+    // This is different from UNASSIGN_CREW which places them on the battlefield
+    const newAssignments = state.crewAssignments.filter(
+      (a) => a.creatureId !== selectedCreatureId
+    );
+    // Dispatch directly to update crew assignments without the exit vehicle logic
+    dispatch({
+      type: 'LOG_ACTION',
+      payload: {
+        type: 'system',
+        action: `Removed body from ${zone.name}`
+      }
+    });
+    // We need a simpler action - let's use ASSIGN_CREW with removal by assigning to nowhere
+    // Actually, let's just call UNASSIGN_CREW but the creature is dead so it won't affect initiative
+    dispatch({ type: 'UNASSIGN_CREW', payload: { creatureId: selectedCreatureId } });
+    setMoveMenuAnchor(null);
+    setSelectedCreatureId(null);
+  };
+
+  const handleCloseMoveMenu = () => {
+    setMoveMenuAnchor(null);
+    setSelectedCreatureId(null);
+  };
+
+  // Get the selected creature to check if they're dead
+  const selectedCreature = selectedCreatureId
+    ? state.creatures.find((c) => c.id === selectedCreatureId)
+    : null;
+  const isSelectedDead = selectedCreature?.currentHp === 0;
+
+  // Get other crew members on this vehicle for swap functionality (excluding dead ones and current selection)
+  const otherCrewOnVehicle = state.crewAssignments
+    .filter((a) => a.vehicleId === vehicleId && a.creatureId !== selectedCreatureId)
+    .map((a) => {
+      const creature = state.creatures.find((c) => c.id === a.creatureId);
+      const crewZone = vehicle?.template.zones.find((z) => z.id === a.zoneId);
+      return { assignment: a, creature, zone: crewZone };
+    })
+    .filter((c) => c.creature && c.creature.currentHp > 0); // Only living crew can swap
+
+  // Handle swapping positions with another crew member
+  const handleSwapWith = (otherCreatureId: string, otherZoneId: string) => {
+    if (!selectedCreatureId) return;
+    // Swap: assign selected to other's zone, assign other to selected's zone (current zone)
+    assignCrew({ creatureId: selectedCreatureId, vehicleId, zoneId: otherZoneId });
+    assignCrew({ creatureId: otherCreatureId, vehicleId, zoneId: zone.id });
+    setMoveMenuAnchor(null);
+    setSelectedCreatureId(null);
   };
 
   return (
@@ -678,21 +784,25 @@ function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
         {assignments.map((assignment) => {
           const creature = state.creatures.find((c) => c.id === assignment.creatureId);
           if (!creature) return null;
+          const isDead = creature.currentHp === 0;
           return (
             <Avatar
               key={assignment.creatureId}
-              onClick={() => handleUnassign(assignment.creatureId)}
+              onClick={(e) => handleCreatureClick(e, assignment.creatureId)}
               sx={{
                 width: 28,
                 height: 28,
                 fontSize: '0.75rem',
-                bgcolor: 'success.dark',
+                bgcolor: isDead ? 'grey.700' : 'success.dark',
                 cursor: 'pointer',
-                '&:hover': { bgcolor: 'success.main' },
+                opacity: isDead ? 0.7 : 1,
+                border: isDead ? '2px solid' : 'none',
+                borderColor: isDead ? 'error.main' : 'transparent',
+                '&:hover': { bgcolor: isDead ? 'grey.600' : 'success.main' },
               }}
-              title={`${creature.name} (click to remove)`}
+              title={isDead ? `${creature.name} (DEAD - click to remove body)` : `${creature.name} (click to move/remove)`}
             >
-              {creature.name.charAt(0)}
+              {isDead ? '✕' : creature.name.charAt(0)}
             </Avatar>
           );
         })}
@@ -747,6 +857,95 @@ function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
               />
             </MenuItem>
           ))
+        )}
+      </Menu>
+
+      {/* Move/Exit Menu for assigned crew */}
+      <Menu
+        anchorEl={moveMenuAnchor}
+        open={Boolean(moveMenuAnchor)}
+        onClose={handleCloseMoveMenu}
+        slotProps={{
+          paper: {
+            sx: { maxHeight: 400, minWidth: 180 },
+          },
+        }}
+      >
+        {isSelectedDead ? (
+          /* Dead crew - only show remove body option */
+          <MenuItem onClick={handleRemoveBody} sx={{ color: 'error.main' }}>
+            <ListItemText
+              primary="Remove Body"
+              secondary="Clear this station"
+              primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
+              secondaryTypographyProps={{ variant: 'caption' }}
+            />
+          </MenuItem>
+        ) : (
+          /* Living crew - show move, swap, and exit options */
+          <>
+            {/* Move to another zone */}
+            {otherZones.length > 0 && (
+              <MenuItem disabled sx={{ opacity: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Move to...
+                </Typography>
+              </MenuItem>
+            )}
+            {otherZones.map((targetZone) => {
+              const availableCapacity = getZoneAvailableCapacity(targetZone.id);
+              const isDisabled = availableCapacity <= 0;
+              return (
+                <MenuItem
+                  key={targetZone.id}
+                  onClick={() => handleMoveToZone(targetZone.id)}
+                  disabled={isDisabled}
+                >
+                  <ListItemText
+                    primary={targetZone.name}
+                    secondary={isDisabled ? 'Full' : `${availableCapacity} spot${availableCapacity !== 1 ? 's' : ''} available`}
+                    primaryTypographyProps={{ variant: 'body2' }}
+                    secondaryTypographyProps={{ variant: 'caption' }}
+                  />
+                </MenuItem>
+              );
+            })}
+
+            {/* Swap with another crew member */}
+            {otherCrewOnVehicle.length > 0 && (
+              <>
+                <Divider />
+                <MenuItem disabled sx={{ opacity: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Swap with...
+                  </Typography>
+                </MenuItem>
+                {otherCrewOnVehicle.map(({ assignment, creature, zone: crewZone }) => (
+                  <MenuItem
+                    key={creature!.id}
+                    onClick={() => handleSwapWith(creature!.id, assignment.zoneId)}
+                  >
+                    <ListItemText
+                      primary={creature!.name}
+                      secondary={crewZone?.name || 'Unknown zone'}
+                      primaryTypographyProps={{ variant: 'body2' }}
+                      secondaryTypographyProps={{ variant: 'caption' }}
+                    />
+                  </MenuItem>
+                ))}
+              </>
+            )}
+
+            <Divider />
+            <MenuItem onClick={handleExitVehicle} sx={{ color: 'warning.main' }}>
+              <ListItemText
+                primary="Exit Vehicle"
+                secondary="Place on battlefield"
+                primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
+                secondaryTypographyProps={{ variant: 'caption' }}
+              />
+            </MenuItem>
+          </>
         )}
       </Menu>
     </Paper>
