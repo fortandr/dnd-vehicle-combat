@@ -169,6 +169,55 @@ export function deletePartyPreset(id: string): void {
 }
 
 // ==========================================
+// Combat Archive Storage Helpers
+// ==========================================
+
+const COMBAT_ARCHIVES_KEY = 'avernus-combat-archives';
+
+export interface CombatArchive {
+  id: string;
+  encounterName: string;
+  completedAt: string;
+  totalRounds: number;
+  summary: {
+    partyVehicles: string[];
+    enemyVehicles: string[];
+    partyCreatures: string[];
+    enemyCreatures: string[];
+    vehiclesDestroyed: string[];
+    creaturesKilled: string[];
+  };
+  actionLog: unknown[]; // LogEntry[]
+}
+
+export function getCombatArchives(): CombatArchive[] {
+  try {
+    const item = window.localStorage.getItem(COMBAT_ARCHIVES_KEY);
+    return item ? JSON.parse(item) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCombatArchive(archive: CombatArchive): void {
+  const archives = getCombatArchives();
+  archives.unshift(archive); // Add to beginning (newest first)
+  // Keep only last 20 archives to prevent storage bloat
+  const trimmedArchives = archives.slice(0, 20);
+  window.localStorage.setItem(COMBAT_ARCHIVES_KEY, JSON.stringify(trimmedArchives));
+}
+
+export function getCombatArchive(id: string): CombatArchive | null {
+  const archives = getCombatArchives();
+  return archives.find((a) => a.id === id) || null;
+}
+
+export function deleteCombatArchive(id: string): void {
+  const archives = getCombatArchives().filter((a) => a.id !== id);
+  window.localStorage.setItem(COMBAT_ARCHIVES_KEY, JSON.stringify(archives));
+}
+
+// ==========================================
 // Auto-Save Hook
 // ==========================================
 

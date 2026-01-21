@@ -1523,7 +1523,7 @@ function WeaponRangeArcs({ weaponRanges, pixelsPerFoot, tokenSize, vehicleType, 
       style={{
         position: 'absolute',
         left: tokenSize / 2 - center,
-        top: tokenSize * 0.3 - center,
+        top: tokenSize / 2 - center,
         width: svgSize,
         height: svgSize,
         pointerEvents: 'none',
@@ -1926,113 +1926,484 @@ function VehicleIcon({ templateId, size, color }: VehicleIconProps) {
   // Circles indicate weapon stations
 
   if (id.includes('buzz') || id.includes('killer')) {
-    // Buzz Killer - motor trike with saw blade front wheel
+    // Buzz Killer - Hellish trike with massive saw blade front wheel
+    // Wedge-shaped predatory profile, low front rising to elevated rear passenger
     return (
-      <svg width={size} height={size} viewBox="0 0 28 44">
-        {/* Saw blade front wheel - jagged circle */}
-        <circle cx="14" cy="6" r="5" fill={color} opacity="0.9"/>
-        <path d="M14,1 L15,4 L18,2 L16,5 L19,6 L16,7 L18,10 L15,8 L14,11 L13,8 L10,10 L12,7 L9,6 L12,5 L10,2 L13,4 Z" fill={color}/>
-        {/* Main trike body */}
-        <path d="M8,12 L20,12 L22,20 L22,32 L20,36 L8,36 L6,32 L6,20 Z" fill={color} opacity="0.8"/>
-        {/* Rear spiked wheels */}
-        <circle cx="8" cy="38" r="4" fill={color}/>
-        <circle cx="20" cy="38" r="4" fill={color}/>
-        {/* Spikes on rear wheels */}
-        <path d="M8,34 L9,36 L8,38 L7,36 Z M4,38 L6,37 L8,38 L6,39 Z M8,42 L7,40 L8,38 L9,40 Z M12,38 L10,39 L8,38 L10,37 Z" fill={color}/>
-        <path d="M20,34 L21,36 L20,38 L19,36 Z M16,38 L18,37 L20,38 L18,39 Z M20,42 L19,40 L20,38 L21,40 Z M24,38 L22,39 L20,38 L22,37 Z" fill={color}/>
-        {/* Helm station - driver */}
-        <circle cx="14" cy="18" r="3.5" fill="#000" stroke={color} strokeWidth="1.5"/>
-        {/* Passenger seat */}
-        <circle cx="14" cy="28" r="3" fill="#666" stroke={color} strokeWidth="1"/>
+      <svg width={size} height={size} viewBox="0 0 32 52">
+        {/* === MASSIVE SAW BLADE FRONT WHEEL === */}
+        {/* Main saw blade disc */}
+        <circle cx="16" cy="8" r="7" fill={color} opacity="0.9"/>
+        {/* Inner hub */}
+        <circle cx="16" cy="8" r="3" fill="#333" stroke={color} strokeWidth="1"/>
+        {/* Saw teeth - jagged edges all around */}
+        <path d="M16,0 L17,3 L16,1 L15,3 Z" fill={color}/>
+        <path d="M22,2 L20,4 L21,2 L19,3 Z" fill={color}/>
+        <path d="M24,8 L21,8 L23,7 L21,7 Z" fill={color}/>
+        <path d="M22,14 L20,12 L21,14 L19,13 Z" fill={color}/>
+        <path d="M16,16 L15,13 L16,15 L17,13 Z" fill={color}/>
+        <path d="M10,14 L12,12 L11,14 L13,13 Z" fill={color}/>
+        <path d="M8,8 L11,8 L9,7 L11,7 Z" fill={color}/>
+        <path d="M10,2 L12,4 L11,2 L13,3 Z" fill={color}/>
+        {/* Larger saw teeth for emphasis */}
+        <path d="M16,-1 L14,4 L16,2 L18,4 Z" fill={color}/>
+        <path d="M24,6 L19,7 L22,8 L19,9 Z" fill={color}/>
+        <path d="M16,17 L18,12 L16,14 L14,12 Z" fill={color}/>
+        <path d="M8,6 L13,7 L10,8 L13,9 Z" fill={color}/>
+        {/* Grinding glow effect */}
+        <circle cx="16" cy="8" r="1.5" fill="#ff4500" opacity="0.6"/>
+
+        {/* === WEDGE-SHAPED FRAME - LOW FRONT, RISING REAR === */}
+        {/* Main angular body - predatory wedge shape */}
+        <path d="M10,14 L22,14 L26,24 L28,38 L26,42 L6,42 L4,38 L6,24 Z" fill={color} opacity="0.85"/>
+
+        {/* Reinforced front nose connecting to saw */}
+        <path d="M12,12 L20,12 L22,14 L10,14 Z" fill={color} opacity="0.9"/>
+
+        {/* Angular armor plating lines */}
+        <line x1="8" y1="22" x2="24" y2="22" stroke="#333" strokeWidth="0.8" opacity="0.4"/>
+        <line x1="6" y1="32" x2="26" y2="32" stroke="#333" strokeWidth="0.8" opacity="0.4"/>
+
+        {/* === DRIVER'S ARMORED COCKPIT === */}
+        {/* Heavy armored shell around driver - 3/4 cover */}
+        <path d="M10,18 L22,18 L24,26 L8,26 Z" fill={color} opacity="0.95"/>
+        {/* Cockpit viewport slit */}
+        <rect x="12" y="16" width="8" height="2" fill="#1a1a1a" opacity="0.7" rx="0.5"/>
+        {/* Side armor plates */}
+        <rect x="6" y="20" width="3" height="8" fill={color} opacity="0.9" rx="1"/>
+        <rect x="23" y="20" width="3" height="8" fill={color} opacity="0.9" rx="1"/>
+        {/* Driver helm position - hunched forward */}
+        <circle cx="16" cy="22" r="3.5" fill="#000" stroke={color} strokeWidth="1.5"/>
+
+        {/* === ELEVATED PASSENGER PLATFORM === */}
+        {/* Raised platform behind driver */}
+        <rect x="8" y="30" width="16" height="10" fill={color} opacity="0.8" rx="1"/>
+        {/* Platform rails */}
+        <line x1="8" y1="30" x2="8" y2="40" stroke={color} strokeWidth="1.5"/>
+        <line x1="24" y1="30" x2="24" y2="40" stroke={color} strokeWidth="1.5"/>
+        {/* Elevated passenger seat - half cover */}
+        <circle cx="16" cy="35" r="3" fill="#666" stroke={color} strokeWidth="1"/>
+
+        {/* === ENGINE HOUSING BETWEEN REAR WHEELS === */}
+        <rect x="10" y="40" width="12" height="6" fill={color} opacity="0.9" rx="1"/>
+        {/* Engine glow - tormented souls */}
+        <ellipse cx="16" cy="43" rx="3" ry="2" fill="#1a1a1a" opacity="0.6"/>
+        <ellipse cx="16" cy="43" rx="1.5" ry="1" fill="#ff4500" opacity="0.5"/>
+        {/* Exhaust vents */}
+        <rect x="11" y="46" width="2" height="2" fill="#333" opacity="0.7"/>
+        <rect x="19" y="46" width="2" height="2" fill="#333" opacity="0.7"/>
+
+        {/* === REAR SPIKED WHEELS === */}
+        {/* Left rear wheel */}
+        <circle cx="6" cy="46" r="5" fill={color} opacity="0.9"/>
+        <circle cx="6" cy="46" r="2" fill="#333" stroke={color} strokeWidth="0.5"/>
+        {/* Left wheel spikes */}
+        <path d="M6,40 L5,43 L7,43 Z" fill={color}/>
+        <path d="M0,46 L3,45 L3,47 Z" fill={color}/>
+        <path d="M6,52 L5,49 L7,49 Z" fill={color}/>
+        <path d="M12,46 L9,45 L9,47 Z" fill={color}/>
+
+        {/* Right rear wheel */}
+        <circle cx="26" cy="46" r="5" fill={color} opacity="0.9"/>
+        <circle cx="26" cy="46" r="2" fill="#333" stroke={color} strokeWidth="0.5"/>
+        {/* Right wheel spikes */}
+        <path d="M26,40 L25,43 L27,43 Z" fill={color}/>
+        <path d="M32,46 L29,45 L29,47 Z" fill={color}/>
+        <path d="M26,52 L25,49 L27,49 Z" fill={color}/>
+        <path d="M20,46 L23,45 L23,47 Z" fill={color}/>
+
+        {/* === CHAINS AND TROPHY HOOKS === */}
+        {/* Side chains */}
+        <line x1="6" y1="28" x2="4" y2="34" stroke={color} strokeWidth="1" strokeDasharray="2,1" opacity="0.7"/>
+        <line x1="26" y1="28" x2="28" y2="34" stroke={color} strokeWidth="1" strokeDasharray="2,1" opacity="0.7"/>
+        {/* Trophy hooks */}
+        <path d="M4,34 L2,36 L4,38" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M28,34 L30,36 L28,38" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+        {/* Front frame spikes */}
+        <path d="M8,16 L5,17 L8,18 Z" fill={color}/>
+        <path d="M24,16 L27,17 L24,18 Z" fill={color}/>
       </svg>
     );
   }
 
   if (id.includes('devil') || id.includes('ride')) {
-    // Devil's Ride - narrow motorcycle, rider only (no weapon stations)
+    // Devil's Ride - Hellish chopper motorcycle with devil-face cowling
+    // Single rider, spiked wheels, horn handlebars, demonic aesthetic
     return (
-      <svg width={size} height={size} viewBox="0 0 24 40">
-        {/* Main body - elongated motorcycle shape */}
-        <ellipse cx="12" cy="20" rx="6" ry="16" fill={color} opacity="0.8"/>
-        {/* Front wheel */}
-        <ellipse cx="12" cy="6" rx="4" ry="3" fill={color}/>
-        {/* Rear wheel */}
-        <ellipse cx="12" cy="34" rx="4" ry="3" fill={color}/>
-        {/* Rider position (helm) */}
-        <circle cx="12" cy="18" r="3" fill="#000" stroke={color} strokeWidth="1"/>
+      <svg width={size} height={size} viewBox="0 0 28 48">
+        {/* Front spiked wheel */}
+        <ellipse cx="14" cy="6" rx="5" ry="3" fill={color} opacity="0.9"/>
+        {/* Wheel spikes */}
+        <path d="M9,6 L7,5 L9,4 Z M19,6 L21,5 L19,4 Z M14,3 L13,1 L15,1 Z M14,9 L13,11 L15,11 Z" fill={color}/>
+
+        {/* Devil face cowling - front */}
+        <ellipse cx="14" cy="11" rx="6" ry="4" fill={color} opacity="0.85"/>
+        {/* Glowing demon eyes */}
+        <circle cx="11" cy="10" r="1.5" fill="#ff4500"/>
+        <circle cx="17" cy="10" r="1.5" fill="#ff4500"/>
+        {/* Grinning mouth detail */}
+        <path d="M10,13 Q14,15 18,13" fill="none" stroke="#ff4500" strokeWidth="0.8" opacity="0.7"/>
+
+        {/* Horn handlebars - sweeping back aggressively */}
+        <path d="M8,11 Q2,8 1,14 Q2,16 6,15" fill={color} opacity="0.9"/>
+        <path d="M20,11 Q26,8 27,14 Q26,16 22,15" fill={color} opacity="0.9"/>
+        {/* Horn tips */}
+        <circle cx="1" cy="14" r="1" fill={color}/>
+        <circle cx="27" cy="14" r="1" fill={color}/>
+
+        {/* Main frame/spine - elongated chopper body */}
+        <path d="M10,14 L10,38 Q14,42 18,38 L18,14 Z" fill={color} opacity="0.7"/>
+
+        {/* Engine housing - screaming maw */}
+        <ellipse cx="14" cy="26" rx="5" ry="4" fill={color} opacity="0.8"/>
+        {/* Maw/intake detail */}
+        <ellipse cx="14" cy="26" rx="3" ry="2" fill="#000" opacity="0.5"/>
+        {/* Engine glow */}
+        <ellipse cx="14" cy="26" rx="1.5" ry="1" fill="#ff4500" opacity="0.6"/>
+
+        {/* Exhaust pipes - trailing back on both sides */}
+        <path d="M9,24 L6,26 L5,32 L4,38" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"/>
+        <path d="M19,24 L22,26 L23,32 L24,38" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"/>
+        {/* Exhaust tips with ember glow */}
+        <circle cx="4" cy="38" r="1.5" fill={color}/>
+        <circle cx="4" cy="38" r="0.8" fill="#ff4500" opacity="0.7"/>
+        <circle cx="24" cy="38" r="1.5" fill={color}/>
+        <circle cx="24" cy="38" r="0.8" fill="#ff4500" opacity="0.7"/>
+
+        {/* Rear spiked wheel */}
+        <ellipse cx="14" cy="42" rx="5" ry="3" fill={color} opacity="0.9"/>
+        {/* Wheel spikes */}
+        <path d="M9,42 L7,41 L9,40 Z M19,42 L21,41 L19,40 Z M14,39 L13,37 L15,37 Z M14,45 L13,47 L15,47 Z" fill={color}/>
+
+        {/* Chain drive detail */}
+        <line x1="10" y1="30" x2="10" y2="40" stroke={color} strokeWidth="0.5" strokeDasharray="1,1" opacity="0.5"/>
+        <line x1="18" y1="30" x2="18" y2="40" stroke={color} strokeWidth="0.5" strokeDasharray="1,1" opacity="0.5"/>
+
+        {/* Frame spikes/jagged edges */}
+        <path d="M10,18 L7,19 L10,20 Z" fill={color}/>
+        <path d="M18,18 L21,19 L18,20 Z" fill={color}/>
+        <path d="M10,32 L7,33 L10,34 Z" fill={color}/>
+        <path d="M18,32 L21,33 L18,34 Z" fill={color}/>
+
+        {/* Rider position (helm) - single seat */}
+        <circle cx="14" cy="19" r="3" fill="#000" stroke={color} strokeWidth="1.5"/>
       </svg>
     );
   }
 
   if (id.includes('grinder') || id.includes('demon')) {
-    // Demon Grinder - massive rectangular with chomper front
-    // Stations: Helm, Chomper, Wrecking Ball, 2x Harpoon, 2x Ballista
+    // Demon Grinder - Massive armored war machine, 18-wheeler sized
+    // Chomper jaws at front, wrecking ball at rear, 6 wheels, heavily armored
     return (
-      <svg width={size} height={size} viewBox="0 0 40 48">
-        {/* Main body - heavy rectangular */}
-        <rect x="4" y="8" width="32" height="36" fill={color} opacity="0.8" rx="2"/>
-        {/* Chomper at front - jagged edge */}
-        <path d="M8,8 L12,2 L16,8 L20,2 L24,8 L28,2 L32,8" fill={color}/>
-        {/* Treads on sides */}
-        <rect x="0" y="12" width="4" height="28" fill={color} rx="1"/>
-        <rect x="36" y="12" width="4" height="28" fill={color} rx="1"/>
-        {/* Helm station - front center */}
-        <circle cx="20" cy="14" r="3.5" fill="#000" stroke={color} strokeWidth="1.5"/>
-        {/* Chomper station - very front */}
-        <circle cx="20" cy="6" r="2.5" fill="#ff6b35" stroke={color} strokeWidth="1"/>
-        {/* Wrecking Ball - rear */}
-        <circle cx="20" cy="38" r="3" fill="#ff6b35" stroke={color} strokeWidth="1"/>
-        {/* Harpoon stations - sides front */}
-        <circle cx="8" cy="18" r="2.5" fill="#ff6b35" stroke={color} strokeWidth="1"/>
-        <circle cx="32" cy="18" r="2.5" fill="#ff6b35" stroke={color} strokeWidth="1"/>
-        {/* Ballista stations - sides rear */}
-        <circle cx="8" cy="32" r="2.5" fill="#ff6b35" stroke={color} strokeWidth="1"/>
-        <circle cx="32" cy="32" r="2.5" fill="#ff6b35" stroke={color} strokeWidth="1"/>
+      <svg width={size} height={size} viewBox="0 0 44 72">
+        {/* === FRONT SECTION - CHOMPER === */}
+        {/* Chomper jaw housing - pivoting front end */}
+        <path d="M10,8 L34,8 L36,14 L8,14 Z" fill={color} opacity="0.9"/>
+        {/* Grinding teeth - massive iron jaws */}
+        <path d="M10,2 L13,8 L16,2 L19,8 L22,2 L25,8 L28,2 L31,8 L34,2" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round"/>
+        {/* Inner teeth row */}
+        <path d="M13,5 L15,8 M18,5 L20,8 M23,5 L25,8 M28,5 L30,8" stroke={color} strokeWidth="1.5"/>
+        {/* Chomper intake/maw */}
+        <rect x="14" y="4" width="16" height="6" fill="#1a1a1a" opacity="0.7" rx="1"/>
+        {/* Grinding mechanism glow */}
+        <ellipse cx="22" cy="7" rx="4" ry="2" fill="#ff4500" opacity="0.5"/>
+
+        {/* Pivot point behind front wheels */}
+        <ellipse cx="22" cy="16" rx="8" ry="3" fill={color} opacity="0.6"/>
+        <circle cx="22" cy="16" r="2" fill="#333" stroke={color} strokeWidth="1"/>
+
+        {/* Front wheels - two smaller steering wheels */}
+        <ellipse cx="6" cy="12" rx="4" ry="6" fill={color} opacity="0.85"/>
+        <ellipse cx="38" cy="12" rx="4" ry="6" fill={color} opacity="0.85"/>
+        {/* Front wheel treads */}
+        <path d="M4,8 L4,16 M6,7 L6,17 M8,8 L8,16" stroke="#333" strokeWidth="0.5" opacity="0.5"/>
+        <path d="M36,8 L36,16 M38,7 L38,17 M40,8 L40,16" stroke="#333" strokeWidth="0.5" opacity="0.5"/>
+
+        {/* === MAIN ARMORED BODY === */}
+        {/* Heavy armored hull - tank/APC structure */}
+        <rect x="6" y="18" width="32" height="38" fill={color} opacity="0.85" rx="2"/>
+
+        {/* Armor plating lines */}
+        <line x1="6" y1="26" x2="38" y2="26" stroke="#333" strokeWidth="0.8" opacity="0.4"/>
+        <line x1="6" y1="36" x2="38" y2="36" stroke="#333" strokeWidth="0.8" opacity="0.4"/>
+        <line x1="6" y1="46" x2="38" y2="46" stroke="#333" strokeWidth="0.8" opacity="0.4"/>
+
+        {/* Rivets along armor */}
+        <circle cx="10" cy="22" r="1" fill="#333" opacity="0.6"/>
+        <circle cx="34" cy="22" r="1" fill="#333" opacity="0.6"/>
+        <circle cx="10" cy="32" r="1" fill="#333" opacity="0.6"/>
+        <circle cx="34" cy="32" r="1" fill="#333" opacity="0.6"/>
+        <circle cx="10" cy="42" r="1" fill="#333" opacity="0.6"/>
+        <circle cx="34" cy="42" r="1" fill="#333" opacity="0.6"/>
+        <circle cx="10" cy="52" r="1" fill="#333" opacity="0.6"/>
+        <circle cx="34" cy="52" r="1" fill="#333" opacity="0.6"/>
+
+        {/* Defensive spikes along sides */}
+        <path d="M6,24 L2,25 L6,26 Z" fill={color}/>
+        <path d="M6,34 L2,35 L6,36 Z" fill={color}/>
+        <path d="M6,44 L2,45 L6,46 Z" fill={color}/>
+        <path d="M38,24 L42,25 L38,26 Z" fill={color}/>
+        <path d="M38,34 L42,35 L38,36 Z" fill={color}/>
+        <path d="M38,44 L42,45 L38,46 Z" fill={color}/>
+
+        {/* Middle wheels - medium size */}
+        <ellipse cx="4" cy="34" rx="4" ry="7" fill={color} opacity="0.9"/>
+        <ellipse cx="40" cy="34" rx="4" ry="7" fill={color} opacity="0.9"/>
+        {/* Middle wheel treads/spikes */}
+        <path d="M2,29 L0,30 L2,31 Z M2,36 L0,37 L2,38 Z" fill={color}/>
+        <path d="M42,29 L44,30 L42,31 Z M42,36 L44,37 L42,38 Z" fill={color}/>
+
+        {/* Rear wheels - MASSIVE crushing wheels */}
+        <ellipse cx="3" cy="54" rx="5" ry="9" fill={color} opacity="0.95"/>
+        <ellipse cx="41" cy="54" rx="5" ry="9" fill={color} opacity="0.95"/>
+        {/* Rear wheel crushing treads */}
+        <path d="M1,47 L-2,48 L1,49 Z M1,53 L-2,54 L1,55 Z M1,59 L-2,60 L1,61 Z" fill={color}/>
+        <path d="M43,47 L46,48 L43,49 Z M43,53 L46,54 L43,55 Z M43,59 L46,60 L43,61 Z" fill={color}/>
+        {/* Wheel hub details */}
+        <circle cx="3" cy="54" r="2" fill="#333" stroke={color} strokeWidth="0.5"/>
+        <circle cx="41" cy="54" r="2" fill="#333" stroke={color} strokeWidth="0.5"/>
+
+        {/* === WEAPON STATIONS === */}
+        {/* Helm station - front of main body */}
+        <circle cx="22" cy="22" r="4" fill="#000" stroke={color} strokeWidth="1.5"/>
+
+        {/* Chomper operator station */}
+        <circle cx="22" cy="12" r="2.5" fill="#ff6b35" stroke={color} strokeWidth="1"/>
+
+        {/* Harpoon Flinger stations - sides */}
+        <rect x="2" y="20" width="5" height="6" fill={color} opacity="0.9" rx="1"/>
+        <circle cx="4" cy="23" r="2" fill="#ff6b35" stroke={color} strokeWidth="1"/>
+        <rect x="37" y="20" width="5" height="6" fill={color} opacity="0.9" rx="1"/>
+        <circle cx="40" cy="23" r="2" fill="#ff6b35" stroke={color} strokeWidth="1"/>
+
+        {/* Additional crew positions */}
+        <circle cx="14" cy="30" r="2" fill="#666" stroke={color} strokeWidth="0.8" opacity="0.7"/>
+        <circle cx="30" cy="30" r="2" fill="#666" stroke={color} strokeWidth="0.8" opacity="0.7"/>
+        <circle cx="14" cy="40" r="2" fill="#666" stroke={color} strokeWidth="0.8" opacity="0.7"/>
+        <circle cx="30" cy="40" r="2" fill="#666" stroke={color} strokeWidth="0.8" opacity="0.7"/>
+
+        {/* === REAR SECTION - WRECKING BALL === */}
+        {/* Rear platform */}
+        <rect x="10" y="56" width="24" height="6" fill={color} opacity="0.8" rx="1"/>
+
+        {/* Wrecking ball station */}
+        <circle cx="22" cy="59" r="2.5" fill="#ff6b35" stroke={color} strokeWidth="1"/>
+
+        {/* Chain extending to wrecking ball */}
+        <line x1="22" y1="62" x2="22" y2="68" stroke={color} strokeWidth="1.5" strokeDasharray="2,1"/>
+
+        {/* Wrecking ball */}
+        <circle cx="22" cy="70" r="4" fill={color}/>
+        <circle cx="22" cy="70" r="2.5" fill="#333"/>
+        {/* Ball spikes */}
+        <path d="M22,66 L21,64 L23,64 Z" fill={color}/>
+        <path d="M18,70 L16,69 L16,71 Z" fill={color}/>
+        <path d="M26,70 L28,69 L28,71 Z" fill={color}/>
+
+        {/* === SMOKE PIPES AND VENTS === */}
+        {/* Exhaust pipes */}
+        <rect x="12" y="16" width="2" height="4" fill="#333" rx="0.5"/>
+        <rect x="30" y="16" width="2" height="4" fill="#333" rx="0.5"/>
+        {/* Smoke effect */}
+        <circle cx="13" cy="15" r="1.5" fill="#666" opacity="0.4"/>
+        <circle cx="31" cy="15" r="1.5" fill="#666" opacity="0.4"/>
+
+        {/* Side vents */}
+        <rect x="6" y="28" width="1" height="3" fill="#333" opacity="0.6"/>
+        <rect x="6" y="38" width="1" height="3" fill="#333" opacity="0.6"/>
+        <rect x="37" y="28" width="1" height="3" fill="#333" opacity="0.6"/>
+        <rect x="37" y="38" width="1" height="3" fill="#333" opacity="0.6"/>
       </svg>
     );
   }
 
   if (id.includes('tormentor')) {
-    // Tormentor - wedge-shaped assault vehicle
-    // Stations: Helm, Harpoon Flinger, 2x Chompers
+    // Tormentor - Infernal raider/APC, Mad Max war buggy rebuilt in Hell
+    // Open roll-cage frame, 4 bladed wheels, raking scythes at front
+    // Stations: Helm (front), Harpoon Flinger (middle), 2x Passenger (rear)
+    // Scale 0.83 to fit in smaller viewBox for 20% larger rendering
     return (
-      <svg width={size} height={size} viewBox="0 0 32 40">
-        {/* Main body - pointed wedge */}
-        <polygon points="16,4 4,16 4,36 28,36 28,16" fill={color} opacity="0.8"/>
-        {/* Wheels */}
-        <circle cx="8" cy="32" r="3" fill={color}/>
-        <circle cx="24" cy="32" r="3" fill={color}/>
-        {/* Helm station */}
-        <circle cx="16" cy="20" r="3" fill="#000" stroke={color} strokeWidth="1.5"/>
-        {/* Harpoon Flinger - front */}
-        <circle cx="16" cy="8" r="2.5" fill="#ff6b35" stroke={color} strokeWidth="1"/>
-        {/* Chomper stations - sides */}
-        <circle cx="7" cy="26" r="2.5" fill="#ff6b35" stroke={color} strokeWidth="1"/>
-        <circle cx="25" cy="26" r="2.5" fill="#ff6b35" stroke={color} strokeWidth="1"/>
+      <svg width={size} height={size} viewBox="0 0 30 43">
+        <g transform="scale(0.833)">
+        {/* Four Raking Scythes - jutting forward from bumper */}
+        <path d="M8,2 L10,10 L12,10 L10,2 Z" fill={color} opacity="0.9"/>
+        <path d="M14,0 L15,10 L17,10 L16,0 Z" fill={color} opacity="0.9"/>
+        <path d="M19,0 L21,10 L23,10 L22,0 Z" fill={color} opacity="0.9"/>
+        <path d="M26,2 L24,10 L26,10 L28,2 Z" fill={color} opacity="0.9"/>
+
+        {/* Engine compartment - front, exposed */}
+        <rect x="10" y="8" width="16" height="8" fill={color} opacity="0.6"/>
+        <line x1="12" y1="9" x2="12" y2="15" stroke="#000" strokeWidth="0.5" opacity="0.5"/>
+        <line x1="18" y1="9" x2="18" y2="15" stroke="#000" strokeWidth="0.5" opacity="0.5"/>
+        <line x1="24" y1="9" x2="24" y2="15" stroke="#000" strokeWidth="0.5" opacity="0.5"/>
+
+        {/* Roll cage frame - skeletal open construction */}
+        <rect x="6" y="14" width="24" height="32" fill="none" stroke={color} strokeWidth="2" rx="1"/>
+        {/* Cross bars of roll cage */}
+        <line x1="6" y1="24" x2="30" y2="24" stroke={color} strokeWidth="1.5"/>
+        <line x1="6" y1="34" x2="30" y2="34" stroke={color} strokeWidth="1.5"/>
+        {/* Center spine */}
+        <line x1="18" y1="14" x2="18" y2="46" stroke={color} strokeWidth="1"/>
+
+        {/* Floor/chassis visible through cage */}
+        <rect x="8" y="16" width="20" height="28" fill={color} opacity="0.3"/>
+
+        {/* Four bladed wheels with cutting edges */}
+        {/* Front left wheel */}
+        <circle cx="4" cy="18" r="4" fill={color} opacity="0.9"/>
+        <path d="M4,14 L5,16 L4,18 L3,16 Z M0,18 L2,17 L4,18 L2,19 Z M4,22 L3,20 L4,18 L5,20 Z M8,18 L6,19 L4,18 L6,17 Z" fill={color}/>
+        {/* Front right wheel */}
+        <circle cx="32" cy="18" r="4" fill={color} opacity="0.9"/>
+        <path d="M32,14 L33,16 L32,18 L31,16 Z M28,18 L30,17 L32,18 L30,19 Z M32,22 L31,20 L32,18 L33,20 Z M36,18 L34,19 L32,18 L34,17 Z" fill={color}/>
+        {/* Rear left wheel */}
+        <circle cx="4" cy="42" r="4" fill={color} opacity="0.9"/>
+        <path d="M4,38 L5,40 L4,42 L3,40 Z M0,42 L2,41 L4,42 L2,43 Z M4,46 L3,44 L4,42 L5,44 Z M8,42 L6,43 L4,42 L6,41 Z" fill={color}/>
+        {/* Rear right wheel */}
+        <circle cx="32" cy="42" r="4" fill={color} opacity="0.9"/>
+        <path d="M32,38 L33,40 L32,42 L31,40 Z M28,42 L30,41 L32,42 L30,43 Z M32,46 L31,44 L32,42 L33,44 Z M36,42 L34,43 L32,42 L34,41 Z" fill={color}/>
+
+        {/* Spikes on roll cage */}
+        <path d="M6,14 L4,11 L8,14 Z" fill={color}/>
+        <path d="M30,14 L32,11 L28,14 Z" fill={color}/>
+        <path d="M6,46 L4,49 L8,46 Z" fill={color}/>
+        <path d="M30,46 L32,49 L28,46 Z" fill={color}/>
+
+        {/* Chains hanging from attachment points */}
+        <path d="M6,28 Q3,30 4,32 Q5,34 3,36" fill="none" stroke={color} strokeWidth="0.8" opacity="0.6"/>
+        <path d="M30,28 Q33,30 32,32 Q31,34 33,36" fill="none" stroke={color} strokeWidth="0.8" opacity="0.6"/>
+
+        {/* Helm station - Driver, front behind engine */}
+        <circle cx="18" cy="19" r="3" fill="#000" stroke={color} strokeWidth="1.5"/>
+
+        {/* Harpoon Flinger weapon station - middle */}
+        <circle cx="18" cy="29" r="3" fill="#ff6b35" stroke={color} strokeWidth="1.5"/>
+        {/* Harpoon weapon visual */}
+        <rect x="16" y="26" width="4" height="6" fill="#ff6b35" opacity="0.5"/>
+
+        {/* Passenger seats - rear port and starboard */}
+        <circle cx="11" cy="40" r="2.5" fill="#666" stroke={color} strokeWidth="1"/>
+        <circle cx="25" cy="40" r="2.5" fill="#666" stroke={color} strokeWidth="1"/>
+        </g>
       </svg>
     );
   }
 
   if (id.includes('scavenger')) {
-    // Scavenger - rectangular with crane
-    // Stations: Helm, Harpoon, 2x Chompers
+    // Scavenger - Salvage/support vehicle with large crane, bus-like armored body
+    // Two front wheels, two rear treaded tracks, crane with grappling claw
     return (
-      <svg width={size} height={size} viewBox="0 0 32 44">
-        {/* Cab section - front */}
-        <rect x="6" y="4" width="20" height="12" fill={color} rx="2"/>
-        {/* Cargo/flatbed - rear */}
-        <rect x="4" y="16" width="24" height="24" fill={color} opacity="0.8" rx="1"/>
-        {/* Wheels */}
-        <circle cx="8" cy="38" r="3" fill={color}/>
-        <circle cx="16" cy="38" r="3" fill={color}/>
-        <circle cx="24" cy="38" r="3" fill={color}/>
+      <svg width={size} height={size} viewBox="0 0 40 64">
+        {/* === FRONT SECTION - CAB === */}
+        {/* Armored cab - boxy bus-like front */}
+        <rect x="8" y="4" width="24" height="16" fill={color} opacity="0.9" rx="2"/>
+        {/* Windshield/viewport slits */}
+        <rect x="12" y="6" width="16" height="3" fill="#1a1a1a" opacity="0.6" rx="1"/>
+        {/* Armored front plate */}
+        <rect x="10" y="2" width="20" height="4" fill={color} rx="1"/>
+
+        {/* Front wheels - two large wheels */}
+        <ellipse cx="6" cy="14" rx="5" ry="7" fill={color} opacity="0.9"/>
+        <ellipse cx="34" cy="14" rx="5" ry="7" fill={color} opacity="0.9"/>
+        {/* Wheel hub details */}
+        <circle cx="6" cy="14" r="2" fill="#333" stroke={color} strokeWidth="0.5"/>
+        <circle cx="34" cy="14" r="2" fill="#333" stroke={color} strokeWidth="0.5"/>
+        {/* Wheel treads */}
+        <path d="M4,9 L2,10 L4,11 Z M4,16 L2,17 L4,18 Z" fill={color}/>
+        <path d="M36,9 L38,10 L36,11 Z M36,16 L38,17 L36,18 Z" fill={color}/>
+
         {/* Helm station */}
-        <circle cx="16" cy="10" r="3" fill="#000" stroke={color} strokeWidth="1.5"/>
-        {/* Harpoon - front */}
-        <circle cx="16" cy="3" r="2" fill="#ff6b35" stroke={color} strokeWidth="1"/>
-        {/* Chomper stations - rear corners */}
-        <circle cx="8" cy="32" r="2.5" fill="#ff6b35" stroke={color} strokeWidth="1"/>
-        <circle cx="24" cy="32" r="2.5" fill="#ff6b35" stroke={color} strokeWidth="1"/>
+        <circle cx="20" cy="12" r="3.5" fill="#000" stroke={color} strokeWidth="1.5"/>
+
+        {/* === MAIN BODY - ARMORED BUS/CARGO === */}
+        {/* Main enclosed body - utilitarian boxy design */}
+        <rect x="6" y="20" width="28" height="28" fill={color} opacity="0.85" rx="2"/>
+
+        {/* Industrial plating lines */}
+        <line x1="6" y1="28" x2="34" y2="28" stroke="#333" strokeWidth="0.8" opacity="0.4"/>
+        <line x1="6" y1="36" x2="34" y2="36" stroke="#333" strokeWidth="0.8" opacity="0.4"/>
+
+        {/* Rivets - industrial look */}
+        <circle cx="10" cy="24" r="0.8" fill="#333" opacity="0.5"/>
+        <circle cx="30" cy="24" r="0.8" fill="#333" opacity="0.5"/>
+        <circle cx="10" cy="32" r="0.8" fill="#333" opacity="0.5"/>
+        <circle cx="30" cy="32" r="0.8" fill="#333" opacity="0.5"/>
+        <circle cx="10" cy="40" r="0.8" fill="#333" opacity="0.5"/>
+        <circle cx="30" cy="40" r="0.8" fill="#333" opacity="0.5"/>
+
+        {/* Side access panels */}
+        <rect x="6" y="30" width="3" height="6" fill="#333" opacity="0.3" rx="0.5"/>
+        <rect x="31" y="30" width="3" height="6" fill="#333" opacity="0.3" rx="0.5"/>
+
+        {/* === HARPOON FLINGERS - DEFENSE === */}
+        {/* Left harpoon mount */}
+        <rect x="2" y="22" width="5" height="8" fill={color} opacity="0.9" rx="1"/>
+        <circle cx="4" cy="26" r="2.5" fill="#ff6b35" stroke={color} strokeWidth="1"/>
+        {/* Right harpoon mount */}
+        <rect x="33" y="22" width="5" height="8" fill={color} opacity="0.9" rx="1"/>
+        <circle cx="36" cy="26" r="2.5" fill="#ff6b35" stroke={color} strokeWidth="1"/>
+
+        {/* === REAR TRACKS === */}
+        {/* Left track assembly */}
+        <rect x="2" y="40" width="8" height="14" fill={color} opacity="0.9" rx="1"/>
+        {/* Track treads */}
+        <line x1="3" y1="42" x2="9" y2="42" stroke="#333" strokeWidth="1" opacity="0.5"/>
+        <line x1="3" y1="45" x2="9" y2="45" stroke="#333" strokeWidth="1" opacity="0.5"/>
+        <line x1="3" y1="48" x2="9" y2="48" stroke="#333" strokeWidth="1" opacity="0.5"/>
+        <line x1="3" y1="51" x2="9" y2="51" stroke="#333" strokeWidth="1" opacity="0.5"/>
+        {/* Track wheels */}
+        <circle cx="5" cy="42" r="1.5" fill="#333"/>
+        <circle cx="5" cy="52" r="1.5" fill="#333"/>
+
+        {/* Right track assembly */}
+        <rect x="30" y="40" width="8" height="14" fill={color} opacity="0.9" rx="1"/>
+        {/* Track treads */}
+        <line x1="31" y1="42" x2="37" y2="42" stroke="#333" strokeWidth="1" opacity="0.5"/>
+        <line x1="31" y1="45" x2="37" y2="45" stroke="#333" strokeWidth="1" opacity="0.5"/>
+        <line x1="31" y1="48" x2="37" y2="48" stroke="#333" strokeWidth="1" opacity="0.5"/>
+        <line x1="31" y1="51" x2="37" y2="51" stroke="#333" strokeWidth="1" opacity="0.5"/>
+        {/* Track wheels */}
+        <circle cx="35" cy="42" r="1.5" fill="#333"/>
+        <circle cx="35" cy="52" r="1.5" fill="#333"/>
+
+        {/* === CRANE ASSEMBLY - DOMINANT FEATURE === */}
+        {/* Crane base/turret */}
+        <rect x="14" y="42" width="12" height="8" fill={color} rx="1"/>
+        <circle cx="20" cy="46" r="4" fill="#333" stroke={color} strokeWidth="1.5"/>
+
+        {/* Winch mechanism */}
+        <circle cx="20" cy="46" r="2" fill={color}/>
+        <circle cx="20" cy="46" r="1" fill="#666"/>
+
+        {/* Crane arm - extends back */}
+        <rect x="17" y="48" width="6" height="12" fill={color} opacity="0.85" rx="1"/>
+        {/* Crane arm joint */}
+        <circle cx="20" cy="50" r="1.5" fill="#333"/>
+
+        {/* Chain extending from crane */}
+        <line x1="20" y1="56" x2="20" y2="62" stroke={color} strokeWidth="1.5" strokeDasharray="2,1"/>
+
+        {/* Grappling claw */}
+        <path d="M16,60 L18,62 L20,60 L22,62 L24,60" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"/>
+        {/* Claw prongs */}
+        <path d="M16,60 L14,64 M18,62 L17,64 M22,62 L23,64 M24,60 L26,64" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+
+        {/* === CREW POSITIONS === */}
+        {/* Additional crew/passenger seats */}
+        <circle cx="14" cy="26" r="2" fill="#666" stroke={color} strokeWidth="0.8" opacity="0.7"/>
+        <circle cx="26" cy="26" r="2" fill="#666" stroke={color} strokeWidth="0.8" opacity="0.7"/>
+        <circle cx="14" cy="36" r="2" fill="#666" stroke={color} strokeWidth="0.8" opacity="0.7"/>
+        <circle cx="26" cy="36" r="2" fill="#666" stroke={color} strokeWidth="0.8" opacity="0.7"/>
+
+        {/* Crane operator station */}
+        <circle cx="20" cy="44" r="2" fill="#ff6b35" stroke={color} strokeWidth="1"/>
+
+        {/* === INDUSTRIAL DETAILS === */}
+        {/* Exhaust stack */}
+        <rect x="8" y="18" width="2" height="4" fill="#333" rx="0.5"/>
+        <circle cx="9" cy="17" r="1.2" fill="#666" opacity="0.4"/>
+
+        {/* Tool/equipment storage boxes */}
+        <rect x="8" y="42" width="4" height="3" fill="#333" opacity="0.4" rx="0.5"/>
+        <rect x="28" y="42" width="4" height="3" fill="#333" opacity="0.4" rx="0.5"/>
       </svg>
     );
   }
@@ -2704,7 +3075,11 @@ function getWeaponRangesByArc(
 
     // Station is manned by living crew - include this weapon's range
     const range = parseWeaponRange(weapon.range);
-    const arcs = weapon.visibleFromArcs || ['front', 'rear', 'left', 'right'];
+
+    // Always use the zone template's visibleFromArcs as the authoritative source
+    // This ensures saved encounters get correct arcs even if weapon data was saved incorrectly
+    const zone = vehicle.template.zones.find((z) => z.id === weapon.zoneId);
+    const arcs = zone?.visibleFromArcs || weapon.visibleFromArcs || ['front', 'rear', 'left', 'right'];
 
     for (const arc of arcs) {
       if (range > ranges[arc]) {

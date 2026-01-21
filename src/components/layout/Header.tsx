@@ -44,14 +44,21 @@ import {
   saveEncounter,
   deleteEncounter,
   SavedEncounter,
+  saveCombatArchive,
+  CombatArchive,
 } from '../../hooks/useLocalStorage';
 import { CombatState } from '../../types';
 import { scaleColors, withOpacity } from '../../theme/customColors';
+import { CombatSummary } from '../combat/CombatSummary';
+import { v4 as uuid } from 'uuid';
+import FlagIcon from '@mui/icons-material/Flag';
 
 export function Header() {
-  const { state, startCombat, returnToSetup, resetCombat, nextRound, nextTurn, loadEncounter, newEncounter, lastSaved, forceSave, markAsSaved, setEncounterName } = useCombat();
+  const { state, dispatch, startCombat, returnToSetup, resetCombat, nextRound, nextTurn, loadEncounter, newEncounter, lastSaved, forceSave, markAsSaved, setEncounterName } = useCombat();
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [currentArchive, setCurrentArchive] = useState<CombatArchive | null>(null);
   const [saveName, setSaveName] = useState(state.name);
   const [savedEncounters, setSavedEncounters] = useState<SavedEncounter[]>([]);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
@@ -145,6 +152,49 @@ export function Header() {
     if (confirm('Create a new encounter? Any unsaved changes will be lost.')) {
       newEncounter('New Encounter');
     }
+  };
+
+  const handleFinishCombat = () => {
+    // Create archive from current state
+    const archive: CombatArchive = {
+      id: uuid(),
+      encounterName: state.name,
+      completedAt: new Date().toISOString(),
+      totalRounds: state.round,
+      summary: {
+        partyVehicles: state.vehicles
+          .filter((v) => v.type === 'party')
+          .map((v) => v.name),
+        enemyVehicles: state.vehicles
+          .filter((v) => v.type === 'enemy')
+          .map((v) => v.name),
+        partyCreatures: state.creatures
+          .filter((c) => c.statblock.type === 'pc')
+          .map((c) => c.name),
+        enemyCreatures: state.creatures
+          .filter((c) => c.statblock.type !== 'pc')
+          .map((c) => c.name),
+        vehiclesDestroyed: state.vehicles
+          .filter((v) => v.currentHp === 0 || v.isInoperative)
+          .map((v) => v.name),
+        creaturesKilled: state.creatures
+          .filter((c) => c.currentHp === 0)
+          .map((c) => c.name),
+      },
+      actionLog: state.actionLog,
+    };
+
+    // Save to archives
+    saveCombatArchive(archive);
+
+    // Set current archive for display
+    setCurrentArchive(archive);
+
+    // End combat
+    dispatch({ type: 'END_COMBAT' });
+
+    // Show summary
+    setShowSummaryModal(true);
   };
 
   const handleRollComplication = () => {
@@ -323,6 +373,17 @@ export function Header() {
                   >
                     Next Round
                   </Button>
+                  <Divider orientation="vertical" flexItem />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color="success"
+                    startIcon={<FlagIcon />}
+                    onClick={handleFinishCombat}
+                    title="End combat and view summary"
+                  >
+                    Finish Combat
+                  </Button>
                 </>
               )}
               <Button
@@ -382,9 +443,9 @@ export function Header() {
               </MenuItem>
               <Divider />
               {state.phase === 'combat' && (
-                <MenuItem onClick={() => { returnToSetup(); setMenuAnchor(null); }}>
-                  <ListItemIcon><StopIcon fontSize="small" /></ListItemIcon>
-                  <ListItemText>End Combat</ListItemText>
+                <MenuItem onClick={() => { handleFinishCombat(); setMenuAnchor(null); }}>
+                  <ListItemIcon><FlagIcon fontSize="small" color="success" /></ListItemIcon>
+                  <ListItemText>Finish Combat</ListItemText>
                 </MenuItem>
               )}
               <MenuItem
@@ -475,6 +536,36 @@ export function Header() {
         <DialogActions>
           <Button fullWidth onClick={() => setShowLoadModal(false)}>
             Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Combat Summary Dialog */}
+      <Dialog
+        open={showSummaryModal}
+        onClose={() => setShowSummaryModal(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <FlagIcon color="success" />
+            Combat Complete
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {currentArchive && <CombatSummary archive={currentArchive} />}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowSummaryModal(false)}>Close</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setShowSummaryModal(false);
+              resetCombat();
+            }}
+          >
+            Reset & Start New Combat
           </Button>
         </DialogActions>
       </Dialog>
