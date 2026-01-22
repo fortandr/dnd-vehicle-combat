@@ -505,7 +505,6 @@ export function Sidebar() {
         borderRight: 1,
         borderColor: 'divider',
         p: 2,
-        overflow: 'auto',
       }}
     >
       {/* Initiative Tracker */}
@@ -1213,85 +1212,127 @@ function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSa
     <Paper
       sx={{
         p: 1,
+        pr: 4.5, // Extra padding for the buttons in upper right
+        pb: 3, // Extra padding for the map button in lower right
+        position: 'relative',
         bgcolor: isDownOrDead ? withOpacity('#dc2626', 0.15) : '#242424',
         borderLeft: 3,
         borderColor: isDownOrDead ? 'error.main' : borderColor,
         opacity: isDead ? 0.6 : 1,
       }}
     >
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Box>
-          <Typography variant="body2" fontWeight={600} component="div">
-            <span
-              onClick={hasStatblock && onViewStatblock ? onViewStatblock : undefined}
-              style={{
-                cursor: hasStatblock && onViewStatblock ? 'pointer' : 'default',
-                textDecoration: isDead ? 'line-through' : 'none',
-              }}
-              onMouseEnter={(e) => {
-                if (hasStatblock && onViewStatblock) {
-                  e.currentTarget.style.color = '#ff4500';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (hasStatblock && onViewStatblock) {
-                  e.currentTarget.style.color = '';
-                }
-              }}
-            >
-              {creature.name}
-            </span>
-            {isInDeathSaves && (
-              <Tooltip title="Making Death Saves" arrow>
-                <SkullIcon sx={{ fontSize: 16, color: 'error.main', ml: 0.5, verticalAlign: 'middle' }} />
-              </Tooltip>
-            )}
-            {isDead && (
-              <Tooltip title="Dead" arrow>
-                <SkullIcon sx={{ fontSize: 16, color: 'error.main', ml: 0.5, verticalAlign: 'middle' }} />
-              </Tooltip>
-            )}
-            {getStatusIndicator()}
-          </Typography>
-          {isInDeathSaves ? (
-            <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600 }}>
-              DEATH SAVES | AC: {creature.statblock.ac} | Init: {creature.initiative}
-            </Typography>
-          ) : isDead ? (
-            <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600 }}>
-              DEAD | AC: {creature.statblock.ac} | Init: {creature.initiative}
-            </Typography>
-          ) : (
-            <Typography variant="caption" color="text.secondary">
-              HP: {creature.currentHp}/{creature.statblock.maxHp} | AC: {creature.statblock.ac} | Init: {creature.initiative} | DEX Save: {
-                creature.statblock.savingThrows?.dex !== undefined
-                  ? (creature.statblock.savingThrows.dex >= 0 ? '+' : '') + creature.statblock.savingThrows.dex
-                  : (creature.statblock.abilities?.dex
-                    ? (Math.floor((creature.statblock.abilities.dex - 10) / 2) >= 0 ? '+' : '') + Math.floor((creature.statblock.abilities.dex - 10) / 2)
-                    : '—')
+      {/* Edit and Delete buttons in upper right corner */}
+      <Stack
+        direction="row"
+        spacing={0}
+        sx={{
+          position: 'absolute',
+          top: 2,
+          right: 2,
+        }}
+      >
+        <IconButton
+          size="small"
+          onClick={onStartEdit}
+          sx={{
+            padding: '2px',
+            color: 'text.disabled',
+            '&:hover': { color: 'primary.main', bgcolor: withOpacity('#ff4500', 0.2) },
+          }}
+          title="Edit"
+        >
+          <EditIcon sx={{ fontSize: 14 }} />
+        </IconButton>
+        <IconButton
+          size="small"
+          onClick={onRemove}
+          sx={{
+            padding: '2px',
+            color: 'text.disabled',
+            '&:hover': { color: 'error.main', bgcolor: withOpacity('#dc2626', 0.2) },
+          }}
+          title="Remove"
+        >
+          <CloseIcon sx={{ fontSize: 14 }} />
+        </IconButton>
+      </Stack>
+
+      {/* Map button in lower right corner */}
+      <Tooltip title={isAssignedToVehicle ? 'Remove from vehicle first' : (creature.position ? 'Remove from map' : 'Place on map')} arrow>
+        <span
+          style={{
+            position: 'absolute',
+            bottom: 4,
+            right: 4,
+          }}
+        >
+          <IconButton
+            size="small"
+            onClick={onToggleMap}
+            disabled={isAssignedToVehicle}
+            sx={{
+              padding: '3px',
+              bgcolor: creature.position && !isAssignedToVehicle ? withOpacity(borderColor, 0.2) : 'transparent',
+              '&:hover': { bgcolor: withOpacity(borderColor, 0.3) },
+            }}
+          >
+            <MapIcon sx={{ fontSize: 16, color: creature.position && !isAssignedToVehicle ? borderColor : 'text.secondary' }} />
+          </IconButton>
+        </span>
+      </Tooltip>
+
+      <Box>
+        <Typography variant="body2" fontWeight={600} component="div" sx={{ pr: 1 }}>
+          <span
+            onClick={hasStatblock && onViewStatblock ? onViewStatblock : undefined}
+            style={{
+              cursor: hasStatblock && onViewStatblock ? 'pointer' : 'default',
+              textDecoration: isDead ? 'line-through' : 'none',
+            }}
+            onMouseEnter={(e) => {
+              if (hasStatblock && onViewStatblock) {
+                e.currentTarget.style.color = '#ff4500';
               }
-            </Typography>
+            }}
+            onMouseLeave={(e) => {
+              if (hasStatblock && onViewStatblock) {
+                e.currentTarget.style.color = '';
+              }
+            }}
+          >
+            {creature.name}
+          </span>
+          {isInDeathSaves && (
+            <Tooltip title="Making Death Saves" arrow>
+              <SkullIcon sx={{ fontSize: 16, color: 'error.main', ml: 0.5, verticalAlign: 'middle' }} />
+            </Tooltip>
           )}
-        </Box>
-        <Stack direction="row" spacing={0.5}>
-          <Tooltip title={isAssignedToVehicle ? 'Remove from vehicle first' : (creature.position ? 'Remove from map' : 'Place on map')} arrow>
-            <span>
-              <IconButton
-                size="small"
-                onClick={onToggleMap}
-                disabled={isAssignedToVehicle}
-              >
-                <MapIcon fontSize="small" sx={{ color: creature.position && !isAssignedToVehicle ? borderColor : 'text.secondary' }} />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <IconButton size="small" onClick={onStartEdit} title="Edit">
-            <EditIcon fontSize="small" />
-          </IconButton>
-          <IconButton size="small" onClick={onRemove} color="error" title="Remove">
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        </Stack>
+          {isDead && (
+            <Tooltip title="Dead" arrow>
+              <SkullIcon sx={{ fontSize: 16, color: 'error.main', ml: 0.5, verticalAlign: 'middle' }} />
+            </Tooltip>
+          )}
+          {getStatusIndicator()}
+        </Typography>
+        {isInDeathSaves ? (
+          <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600 }}>
+            DEATH SAVES | AC: {creature.statblock.ac} | Init: {creature.initiative}
+          </Typography>
+        ) : isDead ? (
+          <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600 }}>
+            DEAD | AC: {creature.statblock.ac} | Init: {creature.initiative}
+          </Typography>
+        ) : (
+          <Typography variant="caption" color="text.secondary">
+            HP: {creature.currentHp}/{creature.statblock.maxHp} | AC: {creature.statblock.ac} | Init: {creature.initiative} | DEX Save: {
+              creature.statblock.savingThrows?.dex !== undefined
+                ? (creature.statblock.savingThrows.dex >= 0 ? '+' : '') + creature.statblock.savingThrows.dex
+                : (creature.statblock.abilities?.dex
+                  ? (Math.floor((creature.statblock.abilities.dex - 10) / 2) >= 0 ? '+' : '') + Math.floor((creature.statblock.abilities.dex - 10) / 2)
+                  : '—')
+            }
+          </Typography>
+        )}
       </Box>
     </Paper>
   );

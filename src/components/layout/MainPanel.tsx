@@ -22,7 +22,10 @@ import {
   ToggleButtonGroup,
   TextField,
   IconButton,
-  Divider,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import MapIcon from '@mui/icons-material/Map';
@@ -30,6 +33,9 @@ import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import SaveIcon from '@mui/icons-material/Save';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
+import GroupIcon from '@mui/icons-material/Group';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import { useCombat } from '../../context/CombatContext';
 import { VehicleCard } from '../vehicles/VehicleCard';
 import { ScaleIndicator } from '../combat/ScaleIndicator';
@@ -50,6 +56,8 @@ export function MainPanel() {
   const [showLoadPartyModal, setShowLoadPartyModal] = useState(false);
   const [partyPresetName, setPartyPresetName] = useState('');
   const [partyPresets, setPartyPresets] = useState<PartyPreset[]>([]);
+  const [vehicleMenuAnchor, setVehicleMenuAnchor] = useState<null | HTMLElement>(null);
+  const [partyPresetMenuAnchor, setPartyPresetMenuAnchor] = useState<null | HTMLElement>(null);
 
   const handleAddVehicle = (templateId: string, type: 'party' | 'enemy') => {
     const template = VEHICLE_TEMPLATES.find((t) => t.id === templateId);
@@ -182,7 +190,7 @@ export function MainPanel() {
   const enemyVehicles = state.vehicles.filter((v) => v.type === 'enemy');
 
   return (
-    <Box component="main" sx={{ gridArea: 'main', p: 3, overflow: 'auto' }}>
+    <Box component="main" sx={{ gridArea: 'main', p: 3, minWidth: 0 }}>
       {/* View Toggle & Actions */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <ToggleButtonGroup
@@ -202,51 +210,82 @@ export function MainPanel() {
         </ToggleButtonGroup>
 
         <Stack direction="row" spacing={1} alignItems="center">
+          {/* Add Vehicle Dropdown */}
           <Button
             variant="contained"
             size="small"
             startIcon={<AddIcon />}
-            onClick={() => setShowAddModal('party')}
+            endIcon={<ArrowDropDownIcon />}
+            onClick={(e) => setVehicleMenuAnchor(e.currentTarget)}
           >
-            Party Vehicle
+            Vehicle
           </Button>
+          <Menu
+            anchorEl={vehicleMenuAnchor}
+            open={Boolean(vehicleMenuAnchor)}
+            onClose={() => setVehicleMenuAnchor(null)}
+          >
+            <MenuItem onClick={() => { setShowAddModal('party'); setVehicleMenuAnchor(null); }}>
+              <ListItemIcon><DirectionsCarIcon fontSize="small" sx={{ color: 'success.main' }} /></ListItemIcon>
+              <ListItemText>Add Party Vehicle</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { setShowAddModal('enemy'); setVehicleMenuAnchor(null); }}>
+              <ListItemIcon><DirectionsCarIcon fontSize="small" sx={{ color: 'error.main' }} /></ListItemIcon>
+              <ListItemText>Add Enemy Vehicle</ListItemText>
+            </MenuItem>
+          </Menu>
+
+          {/* Party Preset Dropdown */}
           <Button
             variant="outlined"
             size="small"
-            startIcon={<SaveIcon />}
-            onClick={handleOpenSavePartyModal}
-            disabled={partyVehicles.length === 0 && state.creatures.length === 0}
+            startIcon={<GroupIcon />}
+            endIcon={<ArrowDropDownIcon />}
+            onClick={(e) => setPartyPresetMenuAnchor(e.currentTarget)}
           >
-            Save Party
+            Party Preset
           </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<FolderOpenIcon />}
-            onClick={handleOpenLoadPartyModal}
+          <Menu
+            anchorEl={partyPresetMenuAnchor}
+            open={Boolean(partyPresetMenuAnchor)}
+            onClose={() => setPartyPresetMenuAnchor(null)}
           >
-            Load Party
-          </Button>
-          <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
-          <Button
-            variant="contained"
-            size="small"
-            color="error"
-            startIcon={<AddIcon />}
-            onClick={() => setShowAddModal('enemy')}
-          >
-            Enemy Vehicle
-          </Button>
+            <MenuItem
+              onClick={() => { handleOpenSavePartyModal(); setPartyPresetMenuAnchor(null); }}
+              disabled={partyVehicles.length === 0 && state.creatures.length === 0}
+            >
+              <ListItemIcon><SaveIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>Save Party</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { handleOpenLoadPartyModal(); setPartyPresetMenuAnchor(null); }}>
+              <ListItemIcon><FolderOpenIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>Load Party</ListItemText>
+            </MenuItem>
+          </Menu>
         </Stack>
       </Box>
 
       {/* Scale Indicator */}
       <ScaleIndicator />
 
-      {/* Battlefield View */}
+      {/* Battlefield View - Map and Combat Log sticky together */}
       {viewMode === 'battlefield' && (
-        <Box sx={{ mt: 3 }}>
+        <Box
+          sx={{
+            mt: 3,
+            position: 'sticky',
+            top: 16,
+            zIndex: 10,
+            bgcolor: 'background.default',
+            maxWidth: '100%',
+            overflow: 'hidden',
+          }}
+        >
           <BattlefieldMap height={500} />
+          {/* Combat Log - Below Battlefield, sticky with map */}
+          <Box sx={{ mt: 2 }}>
+            <CombatLog />
+          </Box>
         </Box>
       )}
 
@@ -322,10 +361,12 @@ export function MainPanel() {
         </Box>
       )}
 
-      {/* Combat Log - Below Battlefield */}
-      <Box sx={{ mt: 3 }}>
-        <CombatLog />
-      </Box>
+      {/* Combat Log - Below Cards View (only shown when not in battlefield view) */}
+      {viewMode === 'cards' && (
+        <Box sx={{ mt: 3 }}>
+          <CombatLog />
+        </Box>
+      )}
 
       {/* Empty State */}
       {state.vehicles.length === 0 && (

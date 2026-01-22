@@ -12,6 +12,7 @@ import {
   Button,
   ButtonGroup,
   Stack,
+  Tooltip,
 } from '@mui/material';
 import { useCombat } from '../../context/CombatContext';
 import {
@@ -74,7 +75,7 @@ export function ScaleIndicator() {
     return ((logDist - logMin) / (logMax - logMin)) * 100;
   };
 
-  const markerPosition = getScalePosition(distance);
+  const markerPosition = Math.min(100, Math.max(0, getScalePosition(distance)));
   const scaleColor = scaleColors[state.scale as keyof typeof scaleColors];
 
   return (
@@ -123,13 +124,21 @@ export function ScaleIndicator() {
       <Box
         sx={{
           position: 'relative',
-          height: 8,
-          bgcolor: '#242424',
-          borderRadius: 1,
+          height: 16,
+          py: '4px',
           mb: 1,
-          overflow: 'visible',
+          overflow: 'hidden',
         }}
       >
+        <Box
+          sx={{
+            position: 'relative',
+            height: 8,
+            bgcolor: '#242424',
+            borderRadius: 1,
+            overflow: 'hidden',
+          }}
+        >
         {/* Threshold markers */}
         {thresholds.map(({ scale, threshold }) => (
           <Box
@@ -158,6 +167,7 @@ export function ScaleIndicator() {
             boxShadow: `0 0 8px ${scaleColor}`,
           }}
         />
+        </Box>
       </Box>
 
       {/* Scale Labels */}
@@ -177,24 +187,53 @@ export function ScaleIndicator() {
       </Box>
 
       {/* Scale Selector */}
-      <ButtonGroup fullWidth size="small" sx={{ mb: 2 }}>
-        {scales.map((scaleName) => (
-          <Button
-            key={scaleName}
-            variant={state.scale === scaleName ? 'contained' : 'outlined'}
-            onClick={() => setScale(scaleName)}
-            sx={{
-              fontSize: '0.75rem',
-              ...(state.scale === scaleName && {
-                bgcolor: scaleColors[scaleName as keyof typeof scaleColors],
-                '&:hover': { bgcolor: scaleColors[scaleName as keyof typeof scaleColors] },
-              }),
-            }}
-          >
-            {SCALES[scaleName].displayName}
-          </Button>
-        ))}
-      </ButtonGroup>
+      <Box sx={{ display: 'flex', mb: 2 }}>
+        {scales.map((scaleName, index) => {
+          const scaleConfig = SCALES[scaleName];
+          const isTooZoomedOut = distance < scaleConfig.minDistance;
+          const isDisabled = isTooZoomedOut && currentTurnVehicle !== null;
+          const isSelected = state.scale === scaleName;
+          const isFirst = index === 0;
+          const isLast = index === scales.length - 1;
+
+          const button = (
+            <Button
+              variant={isSelected ? 'contained' : 'outlined'}
+              onClick={() => !isDisabled && setScale(scaleName)}
+              disabled={isDisabled}
+              size="small"
+              sx={{
+                flex: 1,
+                fontSize: '0.75rem',
+                borderRadius: 0,
+                ...(isFirst && { borderTopLeftRadius: 4, borderBottomLeftRadius: 4 }),
+                ...(isLast && { borderTopRightRadius: 4, borderBottomRightRadius: 4 }),
+                ...(!isFirst && { borderLeft: 'none' }),
+                ...(isSelected && {
+                  bgcolor: scaleColors[scaleName as keyof typeof scaleColors],
+                  '&:hover': { bgcolor: scaleColors[scaleName as keyof typeof scaleColors] },
+                }),
+                ...(isDisabled && {
+                  opacity: 0.5,
+                }),
+              }}
+            >
+              {SCALES[scaleName].displayName}
+            </Button>
+          );
+
+          return (
+            <Tooltip
+              key={scaleName}
+              title={isDisabled ? `Vehicles are within ${formatDistance(scaleConfig.minDistance)} - ${scaleConfig.displayName} scale requires greater distance` : ''}
+              arrow
+              disableHoverListener={!isDisabled}
+            >
+              <Box sx={{ flex: 1, display: 'flex' }}>{button}</Box>
+            </Tooltip>
+          );
+        })}
+      </Box>
 
       {/* Info Box */}
       <Paper sx={{ p: 1.5, bgcolor: '#242424' }}>

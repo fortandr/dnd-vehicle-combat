@@ -24,6 +24,10 @@ function App() {
             "footer footer footer"
           `,
           minHeight: '100vh',
+          // Allow page to scroll - sidebars grow with content
+          '& > *': {
+            minHeight: 0,
+          },
         }}
       >
         <Header />

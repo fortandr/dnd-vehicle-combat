@@ -13,7 +13,11 @@ import {
   Stack,
   Chip,
   Alert,
+  Collapse,
+  LinearProgress,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { useCombat } from '../../context/CombatContext';
 import { Vehicle, Mishap, Creature, VehicleZone } from '../../types';
 import { getMishapResult, getMishapSeverity, checkMishapFromDamage, canRepairMishap, getRepairDescription, rollMishapForVehicle } from '../../data/mishapTable';
@@ -146,9 +150,11 @@ function CrewMemberRow({ creature, zone, onHpChange }: CrewMemberRowProps) {
 
 interface VehicleStatsPanelProps {
   vehicle: Vehicle;
+  expanded: boolean;
+  onToggle: () => void;
 }
 
-export function VehicleStatsPanel({ vehicle }: VehicleStatsPanelProps) {
+export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsPanelProps) {
   const { state, dispatch, applyMishap } = useCombat();
   const [damageAmount, setDamageAmount] = useState('');
   const [lastMishapResult, setLastMishapResult] = useState<{ roll: number; mishap: Mishap } | null>(null);
@@ -272,24 +278,70 @@ export function VehicleStatsPanel({ vehicle }: VehicleStatsPanelProps) {
   };
 
   const borderColor = vehicle.type === 'party' ? factionColors.party : factionColors.enemy;
+  const hpPercent = (vehicle.currentHp / vehicle.template.maxHp) * 100;
+  const hpColor = hpPercent > 50 ? 'success' : hpPercent > 25 ? 'warning' : 'error';
 
   return (
-    <Box sx={{ mb: 2 }}>
-      {/* Vehicle Header */}
-      <Paper sx={{ p: 1, mb: 2, bgcolor: withOpacity(borderColor, 0.1), borderLeft: 3, borderColor }}>
-        <Typography fontWeight={600}>{vehicle.name}</Typography>
-        <Typography variant="caption" color="text.secondary">
-          Damage Threshold: {getEffectiveDamageThreshold(vehicle) < vehicle.template.damageThreshold ? (
-            <span style={{ color: '#f59e0b' }}>
-              <s>{vehicle.template.damageThreshold}</s> {getEffectiveDamageThreshold(vehicle)}
-            </span>
-          ) : (
-            vehicle.template.damageThreshold
-          )} | Mishap Threshold: {vehicle.template.mishapThreshold}
-        </Typography>
+    <Box sx={{ mb: 1 }}>
+      {/* Vehicle Header - Clickable */}
+      <Paper
+        onClick={onToggle}
+        sx={{
+          p: 1,
+          bgcolor: withOpacity(borderColor, 0.1),
+          borderLeft: 3,
+          borderColor,
+          cursor: 'pointer',
+          '&:hover': { bgcolor: withOpacity(borderColor, 0.15) },
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ flex: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography fontWeight={600}>{vehicle.name}</Typography>
+              {vehicle.activeMishaps.length > 0 && (
+                <Chip
+                  label={`${vehicle.activeMishaps.length} mishap${vehicle.activeMishaps.length > 1 ? 's' : ''}`}
+                  size="small"
+                  color="warning"
+                  sx={{ height: 18, fontSize: '0.625rem' }}
+                />
+              )}
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+              <Typography variant="caption" color="text.secondary">
+                HP: {vehicle.currentHp}/{vehicle.template.maxHp}
+              </Typography>
+              <LinearProgress
+                variant="determinate"
+                value={hpPercent}
+                color={hpColor}
+                sx={{ width: 60, height: 4, borderRadius: 1 }}
+              />
+              <Typography variant="caption" color="text.secondary">
+                | Crew: {vehicleCrew.length}
+              </Typography>
+            </Box>
+          </Box>
+          {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        </Box>
       </Paper>
 
-      {/* Vehicle Stats */}
+      {/* Collapsible Content */}
+      <Collapse in={expanded}>
+        <Paper sx={{ p: 1.5, bgcolor: '#1a1a1a', borderLeft: 3, borderColor, borderTop: 0 }}>
+          {/* Thresholds Info */}
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+            Damage Threshold: {getEffectiveDamageThreshold(vehicle) < vehicle.template.damageThreshold ? (
+              <span style={{ color: '#f59e0b' }}>
+                <s>{vehicle.template.damageThreshold}</s> {getEffectiveDamageThreshold(vehicle)}
+              </span>
+            ) : (
+              vehicle.template.damageThreshold
+            )} | Mishap Threshold: {vehicle.template.mishapThreshold}
+          </Typography>
+
+          {/* Vehicle Stats */}
       <Stack spacing={1} sx={{ mb: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="body2">HP:</Typography>
@@ -483,34 +535,49 @@ export function VehicleStatsPanel({ vehicle }: VehicleStatsPanelProps) {
         </Box>
       )}
 
-      {/* Crew HP */}
-      {vehicleCrew.length > 0 && (
-        <Box>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-            Crew HP:
-          </Typography>
-          <Stack spacing={0.5}>
-            {vehicleCrew.map(({ creature, zone }) => (
-              <CrewMemberRow
-                key={creature!.id}
-                creature={creature!}
-                zone={zone}
-                onHpChange={(newHp) => handleCreatureHpChange(creature!.id, newHp, creature!.statblock.maxHp)}
-              />
-            ))}
-          </Stack>
-        </Box>
-      )}
+          {/* Crew HP */}
+          {vehicleCrew.length > 0 && (
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                Crew HP:
+              </Typography>
+              <Stack spacing={0.5}>
+                {vehicleCrew.map(({ creature, zone }) => (
+                  <CrewMemberRow
+                    key={creature!.id}
+                    creature={creature!}
+                    zone={zone}
+                    onHpChange={(newHp) => handleCreatureHpChange(creature!.id, newHp, creature!.statblock.maxHp)}
+                  />
+                ))}
+              </Stack>
+            </Box>
+          )}
+        </Paper>
+      </Collapse>
     </Box>
   );
 }
 
 export function AllVehiclesStatsPanel() {
   const { state } = useCombat();
+  const [expandedVehicles, setExpandedVehicles] = useState<Set<string>>(new Set());
 
   if (state.vehicles.length === 0) {
     return <Typography variant="body2" color="text.secondary">No vehicles in combat.</Typography>;
   }
+
+  const toggleVehicle = (vehicleId: string) => {
+    setExpandedVehicles((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(vehicleId)) {
+        newSet.delete(vehicleId);
+      } else {
+        newSet.add(vehicleId);
+      }
+      return newSet;
+    });
+  };
 
   const partyVehicles = state.vehicles.filter((v) => v.type === 'party');
   const enemyVehicles = state.vehicles.filter((v) => v.type === 'enemy');
@@ -523,7 +590,12 @@ export function AllVehiclesStatsPanel() {
             PARTY VEHICLES
           </Typography>
           {partyVehicles.map((vehicle) => (
-            <VehicleStatsPanel key={vehicle.id} vehicle={vehicle} />
+            <VehicleStatsPanel
+              key={vehicle.id}
+              vehicle={vehicle}
+              expanded={expandedVehicles.has(vehicle.id)}
+              onToggle={() => toggleVehicle(vehicle.id)}
+            />
           ))}
         </Box>
       )}
@@ -534,7 +606,12 @@ export function AllVehiclesStatsPanel() {
             ENEMY VEHICLES
           </Typography>
           {enemyVehicles.map((vehicle) => (
-            <VehicleStatsPanel key={vehicle.id} vehicle={vehicle} />
+            <VehicleStatsPanel
+              key={vehicle.id}
+              vehicle={vehicle}
+              expanded={expandedVehicles.has(vehicle.id)}
+              onToggle={() => toggleVehicle(vehicle.id)}
+            />
           ))}
         </Box>
       )}

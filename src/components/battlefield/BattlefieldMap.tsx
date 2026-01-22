@@ -1029,6 +1029,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
       panOffset,
       round: state.round,
       phase: state.phase,
+      dmViewport: { width, height },
     });
   }, [
     state.vehicles,
@@ -1041,6 +1042,8 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     zoom,
     panOffset,
     broadcast,
+    width,
+    height,
   ]);
 
   // Get grid size in screen pixels
@@ -2290,8 +2293,10 @@ function VehicleIcon({ templateId, size, color }: VehicleIconProps) {
   if (id.includes('scavenger')) {
     // Scavenger - Salvage/support vehicle with large crane, bus-like armored body
     // Two front wheels, two rear treaded tracks, crane with grappling claw
+    // Scale 0.667 to fit in smaller viewBox for ~50% larger rendering
     return (
-      <svg width={size} height={size} viewBox="0 0 40 64">
+      <svg width={size} height={size} viewBox="0 0 27 43">
+        <g transform="scale(0.667)">
         {/* === FRONT SECTION - CAB === */}
         {/* Armored cab - boxy bus-like front */}
         <rect x="8" y="4" width="24" height="16" fill={color} opacity="0.9" rx="2"/>
@@ -2404,6 +2409,7 @@ function VehicleIcon({ templateId, size, color }: VehicleIconProps) {
         {/* Tool/equipment storage boxes */}
         <rect x="8" y="42" width="4" height="3" fill="#333" opacity="0.4" rx="0.5"/>
         <rect x="28" y="42" width="4" height="3" fill="#333" opacity="0.4" rx="0.5"/>
+        </g>
       </svg>
     );
   }
@@ -2992,7 +2998,7 @@ function getVehicleSizeInFeet(size: string, templateId?: string): number {
   if (templateId) {
     const templateSizes: Record<string, number> = {
       'demon-grinder': 45,  // Tour bus (~40-45 ft)
-      'scavenger': 28,      // Garbage truck (~25-30 ft)
+      'scavenger': 35,      // Salvage truck (~35 ft)
       'tormentor': 22,      // APC (~20-25 ft)
       'buzz-killer': 15,    // Sedan (~15 ft)
       'devils-ride': 8,     // Touring motorcycle (~8 ft)

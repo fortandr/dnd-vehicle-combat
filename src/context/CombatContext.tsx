@@ -21,6 +21,11 @@ import {
   CombatPhase,
   BattlefieldState,
   BackgroundImageConfig,
+  ChaseComplication,
+  ActiveBattlefieldComplication,
+  VehicleComplicationResolution,
+  SpeedModifier,
+  ComplicationResolutionStatus,
 } from '../types';
 import { getScaleForDistance, SCALES } from '../data/scaleConfig';
 import { v4 as uuid } from 'uuid';
@@ -62,6 +67,7 @@ export const initialCombatState: CombatState = {
   battlefield: initialBattlefield,
   environment: initialEnvironment,
   actionLog: [],
+  autoRollComplications: false,
 };
 
 // ==========================================
@@ -124,7 +130,15 @@ type CombatAction =
 
   // Logging
   | { type: 'LOG_ACTION'; payload: Omit<LogEntry, 'id' | 'timestamp' | 'round'> }
-  | { type: 'CLEAR_LOG' };
+  | { type: 'CLEAR_LOG' }
+
+  // Complications
+  | { type: 'TOGGLE_AUTO_ROLL_COMPLICATIONS' }
+  | { type: 'START_COMPLICATION_RESOLUTION'; payload: { complication: ChaseComplication; roll: number; rollRange: string } }
+  | { type: 'RESOLVE_VEHICLE_COMPLICATION'; payload: { vehicleId: string; status: ComplicationResolutionStatus; rollResult?: number; modifier?: number; total?: number } }
+  | { type: 'APPLY_COMPLICATION_EFFECTS' }
+  | { type: 'CLEAR_COMPLICATION' }
+  | { type: 'CLEAR_EXPIRED_SPEED_MODIFIERS' };
 
 // ==========================================
 // Reducer
@@ -774,18 +788,35 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
 
     case 'NEXT_ROUND': {
       const newRound = state.round + 1;
-      // Tick mishap durations
-      const updatedVehicles = state.vehicles.map((v) => ({
-        ...v,
-        activeMishaps: v.activeMishaps
+      // Tick mishap durations and clear expired speed modifiers
+      const updatedVehicles = state.vehicles.map((v) => {
+        // Process mishaps
+        const updatedMishaps = v.activeMishaps
           .map((m) => {
             if (m.duration === 'rounds' && m.roundsRemaining !== undefined) {
               return { ...m, roundsRemaining: m.roundsRemaining - 1 };
             }
             return m;
           })
-          .filter((m) => m.duration !== 'rounds' || (m.roundsRemaining ?? 1) > 0),
-      }));
+          .filter((m) => m.duration !== 'rounds' || (m.roundsRemaining ?? 1) > 0);
+
+        // Clear expired speed modifiers (those from previous rounds)
+        const activeSpeedModifiers = (v.speedModifiers || []).filter((mod) => {
+          // Keep 'this_round' modifiers only if they were applied this round
+          // (They'll be cleared at the START of next round, so check against current round)
+          if (mod.duration === 'this_round' && mod.appliedAtRound < state.round) {
+            return false;
+          }
+          // Keep 'until_cleared' modifiers
+          return true;
+        });
+
+        return {
+          ...v,
+          activeMishaps: updatedMishaps,
+          speedModifiers: activeSpeedModifiers.length > 0 ? activeSpeedModifiers : undefined,
+        };
+      });
 
       // Re-sort initiative order to put creatures back in proper initiative positions
       // (This handles creatures that exited vehicles mid-round and were inserted after current turn)
@@ -1155,6 +1186,189 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         actionLog: [],
       };
 
+    // ========== Complications ==========
+    case 'TOGGLE_AUTO_ROLL_COMPLICATIONS':
+      return {
+        ...state,
+        autoRollComplications: !state.autoRollComplications,
+      };
+
+    case 'START_COMPLICATION_RESOLUTION': {
+      const { complication, roll, rollRange } = action.payload;
+
+      // Create resolution entries for all non-destroyed vehicles
+      const resolutions: VehicleComplicationResolution[] = state.vehicles
+        .filter((v) => !v.isInoperative && v.currentHp > 0)
+        .map((vehicle) => {
+          // Find the driver for this vehicle
+          const driver = findVehicleDriver(vehicle, state.crewAssignments, state.creatures);
+          return {
+            vehicleId: vehicle.id,
+            status: 'pending' as ComplicationResolutionStatus,
+            driverName: driver?.name,
+          };
+        });
+
+      const activeBattlefieldComplication: ActiveBattlefieldComplication = {
+        id: uuid(),
+        complication,
+        roll,
+        rollRange,
+        round: state.round,
+        resolutions,
+        isResolved: false,
+      };
+
+      return {
+        ...state,
+        activeBattlefieldComplication,
+      };
+    }
+
+    case 'RESOLVE_VEHICLE_COMPLICATION': {
+      if (!state.activeBattlefieldComplication) return state;
+
+      const { vehicleId, status, rollResult, modifier, total } = action.payload;
+
+      const updatedResolutions = state.activeBattlefieldComplication.resolutions.map((res) =>
+        res.vehicleId === vehicleId
+          ? { ...res, status, rollResult, modifier, total }
+          : res
+      );
+
+      // Check if all vehicles have been resolved
+      const allResolved = updatedResolutions.every((res) => res.status !== 'pending');
+
+      return {
+        ...state,
+        activeBattlefieldComplication: {
+          ...state.activeBattlefieldComplication,
+          resolutions: updatedResolutions,
+          isResolved: allResolved,
+        },
+      };
+    }
+
+    case 'APPLY_COMPLICATION_EFFECTS': {
+      if (!state.activeBattlefieldComplication) return state;
+
+      const complication = state.activeBattlefieldComplication.complication;
+      const failedVehicleIds = state.activeBattlefieldComplication.resolutions
+        .filter((res) => res.status === 'failed')
+        .map((res) => res.vehicleId);
+
+      // Determine what effects to apply based on the complication
+      const mechanicalEffect = complication.mechanicalEffect;
+      const logEntries: LogEntry[] = [];
+
+      // Apply speed modifiers to failed vehicles
+      let updatedVehicles = state.vehicles;
+
+      if (failedVehicleIds.length > 0 && mechanicalEffect?.skillCheck?.failureEffect) {
+        const failureEffect = mechanicalEffect.skillCheck.failureEffect.toLowerCase();
+
+        // Check for difficult terrain / speed effects
+        const isDifficultTerrain =
+          failureEffect.includes('difficult terrain') ||
+          failureEffect.includes('speed halved');
+
+        if (isDifficultTerrain) {
+          updatedVehicles = state.vehicles.map((vehicle) => {
+            if (!failedVehicleIds.includes(vehicle.id)) return vehicle;
+
+            const newModifier: SpeedModifier = {
+              id: uuid(),
+              source: `${complication.name} complication`,
+              multiplier: 0.5, // Half speed for difficult terrain
+              duration: 'this_round',
+              appliedAtRound: state.round,
+            };
+
+            logEntries.push(
+              createLogEntry(
+                state.round,
+                'complication',
+                `${vehicle.name} fails save - speed halved this round`,
+                complication.name
+              )
+            );
+
+            return {
+              ...vehicle,
+              speedModifiers: [...(vehicle.speedModifiers || []), newModifier],
+            };
+          });
+        }
+      }
+
+      // Log passed vehicles
+      const passedVehicleIds = state.activeBattlefieldComplication.resolutions
+        .filter((res) => res.status === 'passed')
+        .map((res) => res.vehicleId);
+
+      for (const vehicleId of passedVehicleIds) {
+        const vehicle = state.vehicles.find((v) => v.id === vehicleId);
+        if (vehicle) {
+          logEntries.push(
+            createLogEntry(
+              state.round,
+              'complication',
+              `${vehicle.name} passes save - no effect`,
+              complication.name
+            )
+          );
+        }
+      }
+
+      return {
+        ...state,
+        vehicles: updatedVehicles,
+        activeBattlefieldComplication: undefined, // Clear after applying
+        actionLog: [...state.actionLog, ...logEntries],
+      };
+    }
+
+    case 'CLEAR_COMPLICATION':
+      return {
+        ...state,
+        activeBattlefieldComplication: undefined,
+      };
+
+    case 'CLEAR_EXPIRED_SPEED_MODIFIERS': {
+      const updatedVehicles = state.vehicles.map((vehicle) => {
+        if (!vehicle.speedModifiers || vehicle.speedModifiers.length === 0) {
+          return vehicle;
+        }
+
+        const activeModifiers = vehicle.speedModifiers.filter((mod) => {
+          // Clear 'this_round' modifiers from previous rounds
+          if (mod.duration === 'this_round' && mod.appliedAtRound < state.round) {
+            return false;
+          }
+          // Clear 'this_turn' modifiers from previous turns
+          if (
+            mod.duration === 'this_turn' &&
+            mod.appliedAtTurnIndex !== undefined &&
+            mod.appliedAtTurnIndex < state.currentTurnIndex
+          ) {
+            return false;
+          }
+          return true;
+        });
+
+        if (activeModifiers.length === vehicle.speedModifiers.length) {
+          return vehicle;
+        }
+
+        return { ...vehicle, speedModifiers: activeModifiers };
+      });
+
+      return {
+        ...state,
+        vehicles: updatedVehicles,
+      };
+    }
+
     default:
       return state;
   }
@@ -1378,6 +1592,14 @@ interface CombatContextValue {
   setVehicleArmor: (vehicleId: string, armorUpgradeId: string) => void;
   toggleVehicleGadget: (vehicleId: string, gadgetId: string) => void;
   loadPartyPreset: (vehicles: Vehicle[], creatures: Creature[], crewAssignments: CrewAssignment[]) => void;
+  toggleAutoRollComplications: () => void;
+  logComplication: (roll: number, complicationName: string | null, details?: string) => void;
+  startComplicationResolution: (complication: ChaseComplication, roll: number, rollRange: string) => void;
+  resolveVehicleComplication: (vehicleId: string, status: ComplicationResolutionStatus, rollResult?: number, modifier?: number, total?: number) => void;
+  applyComplicationEffects: () => void;
+  clearComplication: () => void;
+  getDriverDexSave: (vehicle: Vehicle) => { modifier: number; driverName: string } | null;
+  getEffectiveSpeed: (vehicle: Vehicle) => number;
 
   // Computed values
   currentTurnCreature: Creature | undefined;
@@ -1742,6 +1964,93 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
     []
   );
 
+  const toggleAutoRollComplications = useCallback(
+    () => dispatch({ type: 'TOGGLE_AUTO_ROLL_COMPLICATIONS' }),
+    []
+  );
+
+  const logComplication = useCallback(
+    (roll: number, complicationName: string | null, details?: string) => {
+      dispatch({
+        type: 'LOG_ACTION',
+        payload: {
+          type: 'complication',
+          action: complicationName
+            ? `Complication Roll: ${roll} - ${complicationName}`
+            : `Complication Roll: ${roll} - No complication`,
+          details,
+        },
+      });
+    },
+    []
+  );
+
+  const startComplicationResolution = useCallback(
+    (complication: ChaseComplication, roll: number, rollRange: string) =>
+      dispatch({ type: 'START_COMPLICATION_RESOLUTION', payload: { complication, roll, rollRange } }),
+    []
+  );
+
+  const resolveVehicleComplication = useCallback(
+    (vehicleId: string, status: ComplicationResolutionStatus, rollResult?: number, modifier?: number, total?: number) =>
+      dispatch({ type: 'RESOLVE_VEHICLE_COMPLICATION', payload: { vehicleId, status, rollResult, modifier, total } }),
+    []
+  );
+
+  const applyComplicationEffects = useCallback(
+    () => dispatch({ type: 'APPLY_COMPLICATION_EFFECTS' }),
+    []
+  );
+
+  const clearComplication = useCallback(
+    () => dispatch({ type: 'CLEAR_COMPLICATION' }),
+    []
+  );
+
+  // Get the driver's DEX save modifier for a vehicle
+  const getDriverDexSave = useCallback(
+    (vehicle: Vehicle): { modifier: number; driverName: string } | null => {
+      const driver = findVehicleDriver(vehicle, state.crewAssignments, state.creatures);
+      if (!driver) return null;
+
+      // Get DEX save modifier - check savingThrows first, then calculate from abilities
+      let modifier = 0;
+      if (driver.statblock.savingThrows?.dex !== undefined) {
+        modifier = driver.statblock.savingThrows.dex;
+      } else if (driver.statblock.abilities?.dex !== undefined) {
+        // Calculate from ability score (no proficiency)
+        modifier = Math.floor((driver.statblock.abilities.dex - 10) / 2);
+      }
+
+      return { modifier, driverName: driver.name };
+    },
+    [state.crewAssignments, state.creatures]
+  );
+
+  // Get the effective speed of a vehicle after applying all modifiers
+  const getEffectiveSpeed = useCallback(
+    (vehicle: Vehicle): number => {
+      let speed = vehicle.template.speed;
+
+      // Apply mishap speed reductions
+      for (const mishap of vehicle.activeMishaps) {
+        if (mishap.mechanicalEffect?.speedReduction) {
+          speed = Math.max(0, speed - mishap.mechanicalEffect.speedReduction);
+        }
+      }
+
+      // Apply speed modifiers (multipliers like 0.5 for half speed)
+      if (vehicle.speedModifiers && vehicle.speedModifiers.length > 0) {
+        for (const mod of vehicle.speedModifiers) {
+          speed = Math.floor(speed * mod.multiplier);
+        }
+      }
+
+      return Math.max(0, speed);
+    },
+    []
+  );
+
   // Helper to get vehicle driver
   const getVehicleDriver = useCallback(
     (vehicle: Vehicle) => findVehicleDriver(vehicle, state.crewAssignments, state.creatures),
@@ -1796,6 +2105,14 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
     setVehicleArmor,
     toggleVehicleGadget,
     loadPartyPreset,
+    toggleAutoRollComplications,
+    logComplication,
+    startComplicationResolution,
+    resolveVehicleComplication,
+    applyComplicationEffects,
+    clearComplication,
+    getDriverDexSave,
+    getEffectiveSpeed,
     currentTurnCreature,
     currentTurnVehicle,
     currentTurnDriver,

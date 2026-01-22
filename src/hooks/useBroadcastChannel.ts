@@ -16,6 +16,7 @@ export interface BattlefieldSyncState {
   panOffset: { x: number; y: number };
   round: number;
   phase: CombatPhase;
+  dmViewport?: { width: number; height: number };
 }
 
 const CHANNEL_NAME = 'avernus-battlefield-sync';

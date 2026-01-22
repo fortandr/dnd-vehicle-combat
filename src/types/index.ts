@@ -220,6 +220,8 @@ export interface Vehicle {
   gadgetIds?: string[]; // IDs of installed magical gadgets
   // Status
   isInoperative?: boolean; // True when HP reaches 0 - crew ejected, vehicle disabled
+  // Temporary effects from complications
+  speedModifiers?: SpeedModifier[];
 }
 
 // ==========================================
@@ -283,6 +285,41 @@ export interface ChaseComplicationEffect {
     dc: number;
     failureEffect: string;
   };
+}
+
+// Speed modifier applied to a vehicle (from complications, terrain, etc.)
+export type SpeedModifierDuration = 'this_turn' | 'this_round' | 'until_cleared';
+
+export interface SpeedModifier {
+  id: string;
+  source: string; // e.g., "Uneven Ground complication"
+  multiplier: number; // 0.5 for half speed, 1 for no change
+  duration: SpeedModifierDuration;
+  appliedAtRound: number;
+  appliedAtTurnIndex?: number; // For 'this_turn' duration
+}
+
+// Resolution status for each vehicle in a complication
+export type ComplicationResolutionStatus = 'pending' | 'passed' | 'failed' | 'skipped';
+
+export interface VehicleComplicationResolution {
+  vehicleId: string;
+  status: ComplicationResolutionStatus;
+  rollResult?: number; // The d20 roll
+  modifier?: number; // The modifier applied
+  total?: number; // Roll + modifier
+  driverName?: string; // For display
+}
+
+// Active battlefield-wide complication being resolved
+export interface ActiveBattlefieldComplication {
+  id: string;
+  complication: ChaseComplication;
+  roll: number; // The d20 roll that triggered this
+  rollRange: string; // Display string like "1-2" or "8"
+  round: number; // Round it occurred
+  resolutions: VehicleComplicationResolution[];
+  isResolved: boolean; // True when all vehicles have resolved
 }
 
 // ==========================================
@@ -376,6 +413,10 @@ export interface CombatState {
 
   // Logging
   actionLog: LogEntry[];
+
+  // Complications
+  autoRollComplications: boolean;
+  activeBattlefieldComplication?: ActiveBattlefieldComplication; // Currently resolving complication
 }
 
 export interface Environment {

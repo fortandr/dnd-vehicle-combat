@@ -3,7 +3,7 @@
  * Top navigation bar with encounter info and controls
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -36,6 +36,11 @@ import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import AddIcon from '@mui/icons-material/Add';
 import StopIcon from '@mui/icons-material/Stop';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import CasinoIcon from '@mui/icons-material/Casino';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
+import CheckIcon from '@mui/icons-material/Check';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { useCombat } from '../../context/CombatContext';
 import { SCALES } from '../../data/scaleConfig';
 import { rollComplication, getComplicationRollRange } from '../../data/chaseComplications';
@@ -47,14 +52,16 @@ import {
   saveCombatArchive,
   CombatArchive,
 } from '../../hooks/useLocalStorage';
-import { CombatState } from '../../types';
+import { CombatState, ChaseComplication } from '../../types';
 import { scaleColors, withOpacity } from '../../theme/customColors';
 import { CombatSummary } from '../combat/CombatSummary';
+import { ComplicationResolutionModal } from '../combat/ComplicationResolutionModal';
+import { CreatureChaseModal } from '../combat/CreatureChaseModal';
 import { v4 as uuid } from 'uuid';
 import FlagIcon from '@mui/icons-material/Flag';
 
 export function Header() {
-  const { state, dispatch, startCombat, returnToSetup, resetCombat, nextRound, nextTurn, loadEncounter, newEncounter, lastSaved, forceSave, markAsSaved, setEncounterName } = useCombat();
+  const { state, dispatch, startCombat, returnToSetup, resetCombat, nextRound, nextTurn, loadEncounter, newEncounter, lastSaved, forceSave, markAsSaved, setEncounterName, toggleAutoRollComplications, logComplication, startComplicationResolution, clearComplication } = useCombat();
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
@@ -62,6 +69,16 @@ export function Header() {
   const [saveName, setSaveName] = useState(state.name);
   const [savedEncounters, setSavedEncounters] = useState<SavedEncounter[]>([]);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const [complicationMenuAnchor, setComplicationMenuAnchor] = useState<null | HTMLElement>(null);
+  const [showComplicationModal, setShowComplicationModal] = useState(false);
+  const [showResolutionModal, setShowResolutionModal] = useState(false);
+  const [showCreatureChaseModal, setShowCreatureChaseModal] = useState(false);
+  const [currentComplicationResult, setCurrentComplicationResult] = useState<{
+    roll: number;
+    rollRange: string;
+    complication: ChaseComplication | null;
+  } | null>(null);
+  const [prevRound, setPrevRound] = useState(state.round);
 
   const currentScale = SCALES[state.scale];
 
@@ -112,6 +129,46 @@ export function Header() {
       errorMessage: errors.join('\n'),
     };
   }, [state.creatures, state.crewAssignments, state.vehicles]);
+
+  // Helper to check if a complication is "Creature Chase" (roll 1-2)
+  const isCreatureChaseComplication = (complication: ChaseComplication | null, roll: number): boolean => {
+    return roll <= 2 && complication?.name === 'Creature Chase';
+  };
+
+  // Auto-roll complication when round changes (if enabled)
+  useEffect(() => {
+    // Only trigger on round change (not on initial load), in combat phase, and when auto-roll is enabled
+    if (state.round > prevRound && state.phase === 'combat' && state.autoRollComplications) {
+      // Roll for complication
+      const roll = Math.floor(Math.random() * 20) + 1;
+      const complication = rollComplication(roll, state.scale);
+      const rollRange = getComplicationRollRange(roll);
+
+      // Log to combat log
+      logComplication(
+        roll,
+        complication?.name || null,
+        complication ? complication.effect : 'The hellish terrain poses no additional threats this round.'
+      );
+
+      // Store the result for modals
+      setCurrentComplicationResult({ roll, rollRange, complication });
+
+      // Check what type of complication this is
+      if (isCreatureChaseComplication(complication, roll)) {
+        // Creature Chase - show creature selection modal
+        setShowCreatureChaseModal(true);
+      } else if (complication && complication.mechanicalEffect?.skillCheck) {
+        // Skill check complication - start resolution process
+        startComplicationResolution(complication, roll, rollRange);
+        setShowResolutionModal(true);
+      } else {
+        // No complication or simple info-only complication
+        setShowComplicationModal(true);
+      }
+    }
+    setPrevRound(state.round);
+  }, [state.round, state.phase, state.autoRollComplications, state.scale, prevRound, logComplication, startComplicationResolution]);
 
   const handleSave = () => {
     // Update the encounter name in state
@@ -202,29 +259,29 @@ export function Header() {
     const complication = rollComplication(roll, state.scale);
     const rollRange = getComplicationRollRange(roll);
 
-    if (complication) {
-      let message = `Rolled ${roll} (Range: ${rollRange}) - COMPLICATION!\n\n` +
-        `${complication.name}\n\n` +
-        `${complication.description}\n\n` +
-        `Effect: ${complication.effect}`;
+    // Log to combat log
+    logComplication(
+      roll,
+      complication?.name || null,
+      complication ? complication.effect : 'The hellish terrain poses no additional threats this round.'
+    );
 
-      if (complication.mechanicalEffect) {
-        const mech = complication.mechanicalEffect;
-        if (mech.damage) {
-          message += `\n\nDamage: ${mech.damage}`;
-        }
-        if (mech.skillCheck) {
-          message += `\n\nCheck: ${mech.skillCheck.skill} DC ${mech.skillCheck.dc}`;
-          if (mech.skillCheck.failureEffect) {
-            message += `\nFailure: ${mech.skillCheck.failureEffect}`;
-          }
-        }
-      }
+    // Store the result for modals
+    setCurrentComplicationResult({ roll, rollRange, complication });
 
-      alert(message);
+    // Check what type of complication this is
+    if (isCreatureChaseComplication(complication, roll)) {
+      // Creature Chase - show creature selection modal
+      setShowCreatureChaseModal(true);
+    } else if (complication && complication.mechanicalEffect?.skillCheck) {
+      // Skill check complication - start resolution process
+      startComplicationResolution(complication, roll, rollRange);
+      setShowResolutionModal(true);
     } else {
-      alert(`Rolled ${roll} (Range: ${rollRange}) - No complication this turn.\n\nThe hellish terrain poses no additional threats this round.`);
+      // No complication or simple info-only complication
+      setShowComplicationModal(true);
     }
+    setComplicationMenuAnchor(null);
   };
 
   const scaleColor = scaleColors[state.scale as keyof typeof scaleColors];
@@ -389,11 +446,39 @@ export function Header() {
               <Button
                 variant="outlined"
                 size="small"
-                onClick={handleRollComplication}
-                title={`Roll for chase complication (${currentScale.displayName} scale)`}
+                onClick={(e) => setComplicationMenuAnchor(e.currentTarget)}
+                endIcon={state.autoRollComplications ? <AutorenewIcon sx={{ fontSize: 16 }} /> : undefined}
+                title={`Roll for chase complication (${currentScale.displayName} scale)${state.autoRollComplications ? ' - Auto-roll enabled' : ''}`}
               >
-                Roll Complication
+                Complication
               </Button>
+              <Menu
+                anchorEl={complicationMenuAnchor}
+                open={Boolean(complicationMenuAnchor)}
+                onClose={() => setComplicationMenuAnchor(null)}
+              >
+                <MenuItem onClick={handleRollComplication}>
+                  <ListItemIcon><CasinoIcon fontSize="small" /></ListItemIcon>
+                  <ListItemText>Roll Random Complication</ListItemText>
+                </MenuItem>
+                <Divider />
+                <MenuItem onClick={() => {
+                  toggleAutoRollComplications();
+                  setComplicationMenuAnchor(null);
+                }}>
+                  <ListItemIcon>
+                    {state.autoRollComplications ? <CheckIcon fontSize="small" color="success" /> : <AutorenewIcon fontSize="small" />}
+                  </ListItemIcon>
+                  <ListItemText>
+                    Auto-roll at End of Round
+                    {state.autoRollComplications && (
+                      <Typography variant="caption" color="success.main" sx={{ ml: 1 }}>
+                        (Enabled)
+                      </Typography>
+                    )}
+                  </ListItemText>
+                </MenuItem>
+              </Menu>
             </Stack>
 
             <Divider orientation="vertical" flexItem />
@@ -569,6 +654,151 @@ export function Header() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Complication Modal */}
+      <Dialog
+        open={showComplicationModal}
+        onClose={() => setShowComplicationModal(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {currentComplicationResult?.complication ? (
+              <WarningAmberIcon color="warning" />
+            ) : (
+              <CheckCircleOutlineIcon color="success" />
+            )}
+            <Typography variant="h6">
+              Chase Complication Roll
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {currentComplicationResult && (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              {/* Roll Result */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box
+                  sx={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: currentComplicationResult.complication ? 'warning.dark' : 'success.dark',
+                    color: 'white',
+                  }}
+                >
+                  <Typography variant="h4" fontWeight={700}>
+                    {currentComplicationResult.roll}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Roll Range: {currentComplicationResult.rollRange}
+                  </Typography>
+                  <Typography variant="h6" fontWeight={600} color={currentComplicationResult.complication ? 'warning.main' : 'success.main'}>
+                    {currentComplicationResult.complication ? 'COMPLICATION!' : 'No Complication'}
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Complication Details */}
+              {currentComplicationResult.complication ? (
+                <Card variant="outlined" sx={{ bgcolor: withOpacity('#ff9800', 0.1), borderColor: 'warning.dark' }}>
+                  <CardContent>
+                    <Typography variant="h6" fontWeight={600} gutterBottom>
+                      {currentComplicationResult.complication.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" paragraph>
+                      {currentComplicationResult.complication.description}
+                    </Typography>
+                    <Divider sx={{ my: 1 }} />
+                    <Typography variant="body1" fontWeight={500}>
+                      Effect: {currentComplicationResult.complication.effect}
+                    </Typography>
+
+                    {/* Mechanical Effects */}
+                    {currentComplicationResult.complication.mechanicalEffect && (
+                      <Box sx={{ mt: 2, p: 1.5, bgcolor: 'background.default', borderRadius: 1 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                          MECHANICAL EFFECTS
+                        </Typography>
+                        {currentComplicationResult.complication.mechanicalEffect.damage && (
+                          <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            <strong>Damage:</strong> {currentComplicationResult.complication.mechanicalEffect.damage}
+                          </Typography>
+                        )}
+                        {currentComplicationResult.complication.mechanicalEffect.skillCheck && (
+                          <>
+                            <Typography variant="body2" sx={{ mt: 0.5 }}>
+                              <strong>Check:</strong> {currentComplicationResult.complication.mechanicalEffect.skillCheck.skill} DC {currentComplicationResult.complication.mechanicalEffect.skillCheck.dc}
+                            </Typography>
+                            {currentComplicationResult.complication.mechanicalEffect.skillCheck.failureEffect && (
+                              <Typography variant="body2" color="error.main" sx={{ mt: 0.5 }}>
+                                <strong>On Failure:</strong> {currentComplicationResult.complication.mechanicalEffect.skillCheck.failureEffect}
+                              </Typography>
+                            )}
+                          </>
+                        )}
+                        {currentComplicationResult.complication.mechanicalEffect.speedChange && (
+                          <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            <strong>Speed Change:</strong> {currentComplicationResult.complication.mechanicalEffect.speedChange}%
+                          </Typography>
+                        )}
+                        {currentComplicationResult.complication.mechanicalEffect.targetVehicle && (
+                          <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            <strong>Target:</strong> {currentComplicationResult.complication.mechanicalEffect.targetVehicle}
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card variant="outlined" sx={{ bgcolor: withOpacity('#4caf50', 0.1), borderColor: 'success.dark' }}>
+                  <CardContent>
+                    <Typography variant="body1">
+                      The hellish terrain poses no additional threats this round.
+                    </Typography>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Scale Info */}
+              <Typography variant="caption" color="text.secondary">
+                Current Scale: {currentScale.displayName}
+              </Typography>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowComplicationModal(false)} variant="contained">
+            Acknowledge
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Complication Resolution Modal (for skill check complications) */}
+      {state.activeBattlefieldComplication && (
+        <ComplicationResolutionModal
+          open={showResolutionModal}
+          onClose={() => setShowResolutionModal(false)}
+          complication={state.activeBattlefieldComplication}
+        />
+      )}
+
+      {/* Creature Chase Modal (for roll 1-2 complications) */}
+      {currentComplicationResult?.complication && isCreatureChaseComplication(currentComplicationResult.complication, currentComplicationResult.roll) && (
+        <CreatureChaseModal
+          open={showCreatureChaseModal}
+          onClose={() => setShowCreatureChaseModal(false)}
+          complication={currentComplicationResult.complication}
+          roll={currentComplicationResult.roll}
+        />
+      )}
     </>
   );
 }

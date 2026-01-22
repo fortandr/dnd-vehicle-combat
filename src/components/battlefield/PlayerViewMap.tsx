@@ -12,30 +12,39 @@ export function PlayerViewMap() {
   const { state, isConnected } = useBroadcastReceiver();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<HTMLDivElement>(null);
-  // Use document dimensions to get accurate viewport size without scrollbars
+  // Track actual map container dimensions
   const [dimensions, setDimensions] = useState({
-    width: document.documentElement.clientWidth,
-    height: document.documentElement.clientHeight - 40
+    width: 0,
+    height: 0
   });
 
-  // Update dimensions on resize
+  // Update dimensions from the actual map container
   useEffect(() => {
     const updateDimensions = () => {
-      // Use clientWidth/clientHeight which excludes scrollbars
-      const width = document.documentElement.clientWidth;
-      const height = document.documentElement.clientHeight - 40; // Account for 40px status bar
-      setDimensions({ width, height });
+      if (mapRef.current) {
+        const rect = mapRef.current.getBoundingClientRect();
+        setDimensions({ width: rect.width, height: rect.height });
+      }
     };
 
+    // Initial update after mount
     updateDimensions();
+
+    // Use ResizeObserver to track container size changes
+    const resizeObserver = new ResizeObserver(updateDimensions);
+    if (mapRef.current) {
+      resizeObserver.observe(mapRef.current);
+    }
+
     window.addEventListener('resize', updateDimensions);
-    // Also listen for orientation changes on mobile
     window.addEventListener('orientationchange', updateDimensions);
+
     return () => {
+      resizeObserver.disconnect();
       window.removeEventListener('resize', updateDimensions);
       window.removeEventListener('orientationchange', updateDimensions);
     };
-  }, []);
+  }, [isConnected]);
 
   if (!isConnected || !state) {
     return (
@@ -52,40 +61,30 @@ export function PlayerViewMap() {
   const { width, height } = dimensions;
   const currentScale = SCALES[state.scale];
 
-  // Use DM's zoom and pan values to match their view exactly
-  // The DM's zoom is already factored with mapScale, so pixelsPerFoot = mapScale * zoom
-  const pixelsPerFoot = currentScale.mapScale * state.zoom;
+  // Calculate scale factor to fill the player's viewport while maintaining proportions
+  // This scales everything (tokens, background, grid) together
+  const dmViewport = state.dmViewport || { width: 800, height: 500 };
+  const viewportScaleFactor = Math.min(
+    width / dmViewport.width,
+    height / dmViewport.height
+  ) || 1;
 
-  // Map center uses DM's pan offset, adjusted for player view dimensions
-  // DM's panOffset is calculated relative to their viewport center
+  // Apply viewport scale factor to pixelsPerFoot so everything scales together
+  const basePixelsPerFoot = currentScale.mapScale * state.zoom;
+  const pixelsPerFoot = basePixelsPerFoot * viewportScaleFactor;
+
+  // Scale the pan offset by the same factor
+  const scaledPanOffset = {
+    x: state.panOffset.x * viewportScaleFactor,
+    y: state.panOffset.y * viewportScaleFactor,
+  };
+
+  // Map center uses scaled pan offset
   const mapCenter = {
-    x: width / 2 + state.panOffset.x,
-    y: height / 2 + state.panOffset.y,
+    x: width / 2 + scaledPanOffset.x,
+    y: height / 2 + scaledPanOffset.y,
   };
 
-  // Calculate minimum scale multiplier to ensure background fills viewport
-  // This preserves the coordinate system while ensuring no black edges
-  const getBackgroundScaleMultiplier = () => {
-    const bg = state.backgroundImage;
-    if (!bg || !bg.naturalWidth || !bg.naturalHeight) return 1;
-
-    const feetPerPixel = bg.feetPerPixel || 1;
-    const bgScale = bg.scale || 1;
-
-    // Calculate current rendered size of the image
-    const baseScale = feetPerPixel * pixelsPerFoot * bgScale;
-    const currentImageWidth = bg.naturalWidth * baseScale;
-    const currentImageHeight = bg.naturalHeight * baseScale;
-
-    // Calculate multiplier needed to fill viewport (like CSS cover)
-    const scaleToFillWidth = width / currentImageWidth;
-    const scaleToFillHeight = height / currentImageHeight;
-
-    // Use the larger multiplier to ensure full coverage, minimum 1 (don't shrink)
-    return Math.max(scaleToFillWidth, scaleToFillHeight, 1);
-  };
-
-  const bgScaleMultiplier = getBackgroundScaleMultiplier();
 
   // Convert world position (feet) to screen position (pixels)
   const worldToScreen = (pos: Position) => ({
@@ -100,7 +99,7 @@ export function PlayerViewMap() {
     if (templateId) {
       const templateSizes: Record<string, number> = {
         'demon-grinder': 45,  // Tour bus (~40-45 ft)
-        'scavenger': 28,      // Garbage truck (~25-30 ft)
+        'scavenger': 35,      // Salvage truck (~35 ft)
         'tormentor': 22,      // APC (~20-25 ft)
         'buzz-killer': 15,    // Sedan (~15 ft)
         'devils-ride': 8,     // Touring motorcycle (~8 ft)
@@ -147,10 +146,6 @@ export function PlayerViewMap() {
       <div
         ref={mapRef}
         className="player-view-map"
-        style={{
-          width: `${width}px`,
-          height: `${height}px`,
-        }}
       >
         {/* Background Image */}
         {state.backgroundImage && (
@@ -162,8 +157,7 @@ export function PlayerViewMap() {
               left: mapCenter.x + state.backgroundImage.position.x * pixelsPerFoot,
               top: mapCenter.y + state.backgroundImage.position.y * pixelsPerFoot,
               // Scale image: feetPerPixel converts image pixels to feet, pixelsPerFoot converts feet to screen pixels
-              // Apply bgScaleMultiplier to ensure image always fills viewport (like CSS cover)
-              transform: `translate(-50%, -50%) scale(${(state.backgroundImage.feetPerPixel || 1) * pixelsPerFoot * state.backgroundImage.scale * bgScaleMultiplier})`,
+              transform: `translate(-50%, -50%) scale(${(state.backgroundImage.feetPerPixel || 1) * pixelsPerFoot * state.backgroundImage.scale})`,
               opacity: state.backgroundImage.opacity,
               pointerEvents: 'none',
               maxWidth: 'none',
@@ -964,8 +958,10 @@ function PlayerViewVehicleIcon({ templateId, size, color }: PlayerViewVehicleIco
   if (id.includes('scavenger')) {
     // Scavenger - Salvage/support vehicle with large crane, bus-like armored body
     // Two front wheels, two rear treaded tracks, crane with grappling claw
+    // Scale 0.667 to fit in smaller viewBox for ~50% larger rendering
     return (
-      <svg width={size} height={size} viewBox="0 0 40 64">
+      <svg width={size} height={size} viewBox="0 0 27 43">
+        <g transform="scale(0.667)">
         {/* === FRONT SECTION - CAB === */}
         {/* Armored cab - boxy bus-like front */}
         <rect x="8" y="4" width="24" height="16" fill={color} opacity="0.9" rx="2"/>
@@ -1078,6 +1074,7 @@ function PlayerViewVehicleIcon({ templateId, size, color }: PlayerViewVehicleIco
         {/* Tool/equipment storage boxes */}
         <rect x="8" y="42" width="4" height="3" fill="#333" opacity="0.4" rx="0.5"/>
         <rect x="28" y="42" width="4" height="3" fill="#333" opacity="0.4" rx="0.5"/>
+        </g>
       </svg>
     );
   }

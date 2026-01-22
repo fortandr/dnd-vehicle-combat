@@ -46,7 +46,6 @@ export function RightPanel() {
         borderLeft: 1,
         borderColor: 'divider',
         p: 2,
-        overflow: 'auto',
       }}
     >
       {/* Current Turn Info - Show during combat */}
@@ -89,9 +88,7 @@ export function RightPanel() {
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Vehicle Stats
             </Typography>
-            <Box sx={{ maxHeight: 700, overflow: 'auto' }}>
-              <AllVehiclesStatsPanel />
-            </Box>
+            <AllVehiclesStatsPanel />
           </CardContent>
         </Card>
       )}
@@ -178,8 +175,7 @@ function CurrentTurnInfo() {
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
           Crew ({vehicleCrew.length}):
         </Typography>
-        <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
-          <Stack spacing={0.5}>
+        <Stack spacing={0.5}>
             {vehicleCrew.map(({ creature, zone, weapon, isDriver }) => {
               const isAlive = creature!.currentHp > 0;
               const showWeapon = weapon && isAlive;
@@ -260,8 +256,7 @@ function CurrentTurnInfo() {
               </Paper>
             );
             })}
-          </Stack>
-        </Box>
+        </Stack>
 
         {/* Movement-based Damage Traits (Driver abilities) */}
         {(() => {
