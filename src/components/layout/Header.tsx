@@ -53,6 +53,7 @@ import { CreatureChaseModal } from '../combat/CreatureChaseModal';
 import { v4 as uuid } from 'uuid';
 import FlagIcon from '@mui/icons-material/Flag';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import BugReportIcon from '@mui/icons-material/BugReport';
 import { UserMenu } from '../auth/UserMenu';
 import { isAuthEnabled } from '../../context/AuthContext';
 import { HelpGuide } from '../help/HelpGuide';
@@ -548,6 +549,10 @@ export function Header() {
               <MenuItem onClick={() => { setShowHelpGuide(true); setMenuAnchor(null); }}>
                 <ListItemIcon><HelpOutlineIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>How to Use</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { window.open('https://github.com/fortandr/dnd-vehicle-combat/issues/new', '_blank'); setMenuAnchor(null); }}>
+                <ListItemIcon><BugReportIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Report Issue / Feedback</ListItemText>
               </MenuItem>
             </Menu>
 
