@@ -168,7 +168,11 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
 
       // Get incoming crew assignments and creatures
       let migratedCrewAssignments = action.payload.crewAssignments || [];
-      let migratedCreatures = action.payload.creatures || [];
+      // Migrate creatures to add faction field if missing
+      let migratedCreatures = (action.payload.creatures || []).map((creature: Creature) => ({
+        ...creature,
+        faction: creature.faction ?? (creature.statblock.type === 'pc' ? 'party' : 'enemy'),
+      }));
       let migratedInitiativeOrder = action.payload.initiativeOrder || [];
       const ejectedCreatures: Creature[] = [];
 
@@ -1692,9 +1696,14 @@ function getInitialState(providedState?: CombatState): CombatState {
           ...initialCombatState.environment,
           ...(loadedState.environment || {}),
         },
-        // Arrays with vehicle migration
+        // Arrays with vehicle and creature migration
         vehicles: migratedVehicles,
-        creatures: loadedState.creatures || [],
+        // Migrate creatures to add faction field if missing
+        creatures: (loadedState.creatures || []).map((creature) => ({
+          ...creature,
+          // Default faction based on type: PCs are party, others are enemy
+          faction: creature.faction ?? (creature.statblock.type === 'pc' ? 'party' : 'enemy'),
+        })),
         crewAssignments: loadedState.crewAssignments || [],
         initiativeOrder: loadedState.initiativeOrder || [],
         actionLog: loadedState.actionLog || [],

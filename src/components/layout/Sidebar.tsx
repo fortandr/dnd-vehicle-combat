@@ -30,6 +30,8 @@ import {
   InputAdornment,
   Menu,
   MenuItem,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -222,6 +224,7 @@ function convertOpen5eToCreature(monster: Open5eMonster, position: { x: number; 
     conditions: [],
     initiative: 0, // Don't auto-roll, use "Roll Init" button
     initiativeModifier: dexMod,
+    faction: 'enemy', // Monsters from Open5e default to enemy
     position,
   };
 }
@@ -270,6 +273,7 @@ export function Sidebar() {
   const [editName, setEditName] = useState('');
   const [editSpeed, setEditSpeed] = useState(30);
   const [editDexSave, setEditDexSave] = useState(0); // DEX saving throw modifier
+  const [editFaction, setEditFaction] = useState<'party' | 'enemy'>('enemy');
 
   // Open5e search state
   const [showOpen5eSearch, setShowOpen5eSearch] = useState(false);
@@ -354,6 +358,7 @@ export function Sidebar() {
       conditions: [],
       initiative: pcInit,
       initiativeModifier: dexSave, // Use DEX save as init modifier estimate
+      faction: 'party', // PCs are always party
     };
 
     addCreature(creature);
@@ -401,6 +406,7 @@ export function Sidebar() {
       conditions: [],
       initiative: creatureInit,
       initiativeModifier: 0,
+      faction: 'enemy', // Generic creatures default to enemy
       position: { x: offsetX, y: offsetY },
     };
 
@@ -425,6 +431,7 @@ export function Sidebar() {
     const dexSave = creature.statblock.savingThrows?.dex
       ?? Math.floor(((creature.statblock.abilities?.dex || 10) - 10) / 2);
     setEditDexSave(dexSave);
+    setEditFaction(creature.faction || 'enemy');
   };
 
   const saveEdit = () => {
@@ -439,6 +446,7 @@ export function Sidebar() {
           currentHp: editHp,
           initiative: editInit,
           initiativeModifier: editDexSave,
+          faction: editFaction,
           statblock: {
             ...existingStatblock,
             name: editName,
@@ -751,7 +759,7 @@ export function Sidebar() {
                   creature={creature}
                   isPC={true}
                   isEditing={editingCreatureId === creature.id}
-                  editState={{ editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave }}
+                  editState={{ editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave, editFaction, setEditFaction }}
                   onStartEdit={() => startEdit(creature)}
                   onSaveEdit={saveEdit}
                   onCancelEdit={cancelEdit}
@@ -865,7 +873,7 @@ export function Sidebar() {
                   creature={creature}
                   isPC={false}
                   isEditing={editingCreatureId === creature.id}
-                  editState={{ editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave }}
+                  editState={{ editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave, editFaction, setEditFaction }}
                   onStartEdit={() => startEdit(creature)}
                   onSaveEdit={saveEdit}
                   onCancelEdit={cancelEdit}
@@ -1086,6 +1094,7 @@ interface CreatureEntryProps {
     editInit: number; setEditInit: (v: number) => void;
     editSpeed: number; setEditSpeed: (v: number) => void;
     editDexSave: number; setEditDexSave: (v: number) => void;
+    editFaction: 'party' | 'enemy'; setEditFaction: (v: 'party' | 'enemy') => void;
   };
   onStartEdit: () => void;
   onSaveEdit: () => void;
@@ -1102,7 +1111,8 @@ interface CreatureEntryProps {
 }
 
 function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSaveEdit, onCancelEdit, onRemove, onToggleMap, onViewStatblock, assignment }: CreatureEntryProps) {
-  const borderColor = isPC ? factionColors.party : factionColors.enemy;
+  // Use faction to determine color - party faction is blue/green, enemy is red
+  const borderColor = creature.faction === 'party' ? factionColors.party : factionColors.enemy;
   const hasStatblock = !isPC && (creature.statblock.actions?.length || creature.statblock.traits?.length || creature.statblock.source === 'srd');
 
   // Determine status: driver > crew > map > unassigned
@@ -1192,6 +1202,23 @@ function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSa
               sx={{ flex: 1 }}
               helperText="Vehicle save modifier"
             />
+          </Stack>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="caption" color="text.secondary" sx={{ minWidth: 50 }}>Faction:</Typography>
+            <ToggleButtonGroup
+              value={editState.editFaction}
+              exclusive
+              onChange={(_, value) => value && editState.setEditFaction(value)}
+              size="small"
+              sx={{ flex: 1 }}
+            >
+              <ToggleButton value="party" sx={{ flex: 1, py: 0.5, fontSize: '0.75rem', color: factionColors.party, '&.Mui-selected': { bgcolor: withOpacity(factionColors.party, 0.2), color: factionColors.party } }}>
+                Party
+              </ToggleButton>
+              <ToggleButton value="enemy" sx={{ flex: 1, py: 0.5, fontSize: '0.75rem', color: factionColors.enemy, '&.Mui-selected': { bgcolor: withOpacity(factionColors.enemy, 0.2), color: factionColors.enemy } }}>
+                Enemy
+              </ToggleButton>
+            </ToggleButtonGroup>
           </Stack>
           <Stack direction="row" spacing={1}>
             <Button variant="contained" size="small" onClick={onSaveEdit} sx={{ flex: 1 }}>Save</Button>

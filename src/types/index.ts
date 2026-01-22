@@ -104,6 +104,7 @@ export interface Creature {
   conditions: Condition[];
   initiative: number;
   initiativeModifier: number;
+  faction: 'party' | 'enemy'; // Which side the creature is on
   vehicleId?: string; // If assigned to a vehicle
   zoneId?: string; // Zone within vehicle
   position?: Position; // World position if not on a vehicle

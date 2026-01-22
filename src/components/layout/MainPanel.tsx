@@ -44,7 +44,7 @@ import { CombatLog } from '../combat/CombatLog';
 import { VEHICLE_TEMPLATES } from '../../data/vehicleTemplates';
 import { Vehicle, VehicleWeapon, Creature, CrewAssignment } from '../../types';
 import { factionColors, scaleColors, withOpacity } from '../../theme/customColors';
-import { getPartyPresets, savePartyPreset, deletePartyPreset, PartyPreset } from '../../hooks/useLocalStorage';
+import { storageService, PartyPreset } from '../../services/storageService';
 
 type ViewMode = 'battlefield' | 'cards';
 
@@ -151,24 +151,36 @@ export function MainPanel() {
     setShowSavePartyModal(true);
   };
 
-  const handleSavePartyPreset = () => {
+  const handleSavePartyPreset = async () => {
     if (!partyPresetName.trim()) return;
 
-    const partyVehicles = state.vehicles.filter((v) => v.type === 'party');
     const presetId = uuid();
 
-    savePartyPreset(presetId, partyPresetName.trim(), {
-      vehicles: partyVehicles,
-      creatures: state.creatures,
-      crewAssignments: state.crewAssignments,
-    });
+    try {
+      await storageService.savePartyPreset(presetId, partyPresetName.trim(), {
+        vehicles: partyVehicles,
+        creatures: partyCreaturesForPreset,
+        crewAssignments: partyCrewAssignmentsForPreset,
+      });
+      console.log('Party preset saved successfully');
+    } catch (error) {
+      console.error('Failed to save party preset:', error);
+      alert('Failed to save party preset. Check console for details.');
+    }
 
     setShowSavePartyModal(false);
     setPartyPresetName('');
   };
 
-  const handleOpenLoadPartyModal = () => {
-    setPartyPresets(getPartyPresets());
+  const handleOpenLoadPartyModal = async () => {
+    try {
+      const presets = await storageService.listPartyPresets();
+      console.log('Loaded party presets:', presets);
+      setPartyPresets(presets as PartyPreset[]);
+    } catch (error) {
+      console.error('Failed to load party presets:', error);
+      alert('Failed to load party presets. Check console for details.');
+    }
     setShowLoadPartyModal(true);
   };
 
@@ -181,13 +193,25 @@ export function MainPanel() {
     setShowLoadPartyModal(false);
   };
 
-  const handleDeletePartyPreset = (presetId: string) => {
-    deletePartyPreset(presetId);
-    setPartyPresets(getPartyPresets());
+  const handleDeletePartyPreset = async (presetId: string) => {
+    await storageService.deletePartyPreset(presetId);
+    const presets = await storageService.listPartyPresets();
+    setPartyPresets(presets as PartyPreset[]);
   };
 
   const partyVehicles = state.vehicles.filter((v) => v.type === 'party');
   const enemyVehicles = state.vehicles.filter((v) => v.type === 'enemy');
+
+  // Compute party creatures for preset preview (same logic as save function)
+  const partyCreaturesForPreset = state.creatures.filter((c) => {
+    const faction = c.faction ?? (c.statblock.type === 'pc' ? 'party' : 'enemy');
+    return faction === 'party';
+  });
+  const partyCrewAssignmentsForPreset = state.crewAssignments.filter((a) => {
+    const isPartyVehicle = partyVehicles.some((v) => v.id === a.vehicleId);
+    const isPartyCreature = partyCreaturesForPreset.some((c) => c.id === a.creatureId);
+    return isPartyVehicle && isPartyCreature;
+  });
 
   return (
     <Box component="main" sx={{ gridArea: 'main', p: 3, minWidth: 0 }}>
@@ -368,34 +392,6 @@ export function MainPanel() {
         </Box>
       )}
 
-      {/* Empty State */}
-      {state.vehicles.length === 0 && (
-        <Box sx={{ textAlign: 'center', py: 8 }}>
-          <Typography variant="h5" gutterBottom>
-            Welcome to 5e Vehicular Combat
-          </Typography>
-          <Typography color="text.secondary" sx={{ mb: 3 }}>
-            Set up your encounter by adding vehicles and assigning crew.
-          </Typography>
-          <Stack direction="row" spacing={2} justifyContent="center">
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setShowAddModal('party')}
-            >
-              Add Party Vehicle
-            </Button>
-            <Button
-              variant="contained"
-              color="error"
-              startIcon={<AddIcon />}
-              onClick={() => setShowAddModal('enemy')}
-            >
-              Add Enemy Vehicle
-            </Button>
-          </Stack>
-        </Box>
-      )}
 
       {/* Add Vehicle Dialog */}
       <Dialog
@@ -494,10 +490,10 @@ export function MainPanel() {
               {partyVehicles.length} party vehicle{partyVehicles.length !== 1 ? 's' : ''}
             </Typography>
             <Typography variant="body2">
-              {state.creatures.length} creature{state.creatures.length !== 1 ? 's' : ''}
+              {partyCreaturesForPreset.length} party creature{partyCreaturesForPreset.length !== 1 ? 's' : ''}
             </Typography>
             <Typography variant="body2">
-              {state.crewAssignments.length} crew assignment{state.crewAssignments.length !== 1 ? 's' : ''}
+              {partyCrewAssignmentsForPreset.length} crew assignment{partyCrewAssignmentsForPreset.length !== 1 ? 's' : ''}
             </Typography>
           </Box>
         </DialogContent>

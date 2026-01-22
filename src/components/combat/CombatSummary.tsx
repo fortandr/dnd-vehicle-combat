@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { LogEntry, LogEntryType } from '../../types';
-import { CombatArchive } from '../../hooks/useLocalStorage';
+import { CombatArchive } from '../../services/storageService';
 import { withOpacity } from '../../theme/customColors';
 
 interface CombatSummaryProps {
@@ -31,7 +31,8 @@ const logTypeColors: Record<LogEntryType, string> = {
   mishap: '#eab308',
   complication: '#a855f7',
   movement: '#3b82f6',
-  action: '#6366f1',
+  ability: '#6366f1',
+  condition: '#a78bfa',
   scale_change: '#06b6d4',
   round_start: '#64748b',
   turn_start: '#94a3b8',
@@ -46,7 +47,8 @@ const logTypeLabels: Record<LogEntryType, string> = {
   mishap: 'Mishap',
   complication: 'Complication',
   movement: 'Movement',
-  action: 'Action',
+  ability: 'Ability',
+  condition: 'Condition',
   scale_change: 'Scale',
   round_start: 'Round',
   turn_start: 'Turn',

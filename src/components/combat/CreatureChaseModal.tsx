@@ -213,6 +213,7 @@ function convertOpen5eToCreature(monster: Open5eMonster, position: { x: number; 
     conditions: [],
     initiative: 0,
     initiativeModifier: dexMod,
+    faction: 'enemy', // Chase creatures are enemies
     position,
   };
 }
@@ -257,7 +258,7 @@ export function CreatureChaseModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Open5eMonster[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   // Manual entry state
   const [manualName, setManualName] = useState('');
@@ -358,6 +359,7 @@ export function CreatureChaseModal({
       conditions: [],
       initiative: 0,
       initiativeModifier: manualInitiative,
+      faction: 'enemy', // Chase creatures are enemies
       position,
     };
 

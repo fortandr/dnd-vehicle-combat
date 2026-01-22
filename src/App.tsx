@@ -3,14 +3,42 @@
  * Main Application Component
  */
 
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, CircularProgress } from '@mui/material';
 import { CombatProvider } from './context/CombatContext';
+import { AuthProvider, useAuth, isAuthEnabled } from './context/AuthContext';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { MainPanel } from './components/layout/MainPanel';
 import { RightPanel } from './components/layout/RightPanel';
+import { LoginPage } from './components/auth/LoginPage';
 
-function App() {
+// Inner app content - requires auth check
+function AppContent() {
+  const { isAuthenticated, loading } = useAuth();
+
+  // Show loading spinner while checking auth state
+  if (isAuthEnabled && loading) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: '#0a0a0a',
+        }}
+      >
+        <CircularProgress sx={{ color: '#ff6b35' }} />
+      </Box>
+    );
+  }
+
+  // Show login page if auth is enabled and user is not authenticated
+  if (isAuthEnabled && !isAuthenticated) {
+    return <LoginPage />;
+  }
+
+  // Show main app
   return (
     <CombatProvider>
       <Box
@@ -51,6 +79,14 @@ function App() {
         </Box>
       </Box>
     </CombatProvider>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

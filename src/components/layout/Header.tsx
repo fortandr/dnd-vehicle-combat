@@ -44,14 +44,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { useCombat } from '../../context/CombatContext';
 import { SCALES } from '../../data/scaleConfig';
 import { rollComplication, getComplicationRollRange } from '../../data/chaseComplications';
-import {
-  getSavedEncounters,
-  saveEncounter,
-  deleteEncounter,
-  SavedEncounter,
-  saveCombatArchive,
-  CombatArchive,
-} from '../../hooks/useLocalStorage';
+import { storageService, SavedEncounter, CombatArchive } from '../../services/storageService';
 import { CombatState, ChaseComplication } from '../../types';
 import { scaleColors, withOpacity } from '../../theme/customColors';
 import { CombatSummary } from '../combat/CombatSummary';
@@ -59,6 +52,10 @@ import { ComplicationResolutionModal } from '../combat/ComplicationResolutionMod
 import { CreatureChaseModal } from '../combat/CreatureChaseModal';
 import { v4 as uuid } from 'uuid';
 import FlagIcon from '@mui/icons-material/Flag';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import { UserMenu } from '../auth/UserMenu';
+import { isAuthEnabled } from '../../context/AuthContext';
+import { HelpGuide } from '../help/HelpGuide';
 
 export function Header() {
   const { state, dispatch, startCombat, returnToSetup, resetCombat, nextRound, nextTurn, loadEncounter, newEncounter, lastSaved, forceSave, markAsSaved, setEncounterName, toggleAutoRollComplications, logComplication, startComplicationResolution, clearComplication } = useCombat();
@@ -73,6 +70,7 @@ export function Header() {
   const [showComplicationModal, setShowComplicationModal] = useState(false);
   const [showResolutionModal, setShowResolutionModal] = useState(false);
   const [showCreatureChaseModal, setShowCreatureChaseModal] = useState(false);
+  const [showHelpGuide, setShowHelpGuide] = useState(false);
   const [currentComplicationResult, setCurrentComplicationResult] = useState<{
     roll: number;
     rollRange: string;
@@ -170,28 +168,29 @@ export function Header() {
     setPrevRound(state.round);
   }, [state.round, state.phase, state.autoRollComplications, state.scale, prevRound, logComplication, startComplicationResolution]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Update the encounter name in state
     setEncounterName(saveName);
     // Mark as saved to enable auto-save
     markAsSaved();
     // Save to named encounters list
-    saveEncounter(state.id, saveName, { ...state, name: saveName, hasBeenSaved: true });
+    await storageService.saveEncounter(state.id, saveName, { ...state, name: saveName, hasBeenSaved: true });
     // Force immediate auto-save
     setTimeout(() => forceSave(), 100);
     setShowSaveModal(false);
   };
 
   // Quick save for already-saved encounters
-  const handleQuickSave = () => {
+  const handleQuickSave = async () => {
     // Save to named encounters list with current state
-    saveEncounter(state.id, state.name, state);
+    await storageService.saveEncounter(state.id, state.name, state);
     // Force immediate auto-save
     forceSave();
   };
 
-  const handleOpenLoad = () => {
-    setSavedEncounters(getSavedEncounters());
+  const handleOpenLoad = async () => {
+    const encounters = await storageService.listEncounters();
+    setSavedEncounters(encounters as SavedEncounter[]);
     setShowLoadModal(true);
   };
 
@@ -200,9 +199,10 @@ export function Header() {
     setShowLoadModal(false);
   };
 
-  const handleDelete = (id: string) => {
-    deleteEncounter(id);
-    setSavedEncounters(getSavedEncounters());
+  const handleDelete = async (id: string) => {
+    await storageService.deleteEncounter(id);
+    const encounters = await storageService.listEncounters();
+    setSavedEncounters(encounters as SavedEncounter[]);
   };
 
   const handleNew = () => {
@@ -242,7 +242,7 @@ export function Header() {
     };
 
     // Save to archives
-    saveCombatArchive(archive);
+    storageService.saveCombatArchive(archive);
 
     // Set current archive for display
     setCurrentArchive(archive);
@@ -544,7 +544,15 @@ export function Header() {
                 <ListItemIcon><RefreshIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>Reset Combat</ListItemText>
               </MenuItem>
+              <Divider />
+              <MenuItem onClick={() => { setShowHelpGuide(true); setMenuAnchor(null); }}>
+                <ListItemIcon><HelpOutlineIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>How to Use</ListItemText>
+              </MenuItem>
             </Menu>
+
+            {/* User Menu - shows when auth is enabled */}
+            {isAuthEnabled && <UserMenu />}
           </Stack>
         </Toolbar>
       </AppBar>
@@ -799,6 +807,9 @@ export function Header() {
           roll={currentComplicationResult.roll}
         />
       )}
+
+      {/* Help Guide */}
+      <HelpGuide open={showHelpGuide} onClose={() => setShowHelpGuide(false)} />
     </>
   );
 }
