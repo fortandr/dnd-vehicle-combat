@@ -15,9 +15,11 @@ import {
   Tooltip,
 } from '@mui/material';
 import { useCombat } from '../../context/CombatContext';
+import { useSettings } from '../../context/SettingsContext';
 import {
   SCALES,
-  formatDistance,
+  formatDistanceWithUnit,
+  formatThreshold,
   getScaleThresholds,
   getScalesInOrder,
   getScaleForDistance,
@@ -27,6 +29,7 @@ import { scaleColors, factionColors, withOpacity } from '../../theme/customColor
 
 export function ScaleIndicator() {
   const { state, setScale, currentTurnVehicle } = useCombat();
+  const { unitSystem } = useSettings();
 
   const currentScale = SCALES[state.scale];
   const thresholds = getScaleThresholds();
@@ -116,7 +119,7 @@ export function ScaleIndicator() {
           </Typography>
         </Box>
         <Typography variant="body2">
-          Distance: <Box component="span" fontFamily="monospace" fontWeight={600}>{formatDistance(distance)}</Box>
+          Distance: <Box component="span" fontFamily="monospace" fontWeight={600}>{formatDistanceWithUnit(distance, unitSystem)}</Box>
         </Typography>
       </Box>
 
@@ -173,16 +176,16 @@ export function ScaleIndicator() {
       {/* Scale Labels */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="caption" sx={{ color: scaleColors.point_blank, textAlign: 'center' }}>
-          Point-Blank<br />&lt;100ft
+          Point-Blank<br />&lt;{formatThreshold(100, unitSystem)}
         </Typography>
         <Typography variant="caption" sx={{ color: scaleColors.tactical, textAlign: 'center' }}>
-          Tactical<br />100-1000ft
+          Tactical<br />{formatThreshold(100, unitSystem)}-{formatThreshold(1000, unitSystem)}
         </Typography>
         <Typography variant="caption" sx={{ color: scaleColors.approach, textAlign: 'center' }}>
-          Approach<br />1000ft-1mi
+          Approach<br />{formatThreshold(1000, unitSystem)}-{formatThreshold(5280, unitSystem)}
         </Typography>
         <Typography variant="caption" sx={{ color: scaleColors.strategic, textAlign: 'center' }}>
-          Strategic<br />1mi+
+          Strategic<br />{formatThreshold(5280, unitSystem)}+
         </Typography>
       </Box>
 
@@ -225,7 +228,7 @@ export function ScaleIndicator() {
           return (
             <Tooltip
               key={scaleName}
-              title={isDisabled ? `Vehicles are within ${formatDistance(scaleConfig.minDistance)} - ${scaleConfig.displayName} scale requires greater distance` : ''}
+              title={isDisabled ? `Vehicles are within ${formatDistanceWithUnit(scaleConfig.minDistance, unitSystem)} - ${scaleConfig.displayName} scale requires greater distance` : ''}
               arrow
               disableHoverListener={!isDisabled}
             >

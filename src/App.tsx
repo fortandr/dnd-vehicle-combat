@@ -6,6 +6,7 @@
 import { Box, Typography, CircularProgress } from '@mui/material';
 import { CombatProvider } from './context/CombatContext';
 import { AuthProvider, useAuth, isAuthEnabled } from './context/AuthContext';
+import { SettingsProvider } from './context/SettingsContext';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { MainPanel } from './components/layout/MainPanel';
@@ -84,9 +85,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <SettingsProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </SettingsProvider>
   );
 }
 

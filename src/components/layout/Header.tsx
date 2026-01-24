@@ -54,9 +54,11 @@ import { v4 as uuid } from 'uuid';
 import FlagIcon from '@mui/icons-material/Flag';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import BugReportIcon from '@mui/icons-material/BugReport';
+import SettingsIcon from '@mui/icons-material/Settings';
 import { UserMenu } from '../auth/UserMenu';
 import { isAuthEnabled } from '../../context/AuthContext';
 import { HelpGuide } from '../help/HelpGuide';
+import { SettingsDialog } from '../settings/SettingsDialog';
 
 export function Header() {
   const { state, dispatch, startCombat, returnToSetup, resetCombat, nextRound, nextTurn, loadEncounter, newEncounter, lastSaved, forceSave, markAsSaved, setEncounterName, toggleAutoRollComplications, logComplication, startComplicationResolution, clearComplication } = useCombat();
@@ -72,6 +74,7 @@ export function Header() {
   const [showResolutionModal, setShowResolutionModal] = useState(false);
   const [showCreatureChaseModal, setShowCreatureChaseModal] = useState(false);
   const [showHelpGuide, setShowHelpGuide] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [currentComplicationResult, setCurrentComplicationResult] = useState<{
     roll: number;
     rollRange: string;
@@ -546,6 +549,10 @@ export function Header() {
                 <ListItemText>Reset Combat</ListItemText>
               </MenuItem>
               <Divider />
+              <MenuItem onClick={() => { setShowSettingsDialog(true); setMenuAnchor(null); }}>
+                <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Settings</ListItemText>
+              </MenuItem>
               <MenuItem onClick={() => { setShowHelpGuide(true); setMenuAnchor(null); }}>
                 <ListItemIcon><HelpOutlineIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>How to Use</ListItemText>
@@ -815,6 +822,9 @@ export function Header() {
 
       {/* Help Guide */}
       <HelpGuide open={showHelpGuide} onClose={() => setShowHelpGuide(false)} />
+
+      {/* Settings Dialog */}
+      <SettingsDialog open={showSettingsDialog} onClose={() => setShowSettingsDialog(false)} />
     </>
   );
 }

@@ -9,6 +9,12 @@
  */
 
 import { ScaleConfig, ScaleName } from '../types';
+import { UnitSystem } from '../context/SettingsContext';
+
+// Conversion constants
+const FEET_PER_METER = 3.28084;
+const FEET_PER_MILE = 5280;
+const METERS_PER_KILOMETER = 1000;
 
 // ==========================================
 // Scale Definitions
@@ -163,12 +169,60 @@ export function calculateNewDistance(
 }
 
 /**
- * Format distance for display
+ * Convert feet to meters
+ */
+export function feetToMeters(feet: number): number {
+  return feet / FEET_PER_METER;
+}
+
+/**
+ * Format distance for display (imperial - feet/miles)
  */
 export function formatDistance(distanceFeet: number): string {
-  if (distanceFeet >= 5280) {
-    const miles = distanceFeet / 5280;
+  if (distanceFeet >= FEET_PER_MILE) {
+    const miles = distanceFeet / FEET_PER_MILE;
     return `${miles.toFixed(1)} miles`;
+  }
+  return `${Math.round(distanceFeet)} ft`;
+}
+
+/**
+ * Format distance with unit system preference
+ */
+export function formatDistanceWithUnit(distanceFeet: number, unitSystem: UnitSystem): string {
+  if (unitSystem === 'metric') {
+    const meters = feetToMeters(distanceFeet);
+    if (meters >= METERS_PER_KILOMETER) {
+      const km = meters / METERS_PER_KILOMETER;
+      return `${km.toFixed(1)} km`;
+    }
+    return `${Math.round(meters)} m`;
+  }
+  // Imperial
+  if (distanceFeet >= FEET_PER_MILE) {
+    const miles = distanceFeet / FEET_PER_MILE;
+    return `${miles.toFixed(1)} miles`;
+  }
+  return `${Math.round(distanceFeet)} ft`;
+}
+
+/**
+ * Format a distance threshold for display (e.g., "100 ft" or "30 m")
+ */
+export function formatThreshold(distanceFeet: number, unitSystem: UnitSystem): string {
+  if (unitSystem === 'metric') {
+    const meters = feetToMeters(distanceFeet);
+    if (meters >= METERS_PER_KILOMETER) {
+      const km = meters / METERS_PER_KILOMETER;
+      // Clean up display for nice round numbers
+      return km === Math.floor(km) ? `${km} km` : `${km.toFixed(1)} km`;
+    }
+    return `${Math.round(meters)} m`;
+  }
+  // Imperial
+  if (distanceFeet >= FEET_PER_MILE) {
+    const miles = distanceFeet / FEET_PER_MILE;
+    return miles === Math.floor(miles) ? `${miles} mi` : `${miles.toFixed(1)} mi`;
   }
   return `${Math.round(distanceFeet)} ft`;
 }

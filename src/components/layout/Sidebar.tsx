@@ -3,7 +3,7 @@
  * Initiative tracker and creature/vehicle list
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { v4 as uuid } from 'uuid';
 import {
   Box,
@@ -281,6 +281,7 @@ export function Sidebar() {
   const [searchResults, setSearchResults] = useState<Open5eMonster[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Add NPC menu state
   const [addNpcMenuAnchor, setAddNpcMenuAnchor] = useState<null | HTMLElement>(null);
@@ -288,27 +289,48 @@ export function Sidebar() {
   // Statblock modal state
   const [viewingCreature, setViewingCreature] = useState<Creature | null>(null);
 
-  // Debounced search handler
-  const handleSearch = useCallback(async (query: string) => {
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, []);
+
+  // Debounced search handler - waits 300ms after typing stops
+  const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
+
+    // Clear any pending search
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
     if (query.length < 2) {
       setSearchResults([]);
+      setIsSearching(false);
       return;
     }
 
+    // Show loading indicator immediately
     setIsSearching(true);
     setSearchError(null);
-    try {
-      const results = await searchOpen5e(query);
-      setSearchResults(results);
-      if (results.length === 0) {
-        setSearchError('No monsters found');
+
+    // Debounce the actual API call
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const results = await searchOpen5e(query);
+        setSearchResults(results);
+        if (results.length === 0) {
+          setSearchError('No monsters found');
+        }
+      } catch {
+        setSearchError('Failed to search. Check your internet connection.');
+      } finally {
+        setIsSearching(false);
       }
-    } catch {
-      setSearchError('Failed to search. Check your internet connection.');
-    } finally {
-      setIsSearching(false);
-    }
+    }, 300);
   }, []);
 
   // Add monster from Open5e
