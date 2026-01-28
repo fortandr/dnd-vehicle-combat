@@ -96,23 +96,24 @@ export function PlayerViewMap() {
   // Based on real-world vehicle equivalents for visual accuracy
   const getVehicleSizeInFeet = (size: string, templateId?: string): number => {
     // Specific vehicle dimensions based on real-world equivalents
+    // Template IDs use underscores (e.g., 'demon_grinder')
     if (templateId) {
       const templateSizes: Record<string, number> = {
-        'demon-grinder': 45,  // Tour bus (~40-45 ft)
-        'scavenger': 35,      // Salvage truck (~35 ft)
-        'tormentor': 22,      // APC (~20-25 ft)
-        'buzz-killer': 15,    // Sedan (~15 ft)
-        'devils-ride': 8,     // Touring motorcycle (~8 ft)
+        'demon_grinder': 45,  // Tour bus (~40-45 ft) - Gargantuan
+        'scavenger': 35,      // Salvage truck (~35 ft) - Huge
+        'tormentor': 22,      // APC/dune buggy (~20-25 ft) - Huge
+        'buzz_killer': 15,    // Motor trike (~15 ft) - Large
+        'devils_ride': 8,     // Infernal motorcycle (~8 ft) - Large
       };
       if (templateSizes[templateId]) {
         return templateSizes[templateId];
       }
     }
-    // Fallback to size category
+    // Fallback to D&D size category (space controlled in feet)
     switch (size) {
-      case 'large': return 10;
-      case 'huge': return 25;
-      case 'gargantuan': return 45;
+      case 'large': return 10;      // 10x10 ft space
+      case 'huge': return 15;       // 15x15 ft space
+      case 'gargantuan': return 20; // 20x20 ft space
       default: return 10;
     }
   };
@@ -254,7 +255,8 @@ export function PlayerViewMap() {
             const screenPos = worldToScreen(creature.position!);
             const creatureFeet = getCreatureSizeInFeet(creature.statblock.size);
             const scaledSize = creatureFeet * pixelsPerFoot;
-            const tokenSize = Math.max(30, Math.min(scaledSize, 100));
+            // Min 20px for visibility, no max to scale properly with vehicles
+            const tokenSize = Math.max(20, scaledSize);
             const isPC = creature.statblock.type === 'pc';
 
             return (

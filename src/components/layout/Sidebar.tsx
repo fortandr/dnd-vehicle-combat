@@ -34,6 +34,7 @@ import {
   ToggleButtonGroup,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import RemoveIcon from '@mui/icons-material/Remove';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MapIcon from '@mui/icons-material/Map';
@@ -901,6 +902,12 @@ export function Sidebar() {
                   onCancelEdit={cancelEdit}
                   onRemove={() => removeCreature(creature.id)}
                   onViewStatblock={() => setViewingCreature(creature)}
+                  onHpChange={(newHp) => {
+                    dispatch({
+                      type: 'UPDATE_CREATURE',
+                      payload: { id: creature.id, updates: { currentHp: newHp } },
+                    });
+                  }}
                   onToggleMap={() => {
                     if (creature.position) {
                       dispatch({ type: 'UPDATE_CREATURE', payload: { id: creature.id, updates: { position: undefined } } });
@@ -1124,6 +1131,7 @@ interface CreatureEntryProps {
   onRemove: () => void;
   onToggleMap: () => void;
   onViewStatblock?: () => void; // Optional - only for NPCs with statblock data
+  onHpChange?: (newHp: number) => void; // HP change handler for damage controls
   // Crew assignment info
   assignment?: {
     vehicleName: string;
@@ -1132,10 +1140,29 @@ interface CreatureEntryProps {
   };
 }
 
-function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSaveEdit, onCancelEdit, onRemove, onToggleMap, onViewStatblock, assignment }: CreatureEntryProps) {
+function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSaveEdit, onCancelEdit, onRemove, onToggleMap, onViewStatblock, onHpChange, assignment }: CreatureEntryProps) {
   // Use faction to determine color - party faction is blue/green, enemy is red
   const borderColor = creature.faction === 'party' ? factionColors.party : factionColors.enemy;
   const hasStatblock = !isPC && (creature.statblock.actions?.length || creature.statblock.traits?.length || creature.statblock.source === 'srd');
+
+  // Damage controls state (only used for non-PCs)
+  const [damageInput, setDamageInput] = useState('');
+
+  const handleDealDamage = () => {
+    if (!onHpChange) return;
+    const damage = parseInt(damageInput, 10);
+    if (isNaN(damage) || damage <= 0) return;
+    onHpChange(Math.max(0, creature.currentHp - damage));
+    setDamageInput('');
+  };
+
+  const handleHeal = () => {
+    if (!onHpChange) return;
+    const heal = parseInt(damageInput, 10);
+    if (isNaN(heal) || heal <= 0) return;
+    onHpChange(Math.min(creature.statblock.maxHp, creature.currentHp + heal));
+    setDamageInput('');
+  };
 
   // Determine status: driver > crew > map > unassigned
   const getStatusIndicator = () => {
@@ -1381,6 +1408,43 @@ function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSa
                   : '—')
             }
           </Typography>
+        )}
+        {/* Damage/Heal controls for non-PCs */}
+        {!isPC && onHpChange && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+            <TextField
+              type="number"
+              size="small"
+              value={damageInput}
+              onChange={(e) => setDamageInput(e.target.value)}
+              placeholder="±HP"
+              sx={{ width: 55 }}
+              inputProps={{ min: 1, style: { textAlign: 'center', padding: '3px', fontSize: '0.7rem' } }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleDealDamage();
+              }}
+            />
+            <IconButton
+              size="small"
+              color="error"
+              onClick={handleDealDamage}
+              disabled={!damageInput || parseInt(damageInput, 10) <= 0}
+              title="Deal damage"
+              sx={{ p: 0.25 }}
+            >
+              <RemoveIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+            <IconButton
+              size="small"
+              color="success"
+              onClick={handleHeal}
+              disabled={!damageInput || parseInt(damageInput, 10) <= 0}
+              title="Heal"
+              sx={{ p: 0.25 }}
+            >
+              <AddIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Box>
         )}
       </Box>
     </Paper>

@@ -1627,11 +1627,12 @@ function VehicleToken({
   const weaponRangesByArc = getWeaponRangesByArc(vehicle, crewAssignments, creatures);
   const maxWeaponRange = Math.max(weaponRangesByArc.front, weaponRangesByArc.rear, weaponRangesByArc.left, weaponRangesByArc.right);
 
-  // z-index priority: dragging > hovered > current turn > default
+  // z-index priority: dragging > current turn > hovered > default
+  // Current turn token must be clickable even when overlapping with hovered tokens
   const getZIndex = () => {
     if (isDragging) return 1000;
+    if (isCurrentTurn) return 500;  // High priority so current turn is always accessible
     if (isHovered) return 100;
-    if (isCurrentTurn) return 50;
     return 1;
   };
 
@@ -2834,6 +2835,7 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
   });
 
   // Creature size in feet based on D&D size category
+  // D&D 5e creature sizes in feet (space controlled, not physical size)
   const sizeInFeet: Record<string, number> = {
     tiny: 2.5,
     small: 5,
@@ -2844,16 +2846,18 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
   };
   const creatureFeet = sizeInFeet[creature.statblock.size] || 5;
   const scaledSize = creatureFeet * pixelsPerFoot;
-  const tokenSize = Math.max(20, Math.min(scaledSize, 100));
+  // Minimum 20px for visibility at extreme zoom out, no max to scale properly with vehicles
+  const tokenSize = Math.max(20, scaledSize);
 
   const hpPercent = (creature.currentHp / creature.statblock.maxHp) * 100;
   const isAlive = creature.currentHp > 0;
   const isPC = creature.statblock.type === 'pc';
 
-  // Current turn creature should be on top of all other tokens
+  // z-index priority: dragging > current turn > default
+  // Current turn token must be clickable even when overlapping with other tokens
   const getZIndex = () => {
     if (isDragging) return 1000;
-    if (isCurrentTurn) return 100; // Above vehicles (typically 10-20) and other creatures
+    if (isCurrentTurn) return 500;  // Match vehicle z-index for current turn
     return 5;
   };
 
@@ -2995,24 +2999,25 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
  */
 function getVehicleSizeInFeet(size: string, templateId?: string): number {
   // Specific vehicle dimensions based on real-world equivalents
+  // Template IDs use underscores (e.g., 'demon_grinder')
   if (templateId) {
     const templateSizes: Record<string, number> = {
-      'demon-grinder': 45,  // Tour bus (~40-45 ft)
-      'scavenger': 35,      // Salvage truck (~35 ft)
-      'tormentor': 22,      // APC (~20-25 ft)
-      'buzz-killer': 15,    // Sedan (~15 ft)
-      'devils-ride': 8,     // Touring motorcycle (~8 ft)
+      'demon_grinder': 45,  // Tour bus (~40-45 ft) - Gargantuan
+      'scavenger': 35,      // Salvage truck (~35 ft) - Huge
+      'tormentor': 22,      // APC/dune buggy (~20-25 ft) - Huge
+      'buzz_killer': 15,    // Motor trike (~15 ft) - Large
+      'devils_ride': 8,     // Infernal motorcycle (~8 ft) - Large
     };
     if (templateSizes[templateId]) {
       return templateSizes[templateId];
     }
   }
 
-  // Fallback to size category
+  // Fallback to D&D size category (space controlled in feet)
   const sizes: Record<string, number> = {
-    large: 10,
-    huge: 25,
-    gargantuan: 45,
+    large: 10,      // 10x10 ft space
+    huge: 15,       // 15x15 ft space
+    gargantuan: 20, // 20x20 ft space
   };
   return sizes[size] || 10;
 }
