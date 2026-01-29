@@ -17,6 +17,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { MainPanel } from './components/layout/MainPanel';
 import { RightPanel } from './components/layout/RightPanel';
 import { LoginPage } from './components/auth/LoginPage';
+import { WhatsNewDialog } from './components/settings/WhatsNewDialog';
 
 // Inner app content - requires auth check
 function AppContent() {
@@ -101,6 +102,9 @@ function AppContent() {
             <BottomNavigationAction label="Creatures" icon={<GroupIcon />} />
             <BottomNavigationAction label="Vehicles" icon={<DirectionsCarIcon />} />
           </BottomNavigation>
+
+          {/* What's New Dialog */}
+          <WhatsNewDialog />
         </Box>
       </CombatProvider>
     );
@@ -145,6 +149,9 @@ function AppContent() {
             Avernus Vehicle Combat Tracker • Based on Descent into Avernus (5e)
           </Typography>
         </Box>
+
+        {/* What's New Dialog */}
+        <WhatsNewDialog />
       </Box>
     </CombatProvider>
   );
