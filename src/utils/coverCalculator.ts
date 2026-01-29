@@ -3,7 +3,17 @@
  * Calculates effective cover based on vehicle positions, facing, and zone visibility
  */
 
-import { Vehicle, VehicleZone, Position, CoverType } from '../types';
+import { Vehicle, VehicleZone, Position, CoverType, ElevationZone } from '../types';
+import {
+  getVehicleElevation,
+  getPositionElevation,
+  getElevationDifference,
+  getElevationAttackModifier,
+  getElevationAdjustedCover,
+  wasCoverUpgradedByElevation,
+  formatElevationDiff,
+  formatAttackModifier,
+} from './elevationCalculator';
 
 export type AttackArc = 'front' | 'rear' | 'left' | 'right';
 
@@ -14,6 +24,16 @@ export interface CoverResult {
   attackArc: AttackArc;
   isVisible: boolean;
   reason: string;
+}
+
+export interface ElevationCoverResult extends CoverResult {
+  attackerElevation: number;
+  targetElevation: number;
+  elevationDiff: number;
+  elevationAttackModifier: number;
+  coverUpgradedByElevation: boolean;
+  elevationDisplayText: string;
+  attackModifierDisplayText: string;
 }
 
 /**
@@ -297,5 +317,137 @@ export function calculateCoverFromPosition(
     reason: baseCover === 'none'
       ? `Target in ${targetZone.name} is fully exposed (attacking from ${getArcDisplayName(attackArc)})`
       : `Target in ${targetZone.name} has ${formatCover(baseCover)} from station (attacking from ${getArcDisplayName(attackArc)})`,
+  };
+}
+
+/**
+ * Calculate cover with elevation effects
+ * Wraps calculateCover and applies Rule 3 (cover boost for higher defenders)
+ * Also provides elevation attack modifier info for Rule 1
+ */
+export function calculateCoverWithElevation(
+  attackerVehicle: Vehicle,
+  targetVehicle: Vehicle,
+  targetZone: VehicleZone,
+  elevationZones: ElevationZone[]
+): ElevationCoverResult {
+  // Get base cover calculation
+  const baseCoverResult = calculateCover(attackerVehicle, targetVehicle, targetZone);
+
+  // Get elevations
+  const attackerElevation = getVehicleElevation(attackerVehicle, elevationZones);
+  const targetElevation = getVehicleElevation(targetVehicle, elevationZones);
+  const elevationDiff = getElevationDifference(attackerElevation, targetElevation);
+
+  // Calculate elevation attack modifier (Rule 1)
+  const elevationAttackModifier = getElevationAttackModifier(elevationDiff);
+
+  // Apply elevation cover adjustment (Rule 3)
+  // Only applies if target is visible
+  let effectiveCover = baseCoverResult.effectiveCover;
+  let coverUpgradedByElevation = false;
+
+  if (baseCoverResult.isVisible) {
+    effectiveCover = getElevationAdjustedCover(baseCoverResult.effectiveCover, elevationDiff);
+    coverUpgradedByElevation = wasCoverUpgradedByElevation(baseCoverResult.effectiveCover, effectiveCover);
+  }
+
+  // Calculate new AC bonus
+  const acBonus = getCoverACBonus(effectiveCover);
+
+  // Build reason text
+  let reason = baseCoverResult.reason;
+  if (coverUpgradedByElevation) {
+    reason += ` (upgraded to ${formatCover(effectiveCover)} due to defender's high ground)`;
+  }
+
+  return {
+    ...baseCoverResult,
+    effectiveCover,
+    acBonus,
+    reason,
+    attackerElevation,
+    targetElevation,
+    elevationDiff,
+    elevationAttackModifier,
+    coverUpgradedByElevation,
+    elevationDisplayText: formatElevationDiff(elevationDiff),
+    attackModifierDisplayText: formatAttackModifier(elevationAttackModifier),
+  };
+}
+
+/**
+ * Calculate cover with elevation from a position (creature on foot)
+ */
+export function calculateCoverFromPositionWithElevation(
+  attackerPosition: Position,
+  targetVehicle: Vehicle,
+  targetZone: VehicleZone,
+  elevationZones: ElevationZone[]
+): ElevationCoverResult {
+  // Get base cover calculation
+  const baseCoverResult = calculateCoverFromPosition(attackerPosition, targetVehicle, targetZone);
+
+  // Get elevations
+  const attackerElevation = getPositionElevation(attackerPosition, elevationZones);
+  const targetElevation = getVehicleElevation(targetVehicle, elevationZones);
+  const elevationDiff = getElevationDifference(attackerElevation, targetElevation);
+
+  // Calculate elevation attack modifier (Rule 1)
+  const elevationAttackModifier = getElevationAttackModifier(elevationDiff);
+
+  // Apply elevation cover adjustment (Rule 3)
+  let effectiveCover = baseCoverResult.effectiveCover;
+  let coverUpgradedByElevation = false;
+
+  if (baseCoverResult.isVisible) {
+    effectiveCover = getElevationAdjustedCover(baseCoverResult.effectiveCover, elevationDiff);
+    coverUpgradedByElevation = wasCoverUpgradedByElevation(baseCoverResult.effectiveCover, effectiveCover);
+  }
+
+  // Calculate new AC bonus
+  const acBonus = getCoverACBonus(effectiveCover);
+
+  // Build reason text
+  let reason = baseCoverResult.reason;
+  if (coverUpgradedByElevation) {
+    reason += ` (upgraded to ${formatCover(effectiveCover)} due to defender's high ground)`;
+  }
+
+  return {
+    ...baseCoverResult,
+    effectiveCover,
+    acBonus,
+    reason,
+    attackerElevation,
+    targetElevation,
+    elevationDiff,
+    elevationAttackModifier,
+    coverUpgradedByElevation,
+    elevationDisplayText: formatElevationDiff(elevationDiff),
+    attackModifierDisplayText: formatAttackModifier(elevationAttackModifier),
+  };
+}
+
+/**
+ * Calculate same-vehicle cover with elevation info
+ * Elevation doesn't affect same-vehicle attacks but we include the data for consistency
+ */
+export function calculateSameVehicleCoverWithElevation(
+  attackerZone: VehicleZone,
+  targetZone: VehicleZone,
+  vehicleElevation: number
+): ElevationCoverResult {
+  const baseCoverResult = calculateSameVehicleCover(attackerZone, targetZone);
+
+  return {
+    ...baseCoverResult,
+    attackerElevation: vehicleElevation,
+    targetElevation: vehicleElevation,
+    elevationDiff: 0,
+    elevationAttackModifier: 0,
+    coverUpgradedByElevation: false,
+    elevationDisplayText: 'Same vehicle',
+    attackModifierDisplayText: '',
   };
 }

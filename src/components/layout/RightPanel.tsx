@@ -16,6 +16,12 @@ import { useCombat } from '../../context/CombatContext';
 import { TargetCoverPanel } from '../combat/TargetCoverPanel';
 import { AllVehiclesStatsPanel } from '../combat/VehicleStatsPanel';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
+import {
+  getVehicleElevation,
+  getElevationDifference,
+  getElevationAttackModifier,
+  parseWeaponRange,
+} from '../../utils/elevationCalculator';
 
 export function RightPanel() {
   const { state, currentTurnVehicle, currentTurnCreature } = useCombat();
@@ -68,10 +74,10 @@ export function RightPanel() {
             </Box>
             <Box>
               <Typography variant="caption" fontWeight={600} sx={{ color: 'text.primary' }}>
-                Target Cover Status
+                Target Status
               </Typography>
               <Typography variant="caption" display="block">
-                Cover bonuses for potential targets based on relative positions
+                Range, cover, and elevation info for potential targets
               </Typography>
             </Box>
             <Box>
@@ -103,12 +109,12 @@ export function RightPanel() {
         </Card>
       )}
 
-      {/* Target Cover Info - Show during combat when attacker has a vehicle or is on foot with a position */}
+      {/* Target Status - Show during combat when attacker has a vehicle or is on foot with a position */}
       {state.phase === 'combat' && (attackerVehicle || creatureOnFoot) && (
         <Card sx={{ mb: 2 }}>
           <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Target Cover Status
+              Target Status
               {currentTurnCreature && creatureVehicle && (
                 <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
                   (from {creatureVehicle.name})
@@ -152,6 +158,65 @@ function getEffectiveSpeed(vehicle: { currentSpeed: number; activeMishaps: Array
 
 function CurrentTurnInfo() {
   const { state, currentTurnCreature, currentTurnVehicle, currentTurnDriver } = useCombat();
+
+  // Calculate elevation modifiers for the current vehicle against enemy targets
+  // Returns grouped modifiers: { highGround: +2, lowGround: -2 } or null if no elevation differences
+  const getElevationModsForWeapon = (attackerVehicle: typeof currentTurnVehicle): { highGround: number | null; lowGround: number | null } | null => {
+    if (!attackerVehicle) return null;
+
+    const attackerElevation = getVehicleElevation(attackerVehicle, state.elevationZones);
+    const attackerFaction = attackerVehicle.type;
+
+    // Collect all enemy targets: vehicles and unassigned creatures
+    const enemyVehicles = state.vehicles.filter(v => v.type !== attackerFaction);
+    const assignedCreatureIds = new Set(state.crewAssignments.map(a => a.creatureId));
+    const enemyCreatures = state.creatures.filter(c =>
+      !assignedCreatureIds.has(c.id) &&
+      c.position &&
+      (attackerFaction === 'party' ? c.statblock.type !== 'pc' : c.statblock.type === 'pc')
+    );
+
+    let hasHighGround = false; // Attacker has high ground over some target
+    let hasLowGround = false;  // Attacker has low ground against some target
+
+    // Check enemy vehicles
+    for (const enemy of enemyVehicles) {
+      const targetElevation = getVehicleElevation(enemy, state.elevationZones);
+      const elevDiff = getElevationDifference(attackerElevation, targetElevation);
+      const attackMod = getElevationAttackModifier(elevDiff);
+      if (attackMod > 0) hasHighGround = true;
+      if (attackMod < 0) hasLowGround = true;
+    }
+
+    // Check unassigned enemy creatures (they have positions)
+    for (const creature of enemyCreatures) {
+      if (!creature.position) continue;
+      // Get creature's elevation from their position
+      let creatureElevation = 0;
+      for (const zone of state.elevationZones) {
+        if (creature.position.x >= zone.position.x &&
+            creature.position.x <= zone.position.x + zone.size.width &&
+            creature.position.y >= zone.position.y &&
+            creature.position.y <= zone.position.y + zone.size.height) {
+          if (zone.elevation > creatureElevation) {
+            creatureElevation = zone.elevation;
+          }
+        }
+      }
+      const elevDiff = getElevationDifference(attackerElevation, creatureElevation);
+      const attackMod = getElevationAttackModifier(elevDiff);
+      if (attackMod > 0) hasHighGround = true;
+      if (attackMod < 0) hasLowGround = true;
+    }
+
+    // Return null if no elevation differences matter
+    if (!hasHighGround && !hasLowGround) return null;
+
+    return {
+      highGround: hasHighGround ? 2 : null,
+      lowGround: hasLowGround ? -2 : null,
+    };
+  };
 
   // Vehicle turn - show vehicle and crew info
   if (currentTurnVehicle) {
@@ -258,7 +323,17 @@ function CurrentTurnInfo() {
                   </Box>
                 </Box>
                 {/* Weapon info for manned weapon stations - only show if crew is alive */}
-                {showWeapon && (
+                {showWeapon && (() => {
+                  // Only show elevation modifiers for ranged attack roll weapons (not melee, not save-based)
+                  const isRangedWeapon = parseWeaponRange(weapon.range) > 0;
+                  // A weapon is save-based if it has saveDC, saveType, or "Save-based" in properties
+                  const isSaveBased = weapon.saveDC !== undefined ||
+                    weapon.saveType !== undefined ||
+                    weapon.properties?.some(p => p.toLowerCase().includes('save'));
+                  // A weapon uses attack rolls if it has attackBonus defined and is not save-based
+                  const isAttackRoll = weapon.attackBonus !== undefined && !isSaveBased;
+                  const elevMods = (isRangedWeapon && isAttackRoll) ? getElevationModsForWeapon(currentTurnVehicle) : null;
+                  return (
                   <Box
                     sx={{
                       mt: 0.5,
@@ -272,9 +347,33 @@ function CurrentTurnInfo() {
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1.5, mt: 0.25, flexWrap: 'wrap' }}>
                       {weapon.attackBonus !== undefined ? (
-                        <Typography variant="caption" fontFamily="monospace" color="text.secondary">
-                          +{weapon.attackBonus} to hit
-                        </Typography>
+                        <>
+                          <Typography variant="caption" fontFamily="monospace" color="text.secondary">
+                            +{weapon.attackBonus} to hit
+                          </Typography>
+                          {elevMods && (
+                            <>
+                              {elevMods.highGround !== null && (
+                                <Typography
+                                  variant="caption"
+                                  fontFamily="monospace"
+                                  sx={{ color: '#3b82f6', fontWeight: 600 }}
+                                >
+                                  (+{weapon.attackBonus + elevMods.highGround} vs low ground)
+                                </Typography>
+                              )}
+                              {elevMods.lowGround !== null && (
+                                <Typography
+                                  variant="caption"
+                                  fontFamily="monospace"
+                                  sx={{ color: '#ef4444', fontWeight: 600 }}
+                                >
+                                  (+{weapon.attackBonus + elevMods.lowGround} vs high ground)
+                                </Typography>
+                              )}
+                            </>
+                          )}
+                        </>
                       ) : weapon.saveDC !== undefined ? (
                         <Typography variant="caption" fontFamily="monospace" color="text.secondary">
                           DC {weapon.saveDC} {weapon.saveType?.toUpperCase()} save
@@ -295,7 +394,8 @@ function CurrentTurnInfo() {
                       </Typography>
                     )}
                   </Box>
-                )}
+                  );
+                })()}
               </Paper>
             );
             })}

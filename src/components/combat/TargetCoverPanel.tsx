@@ -1,6 +1,6 @@
 /**
- * Target Cover Panel
- * Shows cover status of all potential targets based on vehicle positions and facing
+ * Target Status Panel
+ * Shows cover, range, and elevation status for all potential targets
  */
 
 import {
@@ -11,14 +11,52 @@ import {
   Stack,
 } from '@mui/material';
 import { useCombat } from '../../context/CombatContext';
-import { Vehicle, Creature, VehicleZone, Position } from '../../types';
+import { Vehicle, Creature, VehicleZone, Position, VehicleWeapon } from '../../types';
 import {
-  calculateCover,
-  calculateCoverFromPosition,
+  calculateCoverWithElevation,
+  calculateCoverFromPositionWithElevation,
   getArcDisplayName,
-  CoverResult,
+  ElevationCoverResult,
 } from '../../utils/coverCalculator';
+import {
+  parseWeaponRange,
+  getModifiedWeaponRange,
+} from '../../utils/elevationCalculator';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
+
+// Calculate distance between two positions
+function calculateDistance(pos1: Position, pos2: Position): number {
+  const dx = pos2.x - pos1.x;
+  const dy = pos2.y - pos1.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+// Get max weapon range for attacker (considering manned weapons only)
+function getMaxWeaponRange(
+  attackerVehicle: Vehicle | undefined,
+  crewAssignments: Array<{ vehicleId: string; zoneId: string; creatureId: string }>,
+  creatures: Creature[]
+): { maxRange: number; weapons: VehicleWeapon[] } {
+  if (!attackerVehicle?.weapons) return { maxRange: 0, weapons: [] };
+
+  const vehicleCrew = crewAssignments.filter(a => a.vehicleId === attackerVehicle.id);
+  const mannedWeapons: VehicleWeapon[] = [];
+  let maxRange = 0;
+
+  for (const weapon of attackerVehicle.weapons) {
+    const crewAtStation = vehicleCrew.find(a => a.zoneId === weapon.zoneId);
+    if (!crewAtStation) continue;
+
+    const crewMember = creatures.find(c => c.id === crewAtStation.creatureId);
+    if (!crewMember || crewMember.currentHp === 0) continue;
+
+    mannedWeapons.push(weapon);
+    const range = parseWeaponRange(weapon.range);
+    if (range > maxRange) maxRange = range;
+  }
+
+  return { maxRange, weapons: mannedWeapons };
+}
 
 interface TargetCoverPanelProps {
   attackerVehicle?: Vehicle;
@@ -38,7 +76,20 @@ export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFa
     (v) => v.type === targetFaction
   );
 
+  // Get attacker's position and weapon info
+  const attackerPosition = attackerVehicle?.position || attackerCreature?.position;
+  const { maxRange: baseMaxRange, weapons: mannedWeapons } = getMaxWeaponRange(
+    attackerVehicle,
+    state.crewAssignments,
+    state.creatures
+  );
+
   const targetsByVehicle = opposingVehicles.map((targetVehicle) => {
+    // Calculate distance to target vehicle
+    const distance = attackerPosition
+      ? Math.round(calculateDistance(attackerPosition, targetVehicle.position))
+      : 0;
+
     const vehicleCreatures = state.crewAssignments
       .filter((a) => a.vehicleId === targetVehicle.id)
       .map((a) => {
@@ -46,20 +97,34 @@ export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFa
         const zone = targetVehicle.template.zones.find((z) => z.id === a.zoneId);
         if (!creature || !zone) return null;
 
-        // Calculate cover from vehicle or from creature position
+        // Calculate cover from vehicle or from creature position (with elevation)
         const cover = attackerVehicle
-          ? calculateCover(attackerVehicle, targetVehicle, zone)
+          ? calculateCoverWithElevation(attackerVehicle, targetVehicle, zone, state.elevationZones)
           : attackerCreature?.position
-            ? calculateCoverFromPosition(attackerCreature.position, targetVehicle, zone)
+            ? calculateCoverFromPositionWithElevation(attackerCreature.position, targetVehicle, zone, state.elevationZones)
             : null;
 
         if (!cover) return null;
 
-        return { creature, zone, cover };
+        // Calculate range with elevation extension for this specific target
+        const elevationDiff = cover.elevationDiff;
+        const extendedMaxRange = elevationDiff > 0
+          ? getModifiedWeaponRange(baseMaxRange, elevationDiff)
+          : baseMaxRange;
+
+        return {
+          creature,
+          zone,
+          cover,
+          distance,
+          baseRange: baseMaxRange,
+          extendedRange: extendedMaxRange,
+          inRange: distance <= extendedMaxRange,
+        };
       })
       .filter((t): t is NonNullable<typeof t> => t !== null);
 
-    return { vehicle: targetVehicle, targets: vehicleCreatures };
+    return { vehicle: targetVehicle, targets: vehicleCreatures, distance };
   });
 
   if (opposingVehicles.length === 0) {
@@ -82,7 +147,7 @@ export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFa
       </Typography>
 
       <Stack spacing={2}>
-        {targetsByVehicle.map(({ vehicle, targets }) => (
+        {targetsByVehicle.map(({ vehicle, targets, distance }) => (
           <Box key={vehicle.id}>
             {/* Target Vehicle Header */}
             <Paper
@@ -94,11 +159,18 @@ export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFa
                 borderColor: factionColors.enemy,
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" fontWeight={600}>{vehicle.name}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  HP: {vehicle.currentHp}/{vehicle.template.maxHp}
-                </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" fontWeight={600}>{vehicle.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    HP: {vehicle.currentHp}/{vehicle.template.maxHp}
+                  </Typography>
+                </Box>
+                {distance > 0 && (
+                  <Typography variant="caption" fontFamily="monospace" color="text.secondary">
+                    {distance} ft
+                  </Typography>
+                )}
               </Box>
             </Paper>
 
@@ -109,12 +181,16 @@ export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFa
               </Typography>
             ) : (
               <Stack spacing={0.5}>
-                {targets.map(({ creature, zone, cover }) => (
-                  <TargetCoverCard
-                    key={creature.id}
-                    creature={creature}
-                    zone={zone}
-                    cover={cover}
+                {targets.map((target) => (
+                  <TargetStatusCard
+                    key={target.creature.id}
+                    creature={target.creature}
+                    zone={target.zone}
+                    cover={target.cover}
+                    distance={target.distance}
+                    baseRange={target.baseRange}
+                    extendedRange={target.extendedRange}
+                    inRange={target.inRange}
                   />
                 ))}
               </Stack>
@@ -126,13 +202,17 @@ export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFa
   );
 }
 
-interface TargetCoverCardProps {
+interface TargetStatusCardProps {
   creature: Creature;
   zone: VehicleZone;
-  cover: CoverResult;
+  cover: ElevationCoverResult;
+  distance: number;
+  baseRange: number;
+  extendedRange: number;
+  inRange: boolean;
 }
 
-function TargetCoverCard({ creature, zone, cover }: TargetCoverCardProps) {
+function TargetStatusCard({ creature, zone, cover, distance, baseRange, extendedRange, inRange }: TargetStatusCardProps) {
   const getCoverChipColor = (coverType: string): 'error' | 'warning' | 'success' | 'default' => {
     switch (coverType) {
       case 'none': return 'error';
@@ -204,6 +284,85 @@ function TargetCoverCard({ creature, zone, cover }: TargetCoverCardProps) {
           </Typography>
         )}
       </Box>
+
+      {/* Range Status */}
+      {baseRange > 0 && (
+        <Box
+          sx={{
+            mt: 0.5,
+            p: 0.5,
+            bgcolor: inRange ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+            borderRadius: 1,
+            border: 1,
+            borderColor: inRange ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              {inRange ? '🎯' : '📏'} {distance} ft away
+            </Typography>
+            <Chip
+              label={inRange ? 'In Range' : 'Out of Range'}
+              size="small"
+              sx={{
+                bgcolor: inRange ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                color: inRange ? '#22c55e' : '#ef4444',
+                fontWeight: 500,
+                fontSize: '0.65rem',
+                height: 20,
+              }}
+            />
+          </Box>
+          {extendedRange > baseRange && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+              Range: {baseRange} ft → {extendedRange} ft (elevation bonus)
+            </Typography>
+          )}
+          {extendedRange === baseRange && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+              Max range: {baseRange} ft
+            </Typography>
+          )}
+        </Box>
+      )}
+
+      {/* Elevation Info */}
+      {cover.elevationDiff !== 0 && (
+        <Box
+          sx={{
+            mt: 0.5,
+            p: 0.5,
+            bgcolor: cover.elevationDiff > 0 ? 'rgba(59, 130, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+            borderRadius: 1,
+            border: 1,
+            borderColor: cover.elevationDiff > 0 ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              {cover.elevationDiff > 0 ? '⬇️' : '⬆️'} {cover.elevationDisplayText}
+            </Typography>
+            {cover.elevationAttackModifier !== 0 && (
+              <Chip
+                label={`${cover.elevationAttackModifier > 0 ? '+' : ''}${cover.elevationAttackModifier} to hit`}
+                size="small"
+                sx={{
+                  bgcolor: cover.elevationAttackModifier > 0 ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                  color: cover.elevationAttackModifier > 0 ? '#3b82f6' : '#ef4444',
+                  fontWeight: 500,
+                  fontSize: '0.65rem',
+                  height: 20,
+                }}
+              />
+            )}
+          </Box>
+          {cover.coverUpgradedByElevation && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+              Cover upgraded due to defender's high ground
+            </Typography>
+          )}
+        </Box>
+      )}
 
       {/* Visibility Warning */}
       {!cover.isVisible && (

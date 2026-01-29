@@ -7,6 +7,7 @@ import { useRef, useEffect, useState } from 'react';
 import { useBroadcastReceiver, BattlefieldSyncState } from '../../hooks/useBroadcastChannel';
 import { SCALES } from '../../data/scaleConfig';
 import { Vehicle, Creature, Position, VehicleWeapon, CrewAssignment, ElevationZone } from '../../types';
+import { featureFlags } from '../../config/featureFlags';
 
 export function PlayerViewMap() {
   const { state, isConnected } = useBroadcastReceiver();
@@ -168,7 +169,7 @@ export function PlayerViewMap() {
         )}
 
         {/* Elevation Zones */}
-        {state.elevationZones?.map((zone: ElevationZone) => {
+        {featureFlags.elevationZones && state.elevationZones?.map((zone: ElevationZone) => {
           const screenPos = {
             x: mapCenter.x + zone.position.x * pixelsPerFoot,
             y: mapCenter.y + zone.position.y * pixelsPerFoot

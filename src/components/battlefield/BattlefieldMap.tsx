@@ -20,7 +20,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { useCombat } from '../../context/CombatContext';
 import { Vehicle, Position, ScaleName, Creature, CrewAssignment, ElevationZone } from '../../types';
 import { SCALES, formatDistance, getScaleForDistance, calculateMovementPerRound } from '../../data/scaleConfig';
+import { getVehicleElevation } from '../../utils/elevationCalculator';
 import { useBroadcastSource } from '../../hooks/useBroadcastChannel';
+import { featureFlags } from '../../config/featureFlags';
 
 interface BattlefieldMapProps {
   height?: number;
@@ -32,7 +34,16 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   const [showBackgroundControls, setShowBackgroundControls] = useState(false);
   const [bgPanelTab, setBgPanelTab] = useState<'background' | 'elevation'>('background');
   const [showElevationControls, setShowElevationControls] = useState(false);
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [resizingZone, setResizingZone] = useState<{
+    zoneId: string;
+    handle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';
+    startX: number;
+    startY: number;
+    originalZone: ElevationZone;
+  } | null>(null);
   const [editingZone, setEditingZone] = useState<ElevationZone | null>(null);
+  const [elevationZoneOpacity, setElevationZoneOpacity] = useState(0.3);
   const [isDrawingZone, setIsDrawingZone] = useState(false);
   const [zoneDrawStart, setZoneDrawStart] = useState<Position | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -449,6 +460,36 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
 
     const activeIdStr = String(active.id);
 
+    // Check if this is an elevation zone drag
+    if (activeIdStr.startsWith('zone-')) {
+      const zone = state.elevationZones.find((z) => z.id === activeIdStr);
+      if (!zone) return;
+
+      // If minimal movement, treat as a click to select
+      if (Math.abs(delta.x) < 5 && Math.abs(delta.y) < 5) {
+        setSelectedZoneId(zone.id);
+        return;
+      }
+
+      // Convert screen delta to world delta (feet)
+      const worldDelta = screenDeltaToWorld(delta);
+      const newPosition = {
+        x: zone.position.x + worldDelta.x,
+        y: zone.position.y + worldDelta.y,
+      };
+
+      dispatch({
+        type: 'UPDATE_ELEVATION_ZONE',
+        payload: { id: zone.id, updates: { position: newPosition } },
+      });
+
+      // Sync editingZone if this zone is being edited
+      if (editingZone?.id === zone.id) {
+        setEditingZone({ ...editingZone, position: newPosition });
+      }
+      return;
+    }
+
     // Check if this is a creature drag
     if (activeIdStr.startsWith('creature-')) {
       const creatureId = activeIdStr.replace('creature-', '');
@@ -721,10 +762,20 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   const handleMapMouseDown = (e: React.MouseEvent) => {
     // Only start panning on direct map clicks (not on tokens)
     if (e.target === mapRef.current || (e.target as HTMLElement).closest('.battlefield-map') === mapRef.current) {
-      // Check if clicking on a token or control - if so, don't pan
+      // Check if clicking on a token, zone, or control - if so, don't pan
       const target = e.target as HTMLElement;
-      if (target.closest('.vehicle-token') || target.closest('.creature-token') || target.closest('.rotate-btn') || target.closest('[data-draggable]')) {
+      if (
+        target.closest('.vehicle-token') ||
+        target.closest('.creature-token') ||
+        target.closest('.elevation-zone') ||
+        target.closest('.rotate-btn') ||
+        target.closest('[data-draggable]')
+      ) {
         return;
+      }
+      // Deselect elevation zone when clicking on empty map area
+      if (selectedZoneId) {
+        setSelectedZoneId(null);
       }
       setIsPanning(true);
       setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
@@ -803,7 +854,115 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
 
   const handleMapMouseLeave = () => {
     setIsPanning(false);
+    // Cancel resize if mouse leaves map
+    if (resizingZone) {
+      setResizingZone(null);
+    }
   };
+
+  // Elevation zone resize handlers
+  const handleStartResize = (zoneId: string, handle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w', startX: number, startY: number) => {
+    const zone = state.elevationZones.find(z => z.id === zoneId);
+    if (zone) {
+      setResizingZone({
+        zoneId,
+        handle,
+        startX,
+        startY,
+        originalZone: { ...zone },
+      });
+    }
+  };
+
+  const handleResizeMove = useCallback((e: PointerEvent) => {
+    if (!resizingZone) return;
+
+    const deltaX = e.clientX - resizingZone.startX;
+    const deltaY = e.clientY - resizingZone.startY;
+
+    // Convert screen delta to world delta (feet)
+    const worldDeltaX = deltaX / pixelsPerFoot;
+    const worldDeltaY = deltaY / pixelsPerFoot;
+
+    const { handle, originalZone } = resizingZone;
+    const minSize = 10; // Minimum 10 feet
+
+    let newPosition = { ...originalZone.position };
+    let newSize = { ...originalZone.size };
+
+    // Calculate new size and position based on which handle is being dragged
+    switch (handle) {
+      case 'se': // Bottom-right corner
+        newSize.width = Math.max(minSize, originalZone.size.width + worldDeltaX);
+        newSize.height = Math.max(minSize, originalZone.size.height + worldDeltaY);
+        break;
+      case 'sw': // Bottom-left corner
+        newSize.width = Math.max(minSize, originalZone.size.width - worldDeltaX);
+        newSize.height = Math.max(minSize, originalZone.size.height + worldDeltaY);
+        newPosition.x = originalZone.position.x + (originalZone.size.width - newSize.width);
+        break;
+      case 'ne': // Top-right corner
+        newSize.width = Math.max(minSize, originalZone.size.width + worldDeltaX);
+        newSize.height = Math.max(minSize, originalZone.size.height - worldDeltaY);
+        newPosition.y = originalZone.position.y + (originalZone.size.height - newSize.height);
+        break;
+      case 'nw': // Top-left corner
+        newSize.width = Math.max(minSize, originalZone.size.width - worldDeltaX);
+        newSize.height = Math.max(minSize, originalZone.size.height - worldDeltaY);
+        newPosition.x = originalZone.position.x + (originalZone.size.width - newSize.width);
+        newPosition.y = originalZone.position.y + (originalZone.size.height - newSize.height);
+        break;
+      case 'e': // Right edge
+        newSize.width = Math.max(minSize, originalZone.size.width + worldDeltaX);
+        break;
+      case 'w': // Left edge
+        newSize.width = Math.max(minSize, originalZone.size.width - worldDeltaX);
+        newPosition.x = originalZone.position.x + (originalZone.size.width - newSize.width);
+        break;
+      case 's': // Bottom edge
+        newSize.height = Math.max(minSize, originalZone.size.height + worldDeltaY);
+        break;
+      case 'n': // Top edge
+        newSize.height = Math.max(minSize, originalZone.size.height - worldDeltaY);
+        newPosition.y = originalZone.position.y + (originalZone.size.height - newSize.height);
+        break;
+    }
+
+    // Round to nearest foot
+    newSize.width = Math.round(newSize.width);
+    newSize.height = Math.round(newSize.height);
+    newPosition.x = Math.round(newPosition.x);
+    newPosition.y = Math.round(newPosition.y);
+
+    dispatch({
+      type: 'UPDATE_ELEVATION_ZONE',
+      payload: {
+        id: resizingZone.zoneId,
+        updates: { position: newPosition, size: newSize },
+      },
+    });
+
+    // Sync editingZone if this zone is being edited
+    if (editingZone?.id === resizingZone.zoneId) {
+      setEditingZone({ ...editingZone, position: newPosition, size: newSize });
+    }
+  }, [resizingZone, pixelsPerFoot, dispatch, editingZone, setEditingZone]);
+
+  const handleResizeEnd = useCallback(() => {
+    setResizingZone(null);
+  }, []);
+
+  // Add global pointer listeners for resize
+  useEffect(() => {
+    if (resizingZone) {
+      window.addEventListener('pointermove', handleResizeMove);
+      window.addEventListener('pointerup', handleResizeEnd);
+      return () => {
+        window.removeEventListener('pointermove', handleResizeMove);
+        window.removeEventListener('pointerup', handleResizeEnd);
+      };
+    }
+  }, [resizingZone, handleResizeMove, handleResizeEnd]);
 
   // Auto-fit zoom to show all vehicles and creatures - zooms IN to battle area
   const handleFitAll = () => {
@@ -1003,6 +1162,38 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     };
   };
 
+  // Auto-constrain vehicles and creatures when image bounds change
+  useEffect(() => {
+    if (!imageBounds) return;
+
+    // Check and constrain vehicles
+    state.vehicles.forEach((vehicle) => {
+      const constrained = constrainToImageBounds(vehicle.position);
+      if (constrained.x !== vehicle.position.x || constrained.y !== vehicle.position.y) {
+        updateVehiclePosition(vehicle.id, constrained);
+      }
+    });
+
+    // Check and constrain creatures with positions
+    state.creatures.forEach((creature) => {
+      if (creature.position) {
+        const constrained = constrainToImageBounds(creature.position);
+        if (constrained.x !== creature.position.x || constrained.y !== creature.position.y) {
+          dispatch({
+            type: 'UPDATE_CREATURE',
+            payload: { id: creature.id, updates: { position: constrained } },
+          });
+        }
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    imageBounds?.minX,
+    imageBounds?.maxX,
+    imageBounds?.minY,
+    imageBounds?.maxY,
+  ]);
+
   const handleClearBackground = () => {
     setBackgroundImage(null);
     if (fileInputRef.current) {
@@ -1161,31 +1352,37 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                 }}
               >
                 {/* Tabs */}
-                <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)' }}>
-                  <button
-                    className={`btn text-xs ${bgPanelTab === 'background' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{
-                      flex: 1,
-                      borderRadius: 'var(--radius-sm) 0 0 0',
-                      border: 'none',
-                      borderRight: '1px solid var(--color-border)',
-                    }}
-                    onClick={() => setBgPanelTab('background')}
-                  >
-                    Background
-                  </button>
-                  <button
-                    className={`btn text-xs ${bgPanelTab === 'elevation' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{
-                      flex: 1,
-                      borderRadius: '0 var(--radius-sm) 0 0',
-                      border: 'none',
-                    }}
-                    onClick={() => setBgPanelTab('elevation')}
-                  >
-                    Elevation {state.elevationZones.length > 0 && `(${state.elevationZones.length})`}
-                  </button>
-                </div>
+                {featureFlags.elevationZones ? (
+                  <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)' }}>
+                    <button
+                      className={`btn text-xs ${bgPanelTab === 'background' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{
+                        flex: 1,
+                        borderRadius: 'var(--radius-sm) 0 0 0',
+                        border: 'none',
+                        borderRight: '1px solid var(--color-border)',
+                      }}
+                      onClick={() => setBgPanelTab('background')}
+                    >
+                      Background
+                    </button>
+                    <button
+                      className={`btn text-xs ${bgPanelTab === 'elevation' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{
+                        flex: 1,
+                        borderRadius: '0 var(--radius-sm) 0 0',
+                        border: 'none',
+                      }}
+                      onClick={() => setBgPanelTab('elevation')}
+                    >
+                      Elevation {state.elevationZones.length > 0 && `(${state.elevationZones.length})`}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-xs font-bold" style={{ padding: 'var(--spacing-sm)', borderBottom: '1px solid var(--color-border)' }}>
+                    Background Image
+                  </div>
+                )}
 
                 {/* Tab Content */}
                 <div style={{ padding: 'var(--spacing-sm)' }}>
@@ -1322,8 +1519,24 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                   )}
 
                   {/* Elevation Tab */}
-                  {bgPanelTab === 'elevation' && (
+                  {featureFlags.elevationZones && bgPanelTab === 'elevation' && (
                     <>
+                      {/* Zone Opacity Slider */}
+                      <div style={{ marginBottom: 'var(--spacing-sm)' }}>
+                        <div className="flex justify-between items-center text-xs" style={{ marginBottom: '4px' }}>
+                          <span>Zone Opacity</span>
+                          <span className="text-muted">{Math.round(elevationZoneOpacity * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={elevationZoneOpacity * 100}
+                          onChange={(e) => setElevationZoneOpacity(parseInt(e.target.value) / 100)}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+
                       {/* Add Zone Button */}
                       <button
                         className="btn btn-secondary text-xs mb-sm"
@@ -1584,47 +1797,24 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
           )}
 
           {/* Elevation Zones */}
-          {state.elevationZones.map((zone) => {
+          {featureFlags.elevationZones && state.elevationZones.map((zone) => {
             const screenPos = worldToScreen(zone.position);
             const screenWidth = zone.size.width * pixelsPerFoot;
             const screenHeight = zone.size.height * pixelsPerFoot;
-            const isHigher = zone.elevation > 0;
-            const isLower = zone.elevation < 0;
-            const zoneColor = zone.color || (isHigher ? '#f59e0b' : isLower ? '#3b82f6' : '#6b7280');
             return (
-              <div
+              <DraggableElevationZone
                 key={zone.id}
-                style={{
-                  position: 'absolute',
-                  left: screenPos.x,
-                  top: screenPos.y,
-                  width: screenWidth,
-                  height: screenHeight,
-                  backgroundColor: `${zoneColor}22`,
-                  border: `2px dashed ${zoneColor}`,
-                  borderRadius: 4,
-                  pointerEvents: 'none',
-                  zIndex: 1,
-                }}
-              >
-                {/* Zone label */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 4,
-                    left: 4,
-                    backgroundColor: `${zoneColor}cc`,
-                    color: '#fff',
-                    padding: '2px 6px',
-                    borderRadius: 3,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {zone.name}: {zone.elevation >= 0 ? '+' : ''}{zone.elevation} ft
-                </div>
-              </div>
+                zone={zone}
+                screenPosition={screenPos}
+                screenWidth={screenWidth}
+                screenHeight={screenHeight}
+                pixelsPerFoot={pixelsPerFoot}
+                isSelected={selectedZoneId === zone.id}
+                onSelect={(id) => setSelectedZoneId(id)}
+                onStartResize={handleStartResize}
+                isResizing={!!resizingZone}
+                opacity={elevationZoneOpacity}
+              />
             );
           })}
 
@@ -1687,6 +1877,8 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                 isCurrentTurn={isThisVehicleTurn}
                 crewAssignments={state.crewAssignments}
                 creatures={state.creatures}
+                elevationZones={state.elevationZones}
+                allVehicles={state.vehicles}
               />
             );
           })}
@@ -1886,6 +2078,179 @@ function WeaponRangeArcs({ weaponRanges, pixelsPerFoot, tokenSize, vehicleType, 
 }
 
 // ==========================================
+// Draggable Elevation Zone
+// ==========================================
+
+type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';
+
+interface DraggableElevationZoneProps {
+  zone: ElevationZone;
+  screenPosition: { x: number; y: number };
+  screenWidth: number;
+  screenHeight: number;
+  pixelsPerFoot: number;
+  isSelected: boolean;
+  onSelect: (zoneId: string) => void;
+  onStartResize: (zoneId: string, handle: ResizeHandle, startX: number, startY: number) => void;
+  isResizing: boolean;
+  opacity: number;
+}
+
+function DraggableElevationZone({
+  zone,
+  screenPosition,
+  screenWidth,
+  screenHeight,
+  pixelsPerFoot,
+  isSelected,
+  onSelect,
+  onStartResize,
+  isResizing,
+  opacity,
+}: DraggableElevationZoneProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: zone.id,
+    disabled: isResizing, // Disable dragging while resizing
+  });
+
+  const isHigher = zone.elevation > 0;
+  const isLower = zone.elevation < 0;
+  const zoneColor = zone.color || (isHigher ? '#f59e0b' : isLower ? '#3b82f6' : '#6b7280');
+
+  // Convert opacity (0-1) to hex (00-ff)
+  const opacityHex = Math.round((isDragging ? opacity * 1.5 : opacity) * 255).toString(16).padStart(2, '0');
+
+  const style = {
+    position: 'absolute' as const,
+    left: screenPosition.x,
+    top: screenPosition.y,
+    width: screenWidth,
+    height: screenHeight,
+    backgroundColor: `${zoneColor}${opacityHex}`,
+    border: `2px ${isSelected ? 'solid' : 'dashed'} ${zoneColor}`,
+    borderRadius: 4,
+    cursor: isDragging ? 'grabbing' : 'grab',
+    zIndex: isDragging ? 50 : isSelected ? 10 : 1,
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.7 : 1,
+    boxShadow: isSelected ? `0 0 0 2px ${zoneColor}, 0 0 8px ${zoneColor}66` : undefined,
+    overflow: 'visible' as const,
+  };
+
+  // Resize handle style
+  const handleSize = 10;
+  const handleStyle = (cursor: string): React.CSSProperties => ({
+    position: 'absolute',
+    width: handleSize,
+    height: handleSize,
+    backgroundColor: zoneColor,
+    border: '2px solid #fff',
+    borderRadius: 2,
+    cursor,
+    zIndex: 100,
+  });
+
+  const handleResizePointerDown = (handle: ResizeHandle, e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onStartResize(zone.id, handle, e.clientX, e.clientY);
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      className="elevation-zone"
+      style={style}
+      {...listeners}
+      {...attributes}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect(zone.id);
+      }}
+    >
+      {/* Zone label */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 4,
+          left: 4,
+          backgroundColor: `${zoneColor}cc`,
+          color: '#fff',
+          padding: '2px 6px',
+          borderRadius: 3,
+          fontSize: 11,
+          fontWeight: 600,
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+        }}
+      >
+        {zone.name}: {zone.elevation >= 0 ? '+' : ''}{zone.elevation} ft
+      </div>
+
+      {/* Size indicator when selected */}
+      {isSelected && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: handleSize + 8,
+            right: handleSize + 8,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            color: '#fff',
+            padding: '2px 6px',
+            borderRadius: 3,
+            fontSize: 10,
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+          }}
+        >
+          {zone.size.width} × {zone.size.height} ft
+        </div>
+      )}
+
+      {/* Resize handles - only show when selected */}
+      {isSelected && (
+        <>
+          {/* Corner handles */}
+          <div
+            style={{ ...handleStyle('nw-resize'), top: -handleSize/2, left: -handleSize/2 }}
+            onPointerDown={(e) => handleResizePointerDown('nw', e)}
+          />
+          <div
+            style={{ ...handleStyle('ne-resize'), top: -handleSize/2, right: -handleSize/2 }}
+            onPointerDown={(e) => handleResizePointerDown('ne', e)}
+          />
+          <div
+            style={{ ...handleStyle('sw-resize'), bottom: -handleSize/2, left: -handleSize/2 }}
+            onPointerDown={(e) => handleResizePointerDown('sw', e)}
+          />
+          <div
+            style={{ ...handleStyle('se-resize'), bottom: -handleSize/2, right: -handleSize/2 }}
+            onPointerDown={(e) => handleResizePointerDown('se', e)}
+          />
+          {/* Edge handles */}
+          <div
+            style={{ ...handleStyle('n-resize'), top: -handleSize/2, left: '50%', transform: 'translateX(-50%)' }}
+            onPointerDown={(e) => handleResizePointerDown('n', e)}
+          />
+          <div
+            style={{ ...handleStyle('s-resize'), bottom: -handleSize/2, left: '50%', transform: 'translateX(-50%)' }}
+            onPointerDown={(e) => handleResizePointerDown('s', e)}
+          />
+          <div
+            style={{ ...handleStyle('w-resize'), top: '50%', left: -handleSize/2, transform: 'translateY(-50%)' }}
+            onPointerDown={(e) => handleResizePointerDown('w', e)}
+          />
+          <div
+            style={{ ...handleStyle('e-resize'), top: '50%', right: -handleSize/2, transform: 'translateY(-50%)' }}
+            onPointerDown={(e) => handleResizePointerDown('e', e)}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
 // Vehicle Token (Draggable)
 // ==========================================
 
@@ -1902,6 +2267,8 @@ interface VehicleTokenProps {
   isCurrentTurn?: boolean; // Highlight as current turn
   crewAssignments: CrewAssignment[];
   creatures: Creature[];
+  elevationZones: ElevationZone[];
+  allVehicles: Vehicle[];
 }
 
 function VehicleToken({
@@ -1917,6 +2284,8 @@ function VehicleToken({
   isCurrentTurn = false,
   crewAssignments,
   creatures,
+  elevationZones,
+  allVehicles,
 }: VehicleTokenProps) {
   const [isHovered, setIsHovered] = useState(false);
   const isInoperative = vehicle.isInoperative || vehicle.currentHp === 0;
@@ -1934,7 +2303,8 @@ function VehicleToken({
   const tokenSize = Math.max(24, scaledSize);
 
   // Calculate weapon ranges per arc direction (only for manned weapons)
-  const weaponRangesByArc = getWeaponRangesByArc(vehicle, crewAssignments, creatures);
+  // Includes elevation-based range extension when firing at targets below
+  const weaponRangesByArc = getWeaponRangesByArc(vehicle, crewAssignments, creatures, elevationZones, allVehicles);
   const maxWeaponRange = Math.max(weaponRangesByArc.front, weaponRangesByArc.rear, weaponRangesByArc.left, weaponRangesByArc.right);
 
   // z-index priority: dragging > current turn > hovered > default
@@ -3373,11 +3743,14 @@ function getMaxWeaponRange(vehicle: Vehicle): number {
  * Get max weapon range per arc direction
  * Returns { front, rear, left, right } with the max range for each direction
  * Only includes ranges for weapons that have a living crew member manning them
+ * Note: Shows BASE range only - elevation-based range extension is shown per-target in Target Status panel
  */
 function getWeaponRangesByArc(
   vehicle: Vehicle,
   crewAssignments: CrewAssignment[],
-  creatures: Creature[]
+  creatures: Creature[],
+  _elevationZones: ElevationZone[],
+  _allVehicles: Vehicle[]
 ): Record<'front' | 'rear' | 'left' | 'right', number> {
   const ranges = { front: 0, rear: 0, left: 0, right: 0 };
 
@@ -3394,7 +3767,7 @@ function getWeaponRangesByArc(
     const crewMember = creatures.find((c) => c.id === crewAtStation.creatureId);
     if (!crewMember || crewMember.currentHp === 0) continue; // Crew member is dead or not found
 
-    // Station is manned by living crew - include this weapon's range
+    // Station is manned by living crew - include this weapon's base range
     const range = parseWeaponRange(weapon.range);
 
     // Always use the zone template's visibleFromArcs as the authoritative source

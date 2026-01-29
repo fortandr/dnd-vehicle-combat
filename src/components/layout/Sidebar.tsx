@@ -506,6 +506,26 @@ export function Sidebar() {
     });
   };
 
+  // Roll initiative for all Player Characters
+  const handleRollAllPcInit = () => {
+    const playerCharacters = state.creatures.filter(c => c.statblock.type === 'pc');
+    playerCharacters.forEach(pc => {
+      // Use savingThrows.dex if available, otherwise calculate from abilities.dex
+      const dexMod = pc.statblock.savingThrows?.dex
+        ?? Math.floor(((pc.statblock.abilities?.dex || 10) - 10) / 2);
+      const roll = Math.floor(Math.random() * 20) + 1;
+      const initiative = Math.max(1, roll + dexMod);
+
+      dispatch({
+        type: 'UPDATE_CREATURE',
+        payload: {
+          id: pc.id,
+          updates: { initiative },
+        },
+      });
+    });
+  };
+
   const pcs = state.creatures.filter((c) => c.statblock.type === 'pc');
   const npcs = state.creatures.filter((c) => c.statblock.type !== 'pc');
 
@@ -722,7 +742,20 @@ export function Sidebar() {
       <Card sx={{ mb: 2 }}>
         <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography variant="subtitle2" sx={{ color: 'success.main' }}>Player Characters</Typography>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="subtitle2" sx={{ color: 'success.main' }}>Player Characters</Typography>
+              {pcs.length > 0 && (
+                <Tooltip title="Roll initiative for all PCs (1d20 + DEX Save)" arrow>
+                  <IconButton
+                    size="small"
+                    onClick={handleRollAllPcInit}
+                    sx={{ color: 'success.main' }}
+                  >
+                    <CasinoIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Stack>
             <Button size="small" variant="outlined" onClick={() => setShowAddPC(!showAddPC)} startIcon={<AddIcon />}>
               Add PC
             </Button>

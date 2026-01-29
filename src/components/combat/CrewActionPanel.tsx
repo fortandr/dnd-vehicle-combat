@@ -8,11 +8,17 @@ import { useState } from 'react';
 import { Vehicle, Creature, VehicleZone } from '../../types';
 import { useCombat } from '../../context/CombatContext';
 import {
-  calculateCover,
+  calculateCoverWithElevation,
   getArcDisplayName,
-  CoverResult,
+  ElevationCoverResult,
   getZoneCoverDescription,
 } from '../../utils/coverCalculator';
+import {
+  getVehicleElevation,
+  parseWeaponRange,
+  getModifiedWeaponRange,
+  formatRangeExtension,
+} from '../../utils/elevationCalculator';
 
 interface CrewActionPanelProps {
   vehicle: Vehicle;
@@ -25,7 +31,7 @@ interface CrewMemberAction {
   bonusAction: string | null;
   movement: string | null;
   target: string | null; // Target creature ID for attacks
-  targetCover: CoverResult | null;
+  targetCover: ElevationCoverResult | null;
   resolved: boolean;
 }
 
@@ -109,7 +115,7 @@ export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
       creatureName: string;
       vehicleName: string | null;
       zoneName: string | null;
-      cover: CoverResult | null;
+      cover: ElevationCoverResult | null;
     }> = [];
 
     // Get attacker's zone
@@ -133,7 +139,7 @@ export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
         const targetZone = targetVehicle.template.zones.find((z) => z.id === assignment.zoneId);
 
         if (targetCreature && targetZone) {
-          const cover = calculateCover(vehicle, targetVehicle, targetZone);
+          const cover = calculateCoverWithElevation(vehicle, targetVehicle, targetZone, state.elevationZones);
           targets.push({
             creatureId: targetCreature.id,
             creatureName: targetCreature.name,
@@ -211,7 +217,7 @@ export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
     }));
   };
 
-  const setTarget = (creatureId: string, targetId: string | null, cover: CoverResult | null) => {
+  const setTarget = (creatureId: string, targetId: string | null, cover: ElevationCoverResult | null) => {
     setCrewActions((prev) => ({
       ...prev,
       [creatureId]: {
@@ -406,6 +412,7 @@ export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
                             {target.cover && !target.cover.isVisible && ' [NO LOS]'}
                             {target.cover && target.cover.isVisible && target.cover.acBonus > 0 && ` [+${target.cover.acBonus} AC]`}
                             {target.cover && target.cover.isVisible && target.cover.acBonus === 0 && ' [Exposed]'}
+                            {target.cover && target.cover.elevationAttackModifier !== 0 && ` [${target.cover.elevationAttackModifier > 0 ? '+' : ''}${target.cover.elevationAttackModifier} elev]`}
                           </option>
                         ))}
                       </select>
@@ -442,6 +449,46 @@ export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
                           <div className="text-muted mt-sm">
                             {crewAction.targetCover.reason}
                           </div>
+
+                          {/* Elevation Info */}
+                          {crewAction.targetCover.elevationDiff !== 0 && (
+                            <div
+                              className="mt-sm"
+                              style={{
+                                padding: '4px 8px',
+                                background: crewAction.targetCover.elevationDiff > 0
+                                  ? 'rgba(59, 130, 246, 0.15)'
+                                  : 'rgba(239, 68, 68, 0.15)',
+                                borderRadius: 'var(--radius-sm)',
+                                border: `1px solid ${crewAction.targetCover.elevationDiff > 0 ? 'rgba(59, 130, 246, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                              }}
+                            >
+                              <div className="flex justify-between items-center">
+                                <span>
+                                  {crewAction.targetCover.elevationDiff > 0 ? '⬇️' : '⬆️'} {crewAction.targetCover.elevationDisplayText}
+                                </span>
+                                {crewAction.targetCover.elevationAttackModifier !== 0 && (
+                                  <span
+                                    className="badge"
+                                    style={{
+                                      fontSize: '0.65rem',
+                                      background: crewAction.targetCover.elevationAttackModifier > 0
+                                        ? 'rgba(59, 130, 246, 0.3)'
+                                        : 'rgba(239, 68, 68, 0.3)',
+                                    }}
+                                  >
+                                    {crewAction.targetCover.elevationAttackModifier > 0 ? '+' : ''}{crewAction.targetCover.elevationAttackModifier} to hit
+                                  </span>
+                                )}
+                              </div>
+                              {crewAction.targetCover.coverUpgradedByElevation && (
+                                <div className="text-muted mt-sm" style={{ fontSize: '0.7rem' }}>
+                                  Target's cover upgraded due to high ground
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           {!crewAction.targetCover.isVisible && (
                             <div style={{ color: 'var(--color-fire)', marginTop: '4px' }}>
                               Cannot target - no line of sight!
