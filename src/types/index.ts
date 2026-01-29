@@ -377,6 +377,16 @@ export interface TerrainFeature {
   effect?: string;
 }
 
+// Elevation zone - rectangular area with a specific elevation
+export interface ElevationZone {
+  id: string;
+  name: string;
+  elevation: number; // Feet above/below baseline (0)
+  position: Position; // Top-left corner in world coords (feet)
+  size: { width: number; height: number }; // In feet
+  color?: string; // Optional tint color for visualization
+}
+
 // ==========================================
 // Combat State
 // ==========================================
@@ -409,6 +419,9 @@ export interface CombatState {
   scale: ScaleName;
   battlefield: BattlefieldState;
 
+  // Elevation zones
+  elevationZones: ElevationZone[];
+
   // Environment
   environment: Environment;
 
@@ -418,6 +431,11 @@ export interface CombatState {
   // Complications
   autoRollComplications: boolean;
   activeBattlefieldComplication?: ActiveBattlefieldComplication; // Currently resolving complication
+
+  // Player View Settings
+  playerViewSettings: {
+    showVehicleHealth: boolean;
+  };
 }
 
 export interface Environment {

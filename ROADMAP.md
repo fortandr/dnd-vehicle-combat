@@ -83,6 +83,48 @@
 
 ---
 
+### Enhanced Elevation Zones
+
+**Goal**: Make elevation zones fully interactive with drag-and-drop positioning, resize handles, and polygon support for non-rectangular terrain.
+
+#### Phase 1: Interactive Positioning
+- [ ] Make zones draggable on the battlefield map (similar to vehicle tokens)
+- [ ] Visual feedback while dragging (snap to grid option)
+- [ ] Remove coordinate input fields from form (position via drag only)
+- [ ] Click zone to select, show edit controls inline
+
+#### Phase 2: Resize Handles
+- [ ] Add corner/edge resize handles to selected zones
+- [ ] Maintain minimum zone size (e.g., 10ft × 10ft)
+- [ ] Show dimensions tooltip while resizing
+- [ ] Snap to grid while resizing (optional)
+
+#### Phase 3: Polygon Support
+- [ ] New zone type: Polygon (vs current Rectangle)
+- [ ] Click-to-place vertices for polygon creation
+- [ ] Edit mode: drag vertices to reshape
+- [ ] Add/remove vertices on polygon edges
+- [ ] Support for concave and convex polygons
+- [ ] Calculate area for polygon zones
+
+#### Phase 4: Drawing Tools
+- [ ] Toolbar for zone creation modes:
+  - Rectangle draw (click-drag)
+  - Polygon draw (click vertices, double-click to close)
+  - Freehand draw (converts to polygon approximation)
+- [ ] Zone templates: Common shapes (circle approximation, L-shape, etc.)
+- [ ] Copy/paste zones
+- [ ] Multi-select zones for bulk operations
+
+#### Phase 5: Advanced Features
+- [ ] Layer ordering for overlapping zones
+- [ ] Zone opacity control
+- [ ] Terrain types with preset colors (cliff, water, difficult terrain)
+- [ ] Elevation gradients (show height change direction)
+- [ ] Import zones from image (trace edges)
+
+---
+
 ### General Improvements
 
 - [ ] Code splitting for smaller bundle size

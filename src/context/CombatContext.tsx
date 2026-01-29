@@ -26,8 +26,10 @@ import {
   VehicleComplicationResolution,
   SpeedModifier,
   ComplicationResolutionStatus,
+  ElevationZone,
 } from '../types';
 import { getScaleForDistance, SCALES } from '../data/scaleConfig';
+import { logAnalyticsEvent } from '../firebase';
 import { v4 as uuid } from 'uuid';
 import { loadCurrentEncounter } from '../hooks/useLocalStorage';
 
@@ -65,9 +67,13 @@ export const initialCombatState: CombatState = {
   isChase: false,
   scale: 'tactical',
   battlefield: initialBattlefield,
+  elevationZones: [],
   environment: initialEnvironment,
   actionLog: [],
   autoRollComplications: false,
+  playerViewSettings: {
+    showVehicleHealth: true,
+  },
 };
 
 // ==========================================
@@ -127,6 +133,14 @@ type CombatAction =
   | { type: 'UPDATE_VEHICLE_FACING'; payload: { vehicleId: string; facing: number } }
   | { type: 'SET_SCALE'; payload: ScaleName }
   | { type: 'UPDATE_BATTLEFIELD'; payload: Partial<BattlefieldState> }
+
+  // Elevation Zones
+  | { type: 'ADD_ELEVATION_ZONE'; payload: ElevationZone }
+  | { type: 'UPDATE_ELEVATION_ZONE'; payload: { id: string; updates: Partial<ElevationZone> } }
+  | { type: 'REMOVE_ELEVATION_ZONE'; payload: string }
+
+  // Player View Settings
+  | { type: 'SET_PLAYER_VIEW_SETTINGS'; payload: Partial<CombatState['playerViewSettings']> }
 
   // Logging
   | { type: 'LOG_ACTION'; payload: Omit<LogEntry, 'id' | 'timestamp' | 'round'> }
@@ -1169,6 +1183,38 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         battlefield: { ...state.battlefield, ...action.payload },
       };
 
+    // ========== Elevation Zones ==========
+    case 'ADD_ELEVATION_ZONE':
+      return {
+        ...state,
+        elevationZones: [...state.elevationZones, action.payload],
+      };
+
+    case 'UPDATE_ELEVATION_ZONE':
+      return {
+        ...state,
+        elevationZones: state.elevationZones.map((zone) =>
+          zone.id === action.payload.id
+            ? { ...zone, ...action.payload.updates }
+            : zone
+        ),
+      };
+
+    case 'REMOVE_ELEVATION_ZONE':
+      return {
+        ...state,
+        elevationZones: state.elevationZones.filter((zone) => zone.id !== action.payload),
+      };
+
+    case 'SET_PLAYER_VIEW_SETTINGS':
+      return {
+        ...state,
+        playerViewSettings: {
+          ...state.playerViewSettings,
+          ...action.payload,
+        },
+      };
+
     // ========== Logging ==========
     case 'LOG_ACTION':
       return {
@@ -1910,7 +1956,13 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
 
   const startCombat = useCallback(() => {
     dispatch({ type: 'START_COMBAT' });
-  }, []);
+    // Track analytics
+    logAnalyticsEvent('combat_started', {
+      vehicle_count: state.vehicles.length,
+      creature_count: state.creatures.length,
+      scale: state.scale,
+    });
+  }, [state.vehicles.length, state.creatures.length, state.scale]);
 
   const returnToSetup = useCallback(() => {
     dispatch({ type: 'RETURN_TO_SETUP' });

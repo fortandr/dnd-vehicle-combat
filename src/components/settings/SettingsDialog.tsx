@@ -14,10 +14,13 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
+  Checkbox,
   Typography,
   Box,
+  Divider,
 } from '@mui/material';
 import { useSettings, UnitSystem } from '../../context/SettingsContext';
+import { useCombat } from '../../context/CombatContext';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -26,6 +29,9 @@ interface SettingsDialogProps {
 
 export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const { unitSystem, setUnitSystem } = useSettings();
+  const { state, dispatch } = useCombat();
+
+  const showVehicleHealth = state.playerViewSettings?.showVehicleHealth ?? true;
 
   const handleUnitChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setUnitSystem(event.target.value as UnitSystem);
@@ -64,6 +70,32 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                 }
               />
             </RadioGroup>
+          </FormControl>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* Player View Settings */}
+          <FormControl component="fieldset">
+            <FormLabel component="legend">Player View</FormLabel>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showVehicleHealth}
+                  onChange={(e) => dispatch({
+                    type: 'SET_PLAYER_VIEW_SETTINGS',
+                    payload: { showVehicleHealth: e.target.checked }
+                  })}
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body2">Show Vehicle Health</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Display HP on vehicle tokens in Player View
+                  </Typography>
+                </Box>
+              }
+            />
           </FormControl>
         </Box>
       </DialogContent>

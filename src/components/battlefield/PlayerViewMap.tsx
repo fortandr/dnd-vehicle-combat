@@ -6,7 +6,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useBroadcastReceiver, BattlefieldSyncState } from '../../hooks/useBroadcastChannel';
 import { SCALES } from '../../data/scaleConfig';
-import { Vehicle, Creature, Position, VehicleWeapon, CrewAssignment } from '../../types';
+import { Vehicle, Creature, Position, VehicleWeapon, CrewAssignment, ElevationZone } from '../../types';
 
 export function PlayerViewMap() {
   const { state, isConnected } = useBroadcastReceiver();
@@ -167,6 +167,54 @@ export function PlayerViewMap() {
           />
         )}
 
+        {/* Elevation Zones */}
+        {state.elevationZones?.map((zone: ElevationZone) => {
+          const screenPos = {
+            x: mapCenter.x + zone.position.x * pixelsPerFoot,
+            y: mapCenter.y + zone.position.y * pixelsPerFoot
+          };
+          const screenWidth = zone.size.width * pixelsPerFoot;
+          const screenHeight = zone.size.height * pixelsPerFoot;
+          const isHigher = zone.elevation > 0;
+          const isLower = zone.elevation < 0;
+          const zoneColor = zone.color || (isHigher ? '#f59e0b' : isLower ? '#3b82f6' : '#6b7280');
+          return (
+            <div
+              key={zone.id}
+              style={{
+                position: 'absolute',
+                left: screenPos.x,
+                top: screenPos.y,
+                width: screenWidth,
+                height: screenHeight,
+                backgroundColor: `${zoneColor}22`,
+                border: `2px dashed ${zoneColor}`,
+                borderRadius: 4,
+                pointerEvents: 'none',
+                zIndex: 1,
+              }}
+            >
+              {/* Zone label */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 4,
+                  left: 4,
+                  backgroundColor: `${zoneColor}cc`,
+                  color: '#fff',
+                  padding: '2px 6px',
+                  borderRadius: 3,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {zone.name}: {zone.elevation >= 0 ? '+' : ''}{zone.elevation} ft
+              </div>
+            </div>
+          );
+        })}
+
         {/* Grid */}
         <PlayerViewGrid
           width={width}
@@ -238,9 +286,11 @@ export function PlayerViewMap() {
                 />
               </div>
               <div className="token-label">{vehicle.name}</div>
-              <div className="token-hp">
-                {vehicle.currentHp}/{vehicle.template.maxHp}
-              </div>
+              {state.showVehicleHealth !== false && (
+                <div className="token-hp">
+                  {vehicle.currentHp}/{vehicle.template.maxHp}
+                </div>
+              )}
             </div>
           );
         })}

@@ -55,10 +55,13 @@ import FlagIcon from '@mui/icons-material/Flag';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import SettingsIcon from '@mui/icons-material/Settings';
+import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import { UserMenu } from '../auth/UserMenu';
 import { isAuthEnabled } from '../../context/AuthContext';
 import { HelpGuide } from '../help/HelpGuide';
 import { SettingsDialog } from '../settings/SettingsDialog';
+import { ChangelogDialog } from '../settings/ChangelogDialog';
+import { logAnalyticsEvent } from '../../firebase';
 
 export function Header() {
   const { state, dispatch, startCombat, returnToSetup, resetCombat, nextRound, nextTurn, loadEncounter, newEncounter, lastSaved, forceSave, markAsSaved, setEncounterName, toggleAutoRollComplications, logComplication, startComplicationResolution, clearComplication } = useCombat();
@@ -75,6 +78,7 @@ export function Header() {
   const [showCreatureChaseModal, setShowCreatureChaseModal] = useState(false);
   const [showHelpGuide, setShowHelpGuide] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [showChangelogDialog, setShowChangelogDialog] = useState(false);
   const [currentComplicationResult, setCurrentComplicationResult] = useState<{
     roll: number;
     rollRange: string;
@@ -182,6 +186,8 @@ export function Header() {
     // Force immediate auto-save
     setTimeout(() => forceSave(), 100);
     setShowSaveModal(false);
+    // Track analytics
+    logAnalyticsEvent('encounter_saved', { vehicle_count: state.vehicles.length, creature_count: state.creatures.length });
   };
 
   // Quick save for already-saved encounters
@@ -201,6 +207,8 @@ export function Header() {
   const handleLoad = (encounter: SavedEncounter) => {
     loadEncounter(encounter.data as CombatState);
     setShowLoadModal(false);
+    // Track analytics
+    logAnalyticsEvent('encounter_loaded');
   };
 
   const handleDelete = async (id: string) => {
@@ -557,6 +565,10 @@ export function Header() {
                 <ListItemIcon><HelpOutlineIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>How to Use</ListItemText>
               </MenuItem>
+              <MenuItem onClick={() => { setShowChangelogDialog(true); setMenuAnchor(null); }}>
+                <ListItemIcon><NewReleasesIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>What's New</ListItemText>
+              </MenuItem>
               <MenuItem onClick={() => { window.open('https://github.com/fortandr/dnd-vehicle-combat/issues/new', '_blank'); setMenuAnchor(null); }}>
                 <ListItemIcon><BugReportIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>Report Issue / Feedback</ListItemText>
@@ -825,6 +837,9 @@ export function Header() {
 
       {/* Settings Dialog */}
       <SettingsDialog open={showSettingsDialog} onClose={() => setShowSettingsDialog(false)} />
+
+      {/* Changelog Dialog */}
+      <ChangelogDialog open={showChangelogDialog} onClose={() => setShowChangelogDialog(false)} />
     </>
   );
 }

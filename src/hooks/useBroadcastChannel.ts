@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Vehicle, Creature, ScaleName, BackgroundImageConfig, CrewAssignment, CombatPhase } from '../types';
+import { Vehicle, Creature, ScaleName, BackgroundImageConfig, CrewAssignment, CombatPhase, ElevationZone } from '../types';
 
 export interface BattlefieldSyncState {
   vehicles: Vehicle[];
@@ -12,11 +12,13 @@ export interface BattlefieldSyncState {
   crewAssignments: CrewAssignment[];
   scale: ScaleName;
   backgroundImage?: BackgroundImageConfig;
+  elevationZones: ElevationZone[];
   zoom: number;
   panOffset: { x: number; y: number };
   round: number;
   phase: CombatPhase;
   dmViewport?: { width: number; height: number };
+  showVehicleHealth?: boolean; // Whether to show vehicle HP on player view
 }
 
 const CHANNEL_NAME = 'avernus-battlefield-sync';

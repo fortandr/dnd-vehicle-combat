@@ -11,7 +11,7 @@ import {
   GoogleAuthProvider,
   onAuthStateChanged,
 } from 'firebase/auth';
-import { auth, isAuthEnabled } from '../firebase';
+import { auth, isAuthEnabled, logAnalyticsEvent } from '../firebase';
 
 // ==========================================
 // Types
@@ -82,6 +82,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
+      logAnalyticsEvent('login', { method: 'google' });
     } catch (error) {
       console.error('Sign in error:', error);
       setError(error instanceof Error ? error.message : 'Failed to sign in');

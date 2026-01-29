@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useCombat } from '../../context/CombatContext';
-import { Vehicle, Position, ScaleName, Creature, CrewAssignment } from '../../types';
+import { Vehicle, Position, ScaleName, Creature, CrewAssignment, ElevationZone } from '../../types';
 import { SCALES, formatDistance, getScaleForDistance, calculateMovementPerRound } from '../../data/scaleConfig';
 import { useBroadcastSource } from '../../hooks/useBroadcastChannel';
 
@@ -30,6 +30,11 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   const { state, updateVehiclePosition, updateVehicleFacing, setScale, setBackgroundImage, dispatch, currentTurnVehicle, currentTurnCreature } = useCombat();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showBackgroundControls, setShowBackgroundControls] = useState(false);
+  const [bgPanelTab, setBgPanelTab] = useState<'background' | 'elevation'>('background');
+  const [showElevationControls, setShowElevationControls] = useState(false);
+  const [editingZone, setEditingZone] = useState<ElevationZone | null>(null);
+  const [isDrawingZone, setIsDrawingZone] = useState(false);
+  const [zoneDrawStart, setZoneDrawStart] = useState<Position | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const playerViewRef = useRef<Window | null>(null);
   const { broadcast } = useBroadcastSource();
@@ -1025,11 +1030,13 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
       crewAssignments: state.crewAssignments,
       scale: state.scale,
       backgroundImage: state.battlefield.backgroundImage,
+      elevationZones: state.elevationZones,
       zoom,
       panOffset,
       round: state.round,
       phase: state.phase,
       dmViewport: { width, height },
+      showVehicleHealth: state.playerViewSettings?.showVehicleHealth ?? true,
     });
   }, [
     state.vehicles,
@@ -1037,8 +1044,10 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     state.crewAssignments,
     state.scale,
     state.battlefield.backgroundImage,
+    state.elevationZones,
     state.round,
     state.phase,
+    state.playerViewSettings,
     zoom,
     panOffset,
     broadcast,
@@ -1147,135 +1156,391 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                   background: 'var(--color-bg-secondary)',
                   border: '1px solid var(--color-border)',
                   borderRadius: 'var(--radius-sm)',
-                  padding: 'var(--spacing-sm)',
-                  minWidth: '200px',
+                  minWidth: '220px',
                   marginTop: '4px',
                 }}
               >
-                <div className="text-xs font-bold mb-sm">Background Image</div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  style={{ display: 'none' }}
-                />
-                <button
-                  className="btn btn-secondary text-xs mb-sm"
-                  style={{ width: '100%' }}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {state.battlefield.backgroundImage ? 'Change Image' : 'Upload Image'}
-                </button>
-                {state.battlefield.backgroundImage && (
-                  <>
-                    <div className="text-xs text-muted mb-sm">
-                      Opacity: {Math.round(state.battlefield.backgroundImage.opacity * 100)}%
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={state.battlefield.backgroundImage.opacity * 100}
-                      onChange={(e) => handleOpacityChange(parseInt(e.target.value) / 100)}
-                      style={{ width: '100%', marginBottom: 'var(--spacing-sm)' }}
-                    />
-                    <div className="text-xs text-muted mb-sm">
-                      Scale: {Math.round(state.battlefield.backgroundImage.scale * 100)}%
-                    </div>
-                    <input
-                      type="range"
-                      min="10"
-                      max="500"
-                      value={state.battlefield.backgroundImage.scale * 100}
-                      onChange={(e) => handleBgScaleChange(parseInt(e.target.value) / 100)}
-                      style={{ width: '100%', marginBottom: 'var(--spacing-sm)' }}
-                    />
-                    <div className="flex gap-sm mb-sm">
+                {/* Tabs */}
+                <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)' }}>
+                  <button
+                    className={`btn text-xs ${bgPanelTab === 'background' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{
+                      flex: 1,
+                      borderRadius: 'var(--radius-sm) 0 0 0',
+                      border: 'none',
+                      borderRight: '1px solid var(--color-border)',
+                    }}
+                    onClick={() => setBgPanelTab('background')}
+                  >
+                    Background
+                  </button>
+                  <button
+                    className={`btn text-xs ${bgPanelTab === 'elevation' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{
+                      flex: 1,
+                      borderRadius: '0 var(--radius-sm) 0 0',
+                      border: 'none',
+                    }}
+                    onClick={() => setBgPanelTab('elevation')}
+                  >
+                    Elevation {state.elevationZones.length > 0 && `(${state.elevationZones.length})`}
+                  </button>
+                </div>
+
+                {/* Tab Content */}
+                <div style={{ padding: 'var(--spacing-sm)' }}>
+                  {/* Background Tab */}
+                  {bgPanelTab === 'background' && (
+                    <>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        style={{ display: 'none' }}
+                      />
                       <button
-                        className="btn btn-secondary text-xs"
-                        style={{ flex: 1 }}
-                        onClick={() => handleBgScaleChange(state.battlefield.backgroundImage!.scale * 0.9)}
+                        className="btn btn-secondary text-xs mb-sm"
+                        style={{ width: '100%' }}
+                        onClick={() => fileInputRef.current?.click()}
                       >
-                        −10%
+                        {state.battlefield.backgroundImage ? 'Change Image' : 'Upload Image'}
                       </button>
+                      {state.battlefield.backgroundImage && (
+                        <>
+                          <div className="text-xs text-muted mb-sm">
+                            Opacity: {Math.round(state.battlefield.backgroundImage.opacity * 100)}%
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={state.battlefield.backgroundImage.opacity * 100}
+                            onChange={(e) => handleOpacityChange(parseInt(e.target.value) / 100)}
+                            style={{ width: '100%', marginBottom: 'var(--spacing-sm)' }}
+                          />
+                          <div className="text-xs text-muted mb-sm">
+                            Scale: {Math.round(state.battlefield.backgroundImage.scale * 100)}%
+                          </div>
+                          <input
+                            type="range"
+                            min="10"
+                            max="500"
+                            value={state.battlefield.backgroundImage.scale * 100}
+                            onChange={(e) => handleBgScaleChange(parseInt(e.target.value) / 100)}
+                            style={{ width: '100%', marginBottom: 'var(--spacing-sm)' }}
+                          />
+                          <div className="flex gap-sm mb-sm">
+                            <button
+                              className="btn btn-secondary text-xs"
+                              style={{ flex: 1 }}
+                              onClick={() => handleBgScaleChange(state.battlefield.backgroundImage!.scale * 0.9)}
+                            >
+                              −10%
+                            </button>
+                            <button
+                              className="btn btn-secondary text-xs"
+                              style={{ flex: 1 }}
+                              onClick={() => handleBgScaleChange(1)}
+                            >
+                              100%
+                            </button>
+                            <button
+                              className="btn btn-secondary text-xs"
+                              style={{ flex: 1 }}
+                              onClick={() => handleBgScaleChange(state.battlefield.backgroundImage!.scale * 1.1)}
+                            >
+                              +10%
+                            </button>
+                          </div>
+                          {/* Feet per pixel - for matching grid to map scale */}
+                          <div className="text-xs text-muted mb-sm" style={{ marginTop: 'var(--spacing-sm)', borderTop: '1px solid var(--color-border)', paddingTop: 'var(--spacing-sm)' }}>
+                            Feet per pixel: {state.battlefield.backgroundImage.feetPerPixel?.toFixed(2) || 1}
+                          </div>
+                          <input
+                            type="range"
+                            min="1"
+                            max="100"
+                            step="0.5"
+                            value={(state.battlefield.backgroundImage.feetPerPixel || 1) * 10}
+                            onChange={(e) => handleFeetPerPixelChange(parseInt(e.target.value) / 10)}
+                            style={{ width: '100%', marginBottom: 'var(--spacing-sm)' }}
+                          />
+                          <div className="flex gap-sm mb-sm">
+                            <button
+                              className="btn btn-secondary text-xs"
+                              style={{ flex: 1 }}
+                              onClick={() => handleFeetPerPixelChange(0.5)}
+                              title="1 pixel = 0.5 feet (2 pixels per 1ft)"
+                            >
+                              0.5
+                            </button>
+                            <button
+                              className="btn btn-secondary text-xs"
+                              style={{ flex: 1 }}
+                              onClick={() => handleFeetPerPixelChange(1)}
+                              title="1 pixel = 1 foot"
+                            >
+                              1
+                            </button>
+                            <button
+                              className="btn btn-secondary text-xs"
+                              style={{ flex: 1 }}
+                              onClick={() => handleFeetPerPixelChange(5)}
+                              title="1 pixel = 5 feet (standard grid)"
+                            >
+                              5
+                            </button>
+                            <button
+                              className="btn btn-secondary text-xs"
+                              style={{ flex: 1 }}
+                              onClick={() => handleFeetPerPixelChange(10)}
+                              title="1 pixel = 10 feet"
+                            >
+                              10
+                            </button>
+                          </div>
+                          {/* Show calculated map size */}
+                          {imageBounds && (
+                            <div className="text-xs text-muted" style={{ marginBottom: 'var(--spacing-sm)' }}>
+                              Map size: {formatDistance(imageBounds.widthFeet)} × {formatDistance(imageBounds.heightFeet)}
+                            </div>
+                          )}
+                          <button
+                            className="btn btn-danger text-xs"
+                            style={{ width: '100%' }}
+                            onClick={handleClearBackground}
+                          >
+                            Remove Background
+                          </button>
+                        </>
+                      )}
+                      {!state.battlefield.backgroundImage && (
+                        <div className="text-xs text-muted">No background image set.</div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Elevation Tab */}
+                  {bgPanelTab === 'elevation' && (
+                    <>
+                      {/* Add Zone Button */}
                       <button
-                        className="btn btn-secondary text-xs"
-                        style={{ flex: 1 }}
-                        onClick={() => handleBgScaleChange(1)}
+                        className="btn btn-secondary text-xs mb-sm"
+                        style={{ width: '100%' }}
+                        onClick={() => {
+                          const newZone: ElevationZone = {
+                            id: `zone-${Date.now()}`,
+                            name: `Zone ${state.elevationZones.length + 1}`,
+                            elevation: 10,
+                            position: { x: 0, y: 0 },
+                            size: { width: 30, height: 30 },
+                            color: '#f59e0b',
+                          };
+                          dispatch({ type: 'ADD_ELEVATION_ZONE', payload: newZone });
+                          setEditingZone(newZone);
+                        }}
                       >
-                        100%
+                        + Add Zone
                       </button>
-                      <button
-                        className="btn btn-secondary text-xs"
-                        style={{ flex: 1 }}
-                        onClick={() => handleBgScaleChange(state.battlefield.backgroundImage!.scale * 1.1)}
-                      >
-                        +10%
-                      </button>
-                    </div>
-                    {/* Feet per pixel - for matching grid to map scale */}
-                    <div className="text-xs text-muted mb-sm" style={{ marginTop: 'var(--spacing-sm)', borderTop: '1px solid var(--color-border)', paddingTop: 'var(--spacing-sm)' }}>
-                      Feet per pixel: {state.battlefield.backgroundImage.feetPerPixel?.toFixed(2) || 1}
-                    </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="100"
-                      step="0.5"
-                      value={(state.battlefield.backgroundImage.feetPerPixel || 1) * 10}
-                      onChange={(e) => handleFeetPerPixelChange(parseInt(e.target.value) / 10)}
-                      style={{ width: '100%', marginBottom: 'var(--spacing-sm)' }}
-                    />
-                    <div className="flex gap-sm mb-sm">
-                      <button
-                        className="btn btn-secondary text-xs"
-                        style={{ flex: 1 }}
-                        onClick={() => handleFeetPerPixelChange(0.5)}
-                        title="1 pixel = 0.5 feet (2 pixels per 1ft)"
-                      >
-                        0.5
-                      </button>
-                      <button
-                        className="btn btn-secondary text-xs"
-                        style={{ flex: 1 }}
-                        onClick={() => handleFeetPerPixelChange(1)}
-                        title="1 pixel = 1 foot"
-                      >
-                        1
-                      </button>
-                      <button
-                        className="btn btn-secondary text-xs"
-                        style={{ flex: 1 }}
-                        onClick={() => handleFeetPerPixelChange(5)}
-                        title="1 pixel = 5 feet (standard grid)"
-                      >
-                        5
-                      </button>
-                      <button
-                        className="btn btn-secondary text-xs"
-                        style={{ flex: 1 }}
-                        onClick={() => handleFeetPerPixelChange(10)}
-                        title="1 pixel = 10 feet"
-                      >
-                        10
-                      </button>
-                    </div>
-                    {/* Show calculated map size */}
-                    {imageBounds && (
-                      <div className="text-xs text-muted" style={{ marginBottom: 'var(--spacing-sm)' }}>
-                        Map size: {formatDistance(imageBounds.widthFeet)} × {formatDistance(imageBounds.heightFeet)}
-                      </div>
-                    )}
-                    <button
-                      className="btn btn-danger text-xs"
-                      style={{ width: '100%' }}
-                      onClick={handleClearBackground}
-                    >
-                      Remove Background
-                    </button>
-                  </>
-                )}
+
+                      {/* Existing Zones List */}
+                      {state.elevationZones.length === 0 ? (
+                        <div className="text-xs text-muted">No elevation zones defined.</div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)', maxHeight: '300px', overflowY: 'auto' }}>
+                          {state.elevationZones.map((zone) => (
+                            <div
+                              key={zone.id}
+                              style={{
+                                padding: 'var(--spacing-xs)',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: 'var(--radius-sm)',
+                                backgroundColor: editingZone?.id === zone.id ? 'var(--color-bg-tertiary)' : 'transparent',
+                              }}
+                            >
+                              {editingZone?.id === zone.id ? (
+                                // Editing mode
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <input
+                                    type="text"
+                                    value={editingZone.name}
+                                    onChange={(e) => setEditingZone({ ...editingZone, name: e.target.value })}
+                                    placeholder="Zone name"
+                                    style={{
+                                      padding: '3px 6px',
+                                      fontSize: 11,
+                                      border: '1px solid var(--color-border)',
+                                      borderRadius: 'var(--radius-sm)',
+                                      backgroundColor: 'var(--color-bg-primary)',
+                                      color: 'inherit',
+                                    }}
+                                  />
+                                  <div className="flex items-center gap-xs">
+                                    <label className="text-xs" style={{ width: 50, fontSize: 10 }}>Elev:</label>
+                                    <input
+                                      type="number"
+                                      value={editingZone.elevation}
+                                      onChange={(e) => setEditingZone({ ...editingZone, elevation: parseInt(e.target.value) || 0 })}
+                                      style={{
+                                        flex: 1,
+                                        padding: '3px 6px',
+                                        fontSize: 11,
+                                        border: '1px solid var(--color-border)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        backgroundColor: 'var(--color-bg-primary)',
+                                        color: 'inherit',
+                                      }}
+                                    />
+                                    <span style={{ fontSize: 10 }}>ft</span>
+                                  </div>
+                                  <div className="flex items-center gap-xs">
+                                    <label className="text-xs" style={{ width: 50, fontSize: 10 }}>Pos:</label>
+                                    <input
+                                      type="number"
+                                      value={Math.round(editingZone.position.x)}
+                                      onChange={(e) => setEditingZone({ ...editingZone, position: { ...editingZone.position, x: parseInt(e.target.value) || 0 } })}
+                                      style={{
+                                        width: 50,
+                                        padding: '3px 6px',
+                                        fontSize: 11,
+                                        border: '1px solid var(--color-border)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        backgroundColor: 'var(--color-bg-primary)',
+                                        color: 'inherit',
+                                      }}
+                                      title="X position (feet)"
+                                    />
+                                    <input
+                                      type="number"
+                                      value={Math.round(editingZone.position.y)}
+                                      onChange={(e) => setEditingZone({ ...editingZone, position: { ...editingZone.position, y: parseInt(e.target.value) || 0 } })}
+                                      style={{
+                                        width: 50,
+                                        padding: '3px 6px',
+                                        fontSize: 11,
+                                        border: '1px solid var(--color-border)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        backgroundColor: 'var(--color-bg-primary)',
+                                        color: 'inherit',
+                                      }}
+                                      title="Y position (feet)"
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-xs">
+                                    <label className="text-xs" style={{ width: 50, fontSize: 10 }}>Size:</label>
+                                    <input
+                                      type="number"
+                                      value={editingZone.size.width}
+                                      onChange={(e) => setEditingZone({ ...editingZone, size: { ...editingZone.size, width: parseInt(e.target.value) || 10 } })}
+                                      style={{
+                                        width: 50,
+                                        padding: '3px 6px',
+                                        fontSize: 11,
+                                        border: '1px solid var(--color-border)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        backgroundColor: 'var(--color-bg-primary)',
+                                        color: 'inherit',
+                                      }}
+                                      title="Width (feet)"
+                                    />
+                                    <span style={{ fontSize: 10 }}>×</span>
+                                    <input
+                                      type="number"
+                                      value={editingZone.size.height}
+                                      onChange={(e) => setEditingZone({ ...editingZone, size: { ...editingZone.size, height: parseInt(e.target.value) || 10 } })}
+                                      style={{
+                                        width: 50,
+                                        padding: '3px 6px',
+                                        fontSize: 11,
+                                        border: '1px solid var(--color-border)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        backgroundColor: 'var(--color-bg-primary)',
+                                        color: 'inherit',
+                                      }}
+                                      title="Height (feet)"
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-xs">
+                                    <label className="text-xs" style={{ width: 50, fontSize: 10 }}>Color:</label>
+                                    <input
+                                      type="color"
+                                      value={editingZone.color || '#f59e0b'}
+                                      onChange={(e) => setEditingZone({ ...editingZone, color: e.target.value })}
+                                      style={{ width: 30, height: 20, cursor: 'pointer' }}
+                                    />
+                                    <button
+                                      className="btn btn-secondary"
+                                      style={{ padding: '2px 5px', fontSize: 10, backgroundColor: '#f59e0b33' }}
+                                      onClick={() => setEditingZone({ ...editingZone, color: '#f59e0b' })}
+                                      title="High (amber)"
+                                    >↑</button>
+                                    <button
+                                      className="btn btn-secondary"
+                                      style={{ padding: '2px 5px', fontSize: 10, backgroundColor: '#3b82f633' }}
+                                      onClick={() => setEditingZone({ ...editingZone, color: '#3b82f6' })}
+                                      title="Low (blue)"
+                                    >↓</button>
+                                  </div>
+                                  <div className="flex gap-xs">
+                                    <button
+                                      className="btn btn-primary"
+                                      style={{ flex: 1, padding: '3px 6px', fontSize: 10 }}
+                                      onClick={() => {
+                                        dispatch({
+                                          type: 'UPDATE_ELEVATION_ZONE',
+                                          payload: { id: editingZone.id, updates: editingZone },
+                                        });
+                                        setEditingZone(null);
+                                      }}
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      className="btn btn-secondary"
+                                      style={{ flex: 1, padding: '3px 6px', fontSize: 10 }}
+                                      onClick={() => setEditingZone(null)}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                // Display mode
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div style={{ fontSize: 11, fontWeight: 500 }}>{zone.name}</div>
+                                    <div style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>
+                                      {zone.elevation >= 0 ? '+' : ''}{zone.elevation} ft · {zone.size.width}×{zone.size.height}
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-xs">
+                                    <button
+                                      className="btn btn-secondary"
+                                      style={{ padding: '2px 5px', fontSize: 10 }}
+                                      onClick={() => setEditingZone(zone)}
+                                      title="Edit zone"
+                                    >
+                                      ✎
+                                    </button>
+                                    <button
+                                      className="btn btn-danger"
+                                      style={{ padding: '2px 5px', fontSize: 10 }}
+                                      onClick={() => dispatch({ type: 'REMOVE_ELEVATION_ZONE', payload: zone.id })}
+                                      title="Delete zone"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1317,6 +1582,51 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
               }}
             />
           )}
+
+          {/* Elevation Zones */}
+          {state.elevationZones.map((zone) => {
+            const screenPos = worldToScreen(zone.position);
+            const screenWidth = zone.size.width * pixelsPerFoot;
+            const screenHeight = zone.size.height * pixelsPerFoot;
+            const isHigher = zone.elevation > 0;
+            const isLower = zone.elevation < 0;
+            const zoneColor = zone.color || (isHigher ? '#f59e0b' : isLower ? '#3b82f6' : '#6b7280');
+            return (
+              <div
+                key={zone.id}
+                style={{
+                  position: 'absolute',
+                  left: screenPos.x,
+                  top: screenPos.y,
+                  width: screenWidth,
+                  height: screenHeight,
+                  backgroundColor: `${zoneColor}22`,
+                  border: `2px dashed ${zoneColor}`,
+                  borderRadius: 4,
+                  pointerEvents: 'none',
+                  zIndex: 1,
+                }}
+              >
+                {/* Zone label */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 4,
+                    left: 4,
+                    backgroundColor: `${zoneColor}cc`,
+                    color: '#fff',
+                    padding: '2px 6px',
+                    borderRadius: 3,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {zone.name}: {zone.elevation >= 0 ? '+' : ''}{zone.elevation} ft
+                </div>
+              </div>
+            );
+          })}
 
           {/* Grid Background */}
           <BattlefieldGrid

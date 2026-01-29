@@ -48,6 +48,49 @@ export function RightPanel() {
         p: 2,
       }}
     >
+      {/* Setup Phase - Show placeholder content */}
+      {state.phase === 'setup' && (
+        <Box sx={{ color: 'text.secondary' }}>
+          <Typography variant="subtitle2" gutterBottom sx={{ color: 'text.primary' }}>
+            Combat Info Panel
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            During combat, this panel displays:
+          </Typography>
+          <Stack spacing={1.5}>
+            <Box>
+              <Typography variant="caption" fontWeight={600} sx={{ color: 'text.primary' }}>
+                Current Turn
+              </Typography>
+              <Typography variant="caption" display="block">
+                Active vehicle/creature info, crew positions, and equipped weapons
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" fontWeight={600} sx={{ color: 'text.primary' }}>
+                Target Cover Status
+              </Typography>
+              <Typography variant="caption" display="block">
+                Cover bonuses for potential targets based on relative positions
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" fontWeight={600} sx={{ color: 'text.primary' }}>
+                Vehicle Stats
+              </Typography>
+              <Typography variant="caption" display="block">
+                Quick reference for all vehicle HP, AC, speed, and active mishaps
+              </Typography>
+            </Box>
+          </Stack>
+          <Box sx={{ mt: 3, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
+            <Typography variant="caption" sx={{ fontStyle: 'italic' }}>
+              Add vehicles and creatures, assign crew to stations, then click "Start Combat" to begin.
+            </Typography>
+          </Box>
+        </Box>
+      )}
+
       {/* Current Turn Info - Show during combat */}
       {state.phase === 'combat' && (
         <Card sx={{ mb: 2 }}>

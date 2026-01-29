@@ -1,12 +1,13 @@
 /**
  * Firebase Configuration
- * Initializes Firebase services for authentication and Firestore
+ * Initializes Firebase services for authentication, Firestore, and Analytics
  */
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { getAnalytics, Analytics, logEvent as firebaseLogEvent } from 'firebase/analytics';
 
 // Check if auth is enabled via environment variable
 export const isAuthEnabled = import.meta.env.VITE_AUTH_ENABLED === 'true';
@@ -27,6 +28,7 @@ let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
+let analytics: Analytics | null = null;
 
 if (isAuthEnabled && firebaseConfig.apiKey) {
   // Prevent duplicate initialization
@@ -39,6 +41,18 @@ if (isAuthEnabled && firebaseConfig.apiKey) {
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);
+
+  // Initialize Analytics (only in browser environment)
+  if (typeof window !== 'undefined' && firebaseConfig.measurementId) {
+    analytics = getAnalytics(app);
+  }
 }
 
-export { app, auth, db, storage };
+// Helper function to log analytics events safely
+export function logAnalyticsEvent(eventName: string, eventParams?: Record<string, unknown>) {
+  if (analytics) {
+    firebaseLogEvent(analytics, eventName, eventParams);
+  }
+}
+
+export { app, auth, db, storage, analytics };
