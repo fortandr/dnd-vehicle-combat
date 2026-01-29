@@ -29,14 +29,18 @@ import {
   AccordionSummary,
   AccordionDetails,
   Tooltip,
+  TextField,
 } from '@mui/material';
 import WarningIcon from '@mui/icons-material/Warning';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import BuildIcon from '@mui/icons-material/Build';
+import RemoveIcon from '@mui/icons-material/Remove';
+import AddIcon from '@mui/icons-material/Add';
 import { Vehicle, VehicleZone, CrewAssignment, Mishap, VehicleWeapon } from '../../types';
 import { useCombat } from '../../context/CombatContext';
-import { getMishapResult, canRepairMishap, getRepairDescription } from '../../data/mishapTable';
+import { getMishapResult, getMishapSeverity, canRepairMishap, getRepairDescription, checkMishapFromDamage, rollMishapForVehicle } from '../../data/mishapTable';
+import { v4 as uuid } from 'uuid';
 import { SWAPPABLE_WEAPONS, ARMOR_UPGRADES, MAGICAL_GADGETS } from '../../data/vehicleTemplates';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
 
@@ -87,8 +91,34 @@ function getArmorDefenses(vehicle: Vehicle): { immunities: string[]; resistances
   return { immunities, resistances };
 }
 
+// Calculate effective speed accounting for mishap effects
+function getEffectiveSpeed(vehicle: Vehicle): number {
+  let speed = vehicle.currentSpeed;
+  for (const mishap of vehicle.activeMishaps) {
+    if (mishap.mechanicalEffect?.speedReduction) {
+      speed -= mishap.mechanicalEffect.speedReduction;
+    }
+  }
+  return Math.max(0, speed);
+}
+
+// Calculate effective damage threshold accounting for mishap effects (e.g., Shedding Armor)
+function getEffectiveDamageThreshold(vehicle: Vehicle): number {
+  let threshold = vehicle.template.damageThreshold;
+  for (const mishap of vehicle.activeMishaps) {
+    if (mishap.mechanicalEffect?.damageThresholdReduction) {
+      threshold -= mishap.mechanicalEffect.damageThresholdReduction;
+    }
+  }
+  return Math.max(0, threshold);
+}
+
 export function VehicleCard({ vehicle }: VehicleCardProps) {
-  const { state, dealDamage, applyMishap, dispatch, removeVehicle, swapVehicleWeapon, setVehicleArmor, toggleVehicleGadget } = useCombat();
+  const { state, applyMishap, dispatch, removeVehicle, swapVehicleWeapon, setVehicleArmor, toggleVehicleGadget } = useCombat();
+  const [damageAmount, setDamageAmount] = useState('');
+  const [lastMishapResult, setLastMishapResult] = useState<{ roll: number; mishap: Mishap } | null>(null);
+  const [showMishapResult, setShowMishapResult] = useState(false);
+  const [damageError, setDamageError] = useState<string | null>(null);
 
   const hpPercent = (vehicle.currentHp / vehicle.template.maxHp) * 100;
   const hpColor = hpPercent > 50 ? 'success' : hpPercent > 25 ? 'warning' : 'error';
@@ -100,6 +130,34 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
   const crewAssignments = state.crewAssignments.filter(
     (a) => a.vehicleId === vehicle.id
   );
+
+  // Find the driver (helm zone) and get their DEX save
+  const vehicleCrew = crewAssignments.map((a) => {
+    const creature = state.creatures.find((c) => c.id === a.creatureId);
+    return { creature, assignment: a };
+  }).filter((c) => c.creature);
+
+  const driver = vehicleCrew.find((c) => c.assignment.zoneId === 'helm')?.creature;
+  const driverDexSave = driver
+    ? driver.statblock.savingThrows?.dex ?? (driver.statblock.abilities?.dex !== undefined
+        ? Math.floor((driver.statblock.abilities.dex - 10) / 2)
+        : null)
+    : null;
+
+  // Calculate effective speed and damage threshold
+  const effectiveSpeed = getEffectiveSpeed(vehicle);
+  const hasSpeedReduction = effectiveSpeed < vehicle.currentSpeed;
+  const effectiveDamageThreshold = getEffectiveDamageThreshold(vehicle);
+  const hasThresholdReduction = effectiveDamageThreshold < vehicle.template.damageThreshold;
+
+  const handleVehicleHpChange = (newHp: number) => {
+    const clampedHp = Math.max(0, Math.min(vehicle.template.maxHp, newHp));
+    dispatch({ type: 'UPDATE_VEHICLE', payload: { id: vehicle.id, updates: { currentHp: clampedHp } } });
+  };
+
+  const handleVehicleSpeedChange = (newSpeed: number) => {
+    dispatch({ type: 'UPDATE_VEHICLE', payload: { id: vehicle.id, updates: { currentSpeed: Math.max(0, newSpeed) } } });
+  };
 
   const handleRepair = () => {
     const amount = prompt('Repair amount (HP to restore):');
@@ -114,25 +172,79 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
     }
   };
 
-  const handleRollMishap = () => {
-    const roll = Math.floor(Math.random() * 20) + 1;
-    const mishapData = getMishapResult(roll);
+  const handleDealDamage = () => {
+    const damage = parseInt(damageAmount, 10);
+    if (isNaN(damage) || damage <= 0) return;
 
-    const mishap: Mishap = {
-      ...mishapData,
-      id: `mishap-${Date.now()}`,
-      roundsRemaining: mishapData.duration === 'rounds' ? 1 : undefined,
-    };
-
-    if (mishapData.duration !== 'instant') {
-      applyMishap(vehicle.id, mishap);
+    if (damage < effectiveDamageThreshold) {
+      setDamageError(`Damage (${damage}) is below the damage threshold (${effectiveDamageThreshold}). No damage dealt.`);
+      dispatch({ type: 'LOG_ACTION', payload: { type: 'system', action: `${vehicle.name} ignores ${damage} damage`, details: `Below damage threshold of ${effectiveDamageThreshold}` } });
+      setDamageAmount('');
+      return;
     }
 
-    const repairInfo = canRepairMishap(mishapData)
-      ? `\n\nRepair: ${getRepairDescription(mishapData)}`
-      : mishapData.name === 'Flip' ? '\n\nCannot be repaired - must right the vehicle manually' : '';
+    setDamageError(null);
+    const newHp = Math.max(0, vehicle.currentHp - damage);
+    dispatch({ type: 'UPDATE_VEHICLE', payload: { id: vehicle.id, updates: { currentHp: newHp } } });
+    dispatch({ type: 'LOG_ACTION', payload: { type: 'damage', action: `${vehicle.name} takes ${damage} damage`, details: `HP: ${vehicle.currentHp} → ${newHp}` } });
 
-    alert(`Rolled ${roll}: ${mishapData.name}\n\n${mishapData.effect}${repairInfo}`);
+    if (checkMishapFromDamage(damage, vehicle.template.mishapThreshold)) {
+      // Roll for mishap, rerolling if the result is already active or would have no effect
+      const vehicleMishapState = {
+        currentSpeed: vehicle.currentSpeed,
+        damageThreshold: vehicle.template.damageThreshold,
+        weaponCount: vehicle.weapons.length,
+        activeMishaps: vehicle.activeMishaps,
+      };
+      const mishapRoll = rollMishapForVehicle(vehicleMishapState);
+
+      if (mishapRoll === null) {
+        dispatch({ type: 'LOG_ACTION', payload: { type: 'mishap', action: `Mishap triggered but no valid mishaps available for ${vehicle.name}`, details: 'All mishaps active or at maximum effect' } });
+      } else {
+        const { roll, mishap, rerollCount } = mishapRoll;
+        const mishapInstance: Mishap = { ...mishap, id: uuid(), roundsRemaining: mishap.roundsRemaining };
+
+        setLastMishapResult({ roll, mishap: mishapInstance });
+        setShowMishapResult(true);
+
+        if (mishap.duration !== 'instant') {
+          applyMishap(vehicle.id, mishapInstance);
+        }
+
+        const rerollNote = rerollCount > 0 ? ` (rerolled ${rerollCount}x to find valid mishap)` : '';
+        dispatch({ type: 'LOG_ACTION', payload: { type: 'mishap', action: `Mishap! ${damage} damage >= ${vehicle.template.mishapThreshold} threshold`, details: `Rolled ${roll}: ${mishap.name}${rerollNote}` } });
+      }
+    }
+
+    setDamageAmount('');
+  };
+
+  const handleManualMishapRoll = () => {
+    const vehicleMishapState = {
+      currentSpeed: vehicle.currentSpeed,
+      damageThreshold: vehicle.template.damageThreshold,
+      weaponCount: vehicle.weapons.length,
+      activeMishaps: vehicle.activeMishaps,
+    };
+    const mishapRoll = rollMishapForVehicle(vehicleMishapState);
+
+    if (mishapRoll === null) {
+      dispatch({ type: 'LOG_ACTION', payload: { type: 'mishap', action: `Manual mishap roll on ${vehicle.name} - no valid mishaps available`, details: 'All mishaps active or at maximum effect' } });
+      return;
+    }
+
+    const { roll, mishap, rerollCount } = mishapRoll;
+    const mishapInstance: Mishap = { ...mishap, id: uuid(), roundsRemaining: mishap.roundsRemaining };
+
+    setLastMishapResult({ roll, mishap: mishapInstance });
+    setShowMishapResult(true);
+
+    if (mishap.duration !== 'instant') {
+      applyMishap(vehicle.id, mishapInstance);
+    }
+
+    const rerollNote = rerollCount > 0 ? ` (rerolled ${rerollCount}x to find valid mishap)` : '';
+    dispatch({ type: 'LOG_ACTION', payload: { type: 'mishap', action: `Manual mishap roll on ${vehicle.name}`, details: `Rolled ${roll}: ${mishap.name}${rerollNote}` } });
   };
 
   const handleClearMishap = (mishapId: string) => {
@@ -140,6 +252,13 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
       type: 'REPAIR_MISHAP',
       payload: { vehicleId: vehicle.id, mishapId },
     });
+  };
+
+  const severityColors: Record<string, string> = {
+    minor: '#22c55e',
+    moderate: '#eab308',
+    severe: '#ff4500',
+    catastrophic: '#dc2626',
   };
 
   const borderColor = vehicle.type === 'party' ? factionColors.party : factionColors.enemy;
@@ -203,15 +322,34 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
           </Stack>
         </Box>
 
-        {/* HP Bar */}
+        {/* Thresholds Info */}
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+          Damage Threshold: {hasThresholdReduction ? (
+            <span style={{ color: '#f59e0b' }}>
+              <s>{vehicle.template.damageThreshold}</s> {effectiveDamageThreshold}
+            </span>
+          ) : (
+            vehicle.template.damageThreshold
+          )} | Mishap Threshold: {vehicle.template.mishapThreshold}
+        </Typography>
+
+        {/* HP Bar with editing */}
         <Box sx={{ mb: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
             <Typography variant="caption" color="text.secondary">
               Hit Points
             </Typography>
-            <Typography variant="body2" fontFamily="monospace">
-              {vehicle.currentHp} / {vehicle.template.maxHp}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <TextField
+                type="number"
+                size="small"
+                value={vehicle.currentHp}
+                onChange={(e) => handleVehicleHpChange(parseInt(e.target.value, 10) || 0)}
+                sx={{ width: 72 }}
+                inputProps={{ min: 0, max: vehicle.template.maxHp, style: { textAlign: 'center', padding: '4px' } }}
+              />
+              <Typography variant="body2" color="text.secondary">/ {vehicle.template.maxHp}</Typography>
+            </Box>
           </Box>
           <LinearProgress
             variant="determinate"
@@ -244,14 +382,68 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
               <Typography variant="caption" color="text.secondary">AC</Typography>
             </Paper>
           </Tooltip>
-          <Paper sx={{ flex: 1, p: 1, textAlign: 'center', bgcolor: '#242424' }}>
-            <Typography variant="h6" fontWeight={700}>{vehicle.currentSpeed}</Typography>
-            <Typography variant="caption" color="text.secondary">Speed</Typography>
-          </Paper>
-          <Paper sx={{ flex: 1, p: 1, textAlign: 'center', bgcolor: '#242424' }}>
-            <Typography variant="h6" fontWeight={700}>{vehicle.template.mishapThreshold}</Typography>
-            <Typography variant="caption" color="text.secondary">Mishap</Typography>
-          </Paper>
+          <Tooltip
+            title={hasSpeedReduction ? `${vehicle.currentSpeed} ft reduced by mishap effects` : 'Current speed'}
+            arrow
+            placement="top"
+          >
+            <Paper
+              sx={{
+                flex: 1,
+                p: 1,
+                textAlign: 'center',
+                bgcolor: hasSpeedReduction ? withOpacity('#f59e0b', 0.15) : '#242424',
+                border: hasSpeedReduction ? 1 : 0,
+                borderColor: '#f59e0b',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                <TextField
+                  type="number"
+                  size="small"
+                  value={vehicle.currentSpeed}
+                  onChange={(e) => handleVehicleSpeedChange(parseInt(e.target.value, 10) || 0)}
+                  sx={{
+                    width: 50,
+                    '& input': {
+                      textAlign: 'center',
+                      padding: '2px',
+                      fontWeight: 700,
+                      fontSize: '1.1rem',
+                      textDecoration: hasSpeedReduction ? 'line-through' : 'none',
+                      color: hasSpeedReduction ? 'text.disabled' : 'inherit',
+                    },
+                  }}
+                  inputProps={{ min: 0, step: 10 }}
+                />
+              </Box>
+              {hasSpeedReduction && (
+                <Typography variant="caption" sx={{ color: '#f59e0b', fontWeight: 600 }}>
+                  {effectiveSpeed} ft actual
+                </Typography>
+              )}
+              {!hasSpeedReduction && (
+                <Typography variant="caption" color="text.secondary">Speed</Typography>
+              )}
+            </Paper>
+          </Tooltip>
+          <Tooltip title="Driver's DEX save (for avoiding hazards)" arrow placement="top">
+            <Paper sx={{ flex: 1, p: 1, textAlign: 'center', bgcolor: '#242424' }}>
+              {driverDexSave !== null ? (
+                <>
+                  <Typography variant="h6" fontWeight={700}>
+                    {driverDexSave >= 0 ? '+' : ''}{driverDexSave}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">DEX Save</Typography>
+                </>
+              ) : (
+                <>
+                  <Typography variant="h6" fontWeight={700} sx={{ color: 'warning.main' }}>—</Typography>
+                  <Typography variant="caption" color="warning.main">No Driver</Typography>
+                </>
+              )}
+            </Paper>
+          </Tooltip>
         </Stack>
 
         {/* Defenses (Immunities & Resistances) */}
@@ -323,6 +515,11 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
             ))}
           </Stack>
         </Box>
+
+        {/* Crew HP Management */}
+        {crewAssignments.length > 0 && (
+          <CrewHPSection vehicleId={vehicle.id} assignments={crewAssignments} />
+        )}
 
         {/* Weapons */}
         {vehicle.weapons.length > 0 && (
@@ -547,7 +744,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
         {vehicle.activeMishaps.length > 0 && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-              Active Mishaps {canRepairMishap(vehicle.activeMishaps[0]) ? '(click to clear)' : ''}
+              Active Mishaps ({vehicle.activeMishaps.length}):
             </Typography>
             <Stack spacing={0.5}>
               {vehicle.activeMishaps.map((mishap) => {
@@ -555,40 +752,37 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                 return (
                   <Paper
                     key={mishap.id}
-                    onClick={() => {
-                      if (repairable && confirm(`Clear mishap "${mishap.name}"?`)) {
-                        handleClearMishap(mishap.id);
-                      }
-                    }}
                     sx={{
                       p: 1,
                       bgcolor: withOpacity('#f59e0b', 0.1),
-                      border: 1,
+                      borderLeft: 2,
                       borderColor: repairable ? 'warning.main' : 'primary.main',
-                      cursor: repairable ? 'pointer' : 'default',
-                      '&:hover': repairable ? { bgcolor: withOpacity('#f59e0b', 0.2) } : {},
                     }}
-                    title={repairable ? 'Click to clear this mishap' : 'Cannot be repaired'}
                   >
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography
-                        variant="body2"
-                        fontWeight={600}
-                        sx={{ color: repairable ? 'warning.main' : 'primary.main' }}
-                      >
-                        {mishap.name}
-                      </Typography>
-                      <Chip label={mishap.duration} size="small" color="warning" sx={{ height: 20 }} />
+                      <Typography variant="body2" fontWeight={600}>{mishap.name}</Typography>
+                      {repairable && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => handleClearMishap(mishap.id)}
+                          sx={{ fontSize: '0.625rem', py: 0 }}
+                        >
+                          Repair
+                        </Button>
+                      )}
                     </Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                      {mishap.effect}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      sx={{ display: 'block', mt: 0.5, color: repairable ? 'primary.main' : 'error.main' }}
-                    >
-                      {repairable ? getRepairDescription(mishap) : 'Cannot be repaired'}
-                    </Typography>
+                    <Typography variant="caption" color="text.secondary">{mishap.effect}</Typography>
+                    {repairable && (
+                      <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'primary.main' }}>
+                        {getRepairDescription(mishap)}
+                      </Typography>
+                    )}
+                    {!repairable && (
+                      <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'primary.main' }}>
+                        Cannot be repaired
+                      </Typography>
+                    )}
                   </Paper>
                 );
               })}
@@ -596,39 +790,223 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
           </Box>
         )}
 
-        {/* Quick Actions */}
-        <Divider sx={{ my: 2 }} />
-        <Stack direction="row" spacing={1}>
-          <Button
-            variant="outlined"
-            size="small"
-            fullWidth
-            onClick={() => {
-              const damage = prompt('Damage amount:');
-              if (damage) {
-                const dmg = parseInt(damage, 10);
-                if (dmg > 0) {
-                  dealDamage('vehicle', vehicle.id, dmg);
-                  if (dmg >= vehicle.template.mishapThreshold) {
-                    if (confirm(`Damage (${dmg}) meets mishap threshold (${vehicle.template.mishapThreshold})!\n\nRoll for mishap?`)) {
-                      handleRollMishap();
-                    }
-                  }
-                }
-              }
+        {/* Deal Damage Section */}
+        <Paper sx={{ p: 1.5, bgcolor: '#242424', mb: 2 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+            Deal Damage (ignores &lt;{effectiveDamageThreshold}, mishap at {vehicle.template.mishapThreshold}+)
+          </Typography>
+          <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+            <TextField
+              type="number"
+              size="small"
+              value={damageAmount}
+              onChange={(e) => { setDamageAmount(e.target.value); setDamageError(null); }}
+              placeholder="Damage"
+              fullWidth
+              inputProps={{ min: 1 }}
+              onKeyDown={(e) => e.key === 'Enter' && handleDealDamage()}
+            />
+            <Button variant="contained" color="error" onClick={handleDealDamage} disabled={!damageAmount || parseInt(damageAmount, 10) <= 0}>
+              Deal
+            </Button>
+          </Stack>
+          {damageError && (
+            <Paper sx={{ p: 1, mb: 1, bgcolor: withOpacity('#f59e0b', 0.1), border: 1, borderColor: 'warning.main' }}>
+              <Typography variant="caption" color="warning.main">{damageError}</Typography>
+            </Paper>
+          )}
+          <Stack direction="row" spacing={1}>
+            <Button variant="outlined" size="small" onClick={handleManualMishapRoll} fullWidth>
+              Roll Mishap (d20)
+            </Button>
+            <Button variant="outlined" size="small" onClick={handleRepair} fullWidth>
+              Repair HP
+            </Button>
+          </Stack>
+        </Paper>
+
+        {/* Mishap Result Display */}
+        {showMishapResult && lastMishapResult && (
+          <Paper
+            sx={{
+              p: 1.5,
+              bgcolor: withOpacity('#f59e0b', 0.1),
+              border: 2,
+              borderColor: severityColors[getMishapSeverity(lastMishapResult.roll)],
+              mb: 2,
             }}
           >
-            Damage
-          </Button>
-          <Button variant="outlined" size="small" fullWidth onClick={handleRepair}>
-            Repair
-          </Button>
-          <Button variant="outlined" size="small" fullWidth onClick={handleRollMishap}>
-            Mishap
-          </Button>
-        </Stack>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography fontWeight={600} sx={{ color: severityColors[getMishapSeverity(lastMishapResult.roll)] }}>
+                Mishap Roll: {lastMishapResult.roll}
+              </Typography>
+              <Button size="small" variant="outlined" onClick={() => setShowMishapResult(false)}>
+                Dismiss
+              </Button>
+            </Box>
+            <Typography variant="body2" fontWeight={600}>{lastMishapResult.mishap.name}</Typography>
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>{lastMishapResult.mishap.effect}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              Duration: {lastMishapResult.mishap.duration === 'instant' ? 'Instant' :
+                lastMishapResult.mishap.duration === 'until_repaired' ? 'Until Repaired' :
+                `${lastMishapResult.mishap.roundsRemaining} rounds`}
+            </Typography>
+            {canRepairMishap(lastMishapResult.mishap) && (
+              <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'primary.main' }}>
+                Repair: {getRepairDescription(lastMishapResult.mishap)}
+              </Typography>
+            )}
+            {!canRepairMishap(lastMishapResult.mishap) && lastMishapResult.mishap.duration !== 'instant' && (
+              <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'primary.main' }}>
+                Cannot be repaired - must right the vehicle manually
+              </Typography>
+            )}
+          </Paper>
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+// Crew HP Section Component
+interface CrewHPSectionProps {
+  vehicleId: string;
+  assignments: CrewAssignment[];
+}
+
+function CrewHPSection({ vehicleId, assignments }: CrewHPSectionProps) {
+  const { state, dispatch } = useCombat();
+  const vehicle = state.vehicles.find((v) => v.id === vehicleId);
+  const [damageInputs, setDamageInputs] = useState<Record<string, string>>({});
+
+  const handleCreatureHpChange = (creatureId: string, newHp: number, maxHp: number) => {
+    dispatch({
+      type: 'UPDATE_CREATURE',
+      payload: { id: creatureId, updates: { currentHp: Math.max(0, Math.min(maxHp, newHp)) } },
+    });
+  };
+
+  const handleDealDamage = (creatureId: string, maxHp: number, currentHp: number) => {
+    const damage = parseInt(damageInputs[creatureId] || '', 10);
+    if (isNaN(damage) || damage <= 0) return;
+    handleCreatureHpChange(creatureId, currentHp - damage, maxHp);
+    setDamageInputs((prev) => ({ ...prev, [creatureId]: '' }));
+  };
+
+  const handleHeal = (creatureId: string, maxHp: number, currentHp: number) => {
+    const heal = parseInt(damageInputs[creatureId] || '', 10);
+    if (isNaN(heal) || heal <= 0) return;
+    handleCreatureHpChange(creatureId, currentHp + heal, maxHp);
+    setDamageInputs((prev) => ({ ...prev, [creatureId]: '' }));
+  };
+
+  const crewData = assignments.map((a) => {
+    const creature = state.creatures.find((c) => c.id === a.creatureId);
+    const zone = vehicle?.template.zones.find((z) => z.id === a.zoneId);
+    return { creature, zone, assignment: a };
+  }).filter((c) => c.creature);
+
+  if (crewData.length === 0) return null;
+
+  return (
+    <Box sx={{ mb: 2 }}>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+        Crew HP
+      </Typography>
+      <Stack spacing={0.5}>
+        {crewData.map(({ creature, zone }) => {
+          if (!creature) return null;
+          const isPC = creature.statblock.type === 'pc';
+          const isDead = !isPC && creature.currentHp === 0;
+          const isInDeathSaves = isPC && creature.currentHp === 0;
+          const damageInput = damageInputs[creature.id] || '';
+
+          return (
+            <Paper
+              key={creature.id}
+              sx={{
+                p: 1,
+                bgcolor: isDead || isInDeathSaves ? withOpacity('#dc2626', 0.15) : '#242424',
+                borderLeft: isDead || isInDeathSaves ? 2 : 0,
+                borderColor: 'error.main',
+              }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                <Box>
+                  <Typography
+                    variant="body2"
+                    sx={{ textDecoration: isDead ? 'line-through' : 'none' }}
+                  >
+                    {creature.name}
+                    {isDead && (
+                      <Typography component="span" variant="caption" sx={{ ml: 0.5, color: 'error.main' }}>
+                        (Dead)
+                      </Typography>
+                    )}
+                    {isInDeathSaves && (
+                      <Typography component="span" variant="caption" sx={{ ml: 0.5, color: 'error.main' }}>
+                        (Death Saves)
+                      </Typography>
+                    )}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {zone?.name} • AC {creature.statblock.ac}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <TextField
+                    type="number"
+                    size="small"
+                    value={creature.currentHp}
+                    onChange={(e) => handleCreatureHpChange(creature.id, parseInt(e.target.value, 10) || 0, creature.statblock.maxHp)}
+                    sx={{ width: 52 }}
+                    inputProps={{ min: 0, max: creature.statblock.maxHp, style: { textAlign: 'center', padding: '4px' } }}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    / {creature.statblock.maxHp}
+                  </Typography>
+                </Box>
+              </Box>
+              {/* Damage/Heal controls */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <TextField
+                  type="number"
+                  size="small"
+                  value={damageInput}
+                  onChange={(e) => setDamageInputs((prev) => ({ ...prev, [creature.id]: e.target.value }))}
+                  placeholder="±HP"
+                  sx={{ width: 60 }}
+                  inputProps={{ min: 1, style: { textAlign: 'center', padding: '4px', fontSize: '0.75rem' } }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleDealDamage(creature.id, creature.statblock.maxHp, creature.currentHp);
+                  }}
+                />
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={() => handleDealDamage(creature.id, creature.statblock.maxHp, creature.currentHp)}
+                  disabled={!damageInput || parseInt(damageInput, 10) <= 0}
+                  title="Deal damage"
+                  sx={{ p: 0.5 }}
+                >
+                  <RemoveIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  color="success"
+                  onClick={() => handleHeal(creature.id, creature.statblock.maxHp, creature.currentHp)}
+                  disabled={!damageInput || parseInt(damageInput, 10) <= 0}
+                  title="Heal"
+                  sx={{ p: 0.5 }}
+                >
+                  <AddIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Box>
+            </Paper>
+          );
+        })}
+      </Stack>
+    </Box>
   );
 }
 

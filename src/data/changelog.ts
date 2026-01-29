@@ -14,6 +14,22 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.5.0',
+    date: '2026-01-29',
+    changes: [
+      { type: 'feature', description: 'Added elevation combat mechanics (+2/-2 attack modifiers based on high/low ground)' },
+      { type: 'feature', description: 'Added weapon range extension when firing from elevation (10% per 10ft)' },
+      { type: 'feature', description: 'Added Target Status panel showing distance, range status, and elevation bonuses per target' },
+      { type: 'feature', description: 'Added tabbed Map/Vehicles view in main panel for better workflow' },
+      { type: 'feature', description: 'Added PC initiative roll button in sidebar' },
+      { type: 'improvement', description: 'Enhanced Vehicle Cards with inline damage dealing, auto-mishap triggering, and crew HP management' },
+      { type: 'improvement', description: 'Elevation zone opacity slider now affects borders and labels' },
+      { type: 'improvement', description: 'Added map resize warning with proportional scaling option for vehicles and zones' },
+      { type: 'fix', description: 'Fixed elevation zones being draggable during combat (now locked)' },
+      { type: 'fix', description: 'Fixed elevation zone changes not persisting on save' },
+    ],
+  },
+  {
     version: '1.4.0',
     date: '2026-01-28',
     changes: [

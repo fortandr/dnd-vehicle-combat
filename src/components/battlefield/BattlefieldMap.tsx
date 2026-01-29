@@ -44,6 +44,12 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   } | null>(null);
   const [editingZone, setEditingZone] = useState<ElevationZone | null>(null);
   const [elevationZoneOpacity, setElevationZoneOpacity] = useState(0.3);
+  const [showResizeWarning, setShowResizeWarning] = useState(false);
+  const [pendingResize, setPendingResize] = useState<{
+    type: 'feetPerPixel' | 'scale';
+    oldValue: number;
+    newValue: number;
+  } | null>(null);
   const [isDrawingZone, setIsDrawingZone] = useState(false);
   const [zoneDrawStart, setZoneDrawStart] = useState<Position | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1113,21 +1119,131 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     }
   };
 
-  const handleBgScaleChange = (scale: number) => {
-    if (state.battlefield.backgroundImage) {
+  // Check if there are vehicles, creatures with positions, or elevation zones on the map
+  const hasMapContent = () => {
+    const hasVehicles = state.vehicles.length > 0;
+    const hasCreaturesOnMap = state.creatures.some(c => c.position);
+    const hasElevationZones = state.elevationZones.length > 0;
+    return hasVehicles || hasCreaturesOnMap || hasElevationZones;
+  };
+
+  // Apply proportional scaling to all map content
+  const applyProportionalScaling = (scaleFactor: number) => {
+    const bg = state.battlefield.backgroundImage;
+    if (!bg) return;
+
+    // Scale vehicle positions
+    state.vehicles.forEach((vehicle) => {
+      const newPos = {
+        x: vehicle.position.x * scaleFactor,
+        y: vehicle.position.y * scaleFactor,
+      };
+      updateVehiclePosition(vehicle.id, newPos);
+    });
+
+    // Scale creature positions
+    state.creatures.forEach((creature) => {
+      if (creature.position) {
+        dispatch({
+          type: 'UPDATE_CREATURE',
+          payload: {
+            id: creature.id,
+            updates: {
+              position: {
+                x: creature.position.x * scaleFactor,
+                y: creature.position.y * scaleFactor,
+              },
+            },
+          },
+        });
+      }
+    });
+
+    // Scale elevation zones (position and size)
+    state.elevationZones.forEach((zone) => {
+      dispatch({
+        type: 'UPDATE_ELEVATION_ZONE',
+        payload: {
+          id: zone.id,
+          updates: {
+            position: {
+              x: zone.position.x * scaleFactor,
+              y: zone.position.y * scaleFactor,
+            },
+            size: {
+              width: zone.size.width * scaleFactor,
+              height: zone.size.height * scaleFactor,
+            },
+          },
+        },
+      });
+    });
+  };
+
+  // Handle resize confirmation from dialog
+  const handleResizeConfirm = (scalePositions: boolean) => {
+    if (!pendingResize || !state.battlefield.backgroundImage) {
+      setShowResizeWarning(false);
+      setPendingResize(null);
+      return;
+    }
+
+    const { type, oldValue, newValue } = pendingResize;
+
+    // Calculate the scale factor for positions
+    // If feetPerPixel increases, the map gets bigger, so positions should scale up
+    // If scale increases, the map gets bigger, so positions should scale up
+    const scaleFactor = newValue / oldValue;
+
+    // Apply scaling first if requested
+    if (scalePositions) {
+      applyProportionalScaling(scaleFactor);
+    }
+
+    // Then apply the new map setting
+    if (type === 'feetPerPixel') {
       setBackgroundImage({
         ...state.battlefield.backgroundImage,
-        scale,
+        feetPerPixel: newValue,
       });
+    } else {
+      setBackgroundImage({
+        ...state.battlefield.backgroundImage,
+        scale: newValue,
+      });
+    }
+
+    setShowResizeWarning(false);
+    setPendingResize(null);
+  };
+
+  const handleBgScaleChange = (scale: number) => {
+    if (state.battlefield.backgroundImage) {
+      const oldScale = state.battlefield.backgroundImage.scale || 1;
+      if (hasMapContent() && scale !== oldScale) {
+        setPendingResize({ type: 'scale', oldValue: oldScale, newValue: scale });
+        setShowResizeWarning(true);
+      } else {
+        setBackgroundImage({
+          ...state.battlefield.backgroundImage,
+          scale,
+        });
+      }
     }
   };
 
   const handleFeetPerPixelChange = (feetPerPixel: number) => {
     if (state.battlefield.backgroundImage) {
-      setBackgroundImage({
-        ...state.battlefield.backgroundImage,
-        feetPerPixel,
-      });
+      const oldFpp = state.battlefield.backgroundImage.feetPerPixel || 1;
+      if (hasMapContent() && feetPerPixel !== oldFpp) {
+        setPendingResize({ type: 'feetPerPixel', oldValue: oldFpp, newValue: feetPerPixel });
+        setShowResizeWarning(true);
+      } else {
+        setBackgroundImage({
+          ...state.battlefield.backgroundImage,
+          feetPerPixel,
+        });
+      }
     }
   };
 
@@ -1814,6 +1930,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                 onStartResize={handleStartResize}
                 isResizing={!!resizingZone}
                 opacity={elevationZoneOpacity}
+                isLocked={state.phase === 'combat'}
               />
             );
           })}
@@ -1973,6 +2090,106 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
           </span>
         </div>
       </div>
+
+      {/* Map Resize Warning Dialog */}
+      {showResizeWarning && pendingResize && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+          onClick={() => {
+            setShowResizeWarning(false);
+            setPendingResize(null);
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#1e1e1e',
+              borderRadius: 8,
+              padding: 24,
+              maxWidth: 450,
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.8)',
+              border: '1px solid #444',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 12px 0', color: '#f59e0b', fontSize: 18 }}>
+              Map Resize Warning
+            </h3>
+            <p style={{ margin: '0 0 16px 0', color: '#ccc', fontSize: 14, lineHeight: 1.5 }}>
+              You have vehicles, creatures, or elevation zones on the map. Changing the map scale will affect their positions.
+            </p>
+            <p style={{ margin: '0 0 8px 0', fontSize: 14, color: '#fff' }}>
+              <strong>What would you like to do?</strong>
+            </p>
+            <ul style={{ margin: '0 0 20px 0', paddingLeft: 20, fontSize: 13, color: '#aaa', lineHeight: 1.6 }}>
+              <li style={{ marginBottom: 6 }}>
+                <strong style={{ color: '#fff' }}>Scale positions:</strong> Move everything proportionally so they stay in the same relative positions on the map
+              </li>
+              <li>
+                <strong style={{ color: '#fff' }}>Keep positions:</strong> Leave everything at their current coordinates (may appear in wrong locations relative to background)
+              </li>
+            </ul>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowResizeWarning(false);
+                  setPendingResize(null);
+                }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 4,
+                  border: '1px solid #555',
+                  backgroundColor: '#333',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleResizeConfirm(false)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 4,
+                  border: '1px solid #555',
+                  backgroundColor: '#444',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                }}
+              >
+                Keep Positions
+              </button>
+              <button
+                onClick={() => handleResizeConfirm(true)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 4,
+                  border: 'none',
+                  backgroundColor: '#3b82f6',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: 14,
+                }}
+              >
+                Scale Positions
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2094,6 +2311,7 @@ interface DraggableElevationZoneProps {
   onStartResize: (zoneId: string, handle: ResizeHandle, startX: number, startY: number) => void;
   isResizing: boolean;
   opacity: number;
+  isLocked: boolean;
 }
 
 function DraggableElevationZone({
@@ -2107,18 +2325,23 @@ function DraggableElevationZone({
   onStartResize,
   isResizing,
   opacity,
+  isLocked,
 }: DraggableElevationZoneProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: zone.id,
-    disabled: isResizing, // Disable dragging while resizing
+    disabled: isResizing || isLocked, // Disable dragging while resizing or during combat
   });
 
   const isHigher = zone.elevation > 0;
   const isLower = zone.elevation < 0;
   const zoneColor = zone.color || (isHigher ? '#f59e0b' : isLower ? '#3b82f6' : '#6b7280');
 
-  // Convert opacity (0-1) to hex (00-ff)
-  const opacityHex = Math.round((isDragging ? opacity * 1.5 : opacity) * 255).toString(16).padStart(2, '0');
+  // Convert opacity (0-1) to hex (00-ff) - apply to both fill and border
+  const fillOpacity = isDragging ? opacity * 1.5 : opacity;
+  const opacityHex = Math.round(fillOpacity * 255).toString(16).padStart(2, '0');
+  // Border opacity should be higher than fill but still respect the slider
+  const borderOpacity = Math.min(1, fillOpacity * 2);
+  const borderOpacityHex = Math.round(borderOpacity * 255).toString(16).padStart(2, '0');
 
   const style = {
     position: 'absolute' as const,
@@ -2127,24 +2350,24 @@ function DraggableElevationZone({
     width: screenWidth,
     height: screenHeight,
     backgroundColor: `${zoneColor}${opacityHex}`,
-    border: `2px ${isSelected ? 'solid' : 'dashed'} ${zoneColor}`,
+    border: `2px ${isSelected && !isLocked ? 'solid' : 'dashed'} ${zoneColor}${borderOpacityHex}`,
     borderRadius: 4,
-    cursor: isDragging ? 'grabbing' : 'grab',
+    cursor: isLocked ? 'default' : isDragging ? 'grabbing' : 'grab',
     zIndex: isDragging ? 50 : isSelected ? 10 : 1,
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.7 : 1,
-    boxShadow: isSelected ? `0 0 0 2px ${zoneColor}, 0 0 8px ${zoneColor}66` : undefined,
+    boxShadow: isSelected && !isLocked ? `0 0 0 2px ${zoneColor}${borderOpacityHex}, 0 0 8px ${zoneColor}66` : undefined,
     overflow: 'visible' as const,
   };
 
-  // Resize handle style
+  // Resize handle style - also apply opacity
   const handleSize = 10;
   const handleStyle = (cursor: string): React.CSSProperties => ({
     position: 'absolute',
     width: handleSize,
     height: handleSize,
-    backgroundColor: zoneColor,
-    border: '2px solid #fff',
+    backgroundColor: `${zoneColor}${borderOpacityHex}`,
+    border: `2px solid rgba(255, 255, 255, ${borderOpacity})`,
     borderRadius: 2,
     cursor,
     zIndex: 100,
@@ -2174,8 +2397,8 @@ function DraggableElevationZone({
           position: 'absolute',
           top: 4,
           left: 4,
-          backgroundColor: `${zoneColor}cc`,
-          color: '#fff',
+          backgroundColor: `${zoneColor}${borderOpacityHex}`,
+          color: `rgba(255, 255, 255, ${borderOpacity})`,
           padding: '2px 6px',
           borderRadius: 3,
           fontSize: 11,
@@ -2187,8 +2410,8 @@ function DraggableElevationZone({
         {zone.name}: {zone.elevation >= 0 ? '+' : ''}{zone.elevation} ft
       </div>
 
-      {/* Size indicator when selected */}
-      {isSelected && (
+      {/* Size indicator when selected (only in setup mode) */}
+      {isSelected && !isLocked && (
         <div
           style={{
             position: 'absolute',
@@ -2207,8 +2430,8 @@ function DraggableElevationZone({
         </div>
       )}
 
-      {/* Resize handles - only show when selected */}
-      {isSelected && (
+      {/* Resize handles - only show when selected and not locked */}
+      {isSelected && !isLocked && (
         <>
           {/* Corner handles */}
           <div

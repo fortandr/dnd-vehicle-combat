@@ -14,7 +14,6 @@ import {
 } from '@mui/material';
 import { useCombat } from '../../context/CombatContext';
 import { TargetCoverPanel } from '../combat/TargetCoverPanel';
-import { AllVehiclesStatsPanel } from '../combat/VehicleStatsPanel';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
 import {
   getVehicleElevation,
@@ -80,14 +79,6 @@ export function RightPanel() {
                 Range, cover, and elevation info for potential targets
               </Typography>
             </Box>
-            <Box>
-              <Typography variant="caption" fontWeight={600} sx={{ color: 'text.primary' }}>
-                Vehicle Stats
-              </Typography>
-              <Typography variant="caption" display="block">
-                Quick reference for all vehicle HP, AC, speed, and active mishaps
-              </Typography>
-            </Box>
           </Stack>
           <Box sx={{ mt: 3, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
             <Typography variant="caption" sx={{ fontStyle: 'italic' }}>
@@ -111,7 +102,7 @@ export function RightPanel() {
 
       {/* Target Status - Show during combat when attacker has a vehicle or is on foot with a position */}
       {state.phase === 'combat' && (attackerVehicle || creatureOnFoot) && (
-        <Card sx={{ mb: 2 }}>
+        <Card>
           <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Target Status
@@ -126,18 +117,6 @@ export function RightPanel() {
             ) : creatureOnFoot && currentTurnCreature ? (
               <TargetCoverPanel attackerCreature={currentTurnCreature} attackerFaction={attackerFaction} />
             ) : null}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Vehicle Stats - Show during combat */}
-      {state.phase === 'combat' && state.vehicles.length > 0 && (
-        <Card>
-          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Vehicle Stats
-            </Typography>
-            <AllVehiclesStatsPanel />
           </CardContent>
         </Card>
       )}
