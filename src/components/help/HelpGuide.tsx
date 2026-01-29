@@ -23,6 +23,9 @@ import MapIcon from '@mui/icons-material/Map';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SaveIcon from '@mui/icons-material/Save';
 import CasinoIcon from '@mui/icons-material/Casino';
+import TerrainIcon from '@mui/icons-material/Terrain';
+import GpsFixedIcon from '@mui/icons-material/GpsFixed';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
 
 interface HelpGuideProps {
   open: boolean;
@@ -47,6 +50,14 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
           based on the rules from Baldur's Gate: Descent into Avernus.
         </Typography>
 
+        <Box sx={{ p: 1.5, mb: 2, bgcolor: 'action.hover', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+          <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ViewModuleIcon fontSize="small" color="primary" />
+            <strong>Tip:</strong> Use the <strong>Map</strong> and <strong>Vehicles</strong> tabs in the main panel
+            to switch between the battlefield view and vehicle management.
+          </Typography>
+        </Box>
+
         <Accordion defaultExpanded>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -56,15 +67,22 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" paragraph>
-              Use the <strong>"+ Add Party Vehicle"</strong> and <strong>"+ Add Enemy Vehicle"</strong> buttons
-              to add vehicles to the encounter.
+              Use the <strong>"+ Vehicle"</strong> dropdown button to add Party or Enemy vehicles to the encounter.
             </Typography>
             <Typography variant="body2" paragraph>
-              • <strong>Party vehicles</strong> (blue) are controlled by the players<br />
+              • <strong>Party vehicles</strong> (green) are controlled by the players<br />
               • <strong>Enemy vehicles</strong> (red) are controlled by the DM
             </Typography>
-            <Typography variant="body2">
-              You can customize vehicle weapons, armor, and gadgets from the Vehicle Stats panel on the right.
+            <Typography variant="body2" paragraph>
+              <strong>Managing Vehicles:</strong> Switch to the <strong>"Vehicles"</strong> tab in the main panel
+              to see full vehicle cards with:
+            </Typography>
+            <Typography variant="body2" component="div" sx={{ pl: 2 }}>
+              • HP editing and damage dealing (with auto-mishap triggering)<br />
+              • Speed adjustment and effective speed display<br />
+              • Crew HP management with damage/heal controls<br />
+              • Weapon stations, armor upgrades, and magical gadgets<br />
+              • Active mishaps with repair buttons
             </Typography>
           </AccordionDetails>
         </Accordion>
@@ -110,11 +128,16 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" paragraph>
-              The battlefield map shows vehicle positions. Drag vehicles to position them.
+              Use the <strong>Map</strong> tab to view and position vehicles on the battlefield.
+              Drag vehicles to move them and use the rotation handle to change their facing.
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Distance Tracking:</strong> The scale indicator at the top shows the current
-              combat scale based on distance between party and enemy vehicles:
+              <strong>Background Image:</strong> Upload a custom map image using the map controls panel.
+              You can adjust the scale (feet per pixel) and opacity. If you resize the map after placing
+              vehicles, you'll be prompted to scale positions proportionally.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Combat Scales:</strong> The scale indicator shows the current combat range:
             </Typography>
             <Typography variant="body2" component="div" sx={{ pl: 2 }}>
               • <strong>Point Blank</strong> (0-30 ft): Melee range<br />
@@ -122,8 +145,35 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               • <strong>Pursuit</strong> (300-3000 ft): Chase scale<br />
               • <strong>Exploration</strong> (3000+ ft): Long distance
             </Typography>
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <TerrainIcon color="primary" />
+              <Typography fontWeight={600}>4. Elevation Zones</Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Typography variant="body2" paragraph>
+              Create elevation zones to represent hills, cliffs, and other terrain features.
+              Open the map controls and switch to the <strong>"Elevation"</strong> tab.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Creating Zones:</strong> Click "Add Zone" and draw on the map, or use "Draw Zone"
+              mode to click and drag. You can resize zones using the corner handles.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Elevation Effects:</strong> When attacking between different elevations:
+            </Typography>
+            <Typography variant="body2" component="div" sx={{ pl: 2 }}>
+              • <strong>High ground (+10 ft or more):</strong> +2 to attack rolls<br />
+              • <strong>Low ground (-10 ft or more):</strong> -2 to attack rolls<br />
+              • <strong>Range extension:</strong> Firing downward extends weapon range by 10% per 10 ft of elevation
+            </Typography>
             <Typography variant="body2" sx={{ mt: 1 }}>
-              You can upload a custom background image using the map controls.
+              <em>Note: Elevation zones are locked during combat to prevent accidental changes.</em>
             </Typography>
           </AccordionDetails>
         </Accordion>
@@ -132,7 +182,7 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <PlayArrowIcon color="primary" />
-              <Typography fontWeight={600}>4. Run Combat</Typography>
+              <Typography fontWeight={600}>5. Run Combat</Typography>
             </Box>
           </AccordionSummary>
           <AccordionDetails>
@@ -141,18 +191,46 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
             </Typography>
             <Typography variant="body2" paragraph>
               <strong>Requirements to start:</strong><br />
-              • All PCs must have initiative set<br />
+              • All PCs must have initiative set (or use the dice button to roll)<br />
               • All drivers must have DEX save bonus set<br />
               • Each crewed vehicle needs a driver at the Helm
             </Typography>
             <Typography variant="body2" paragraph>
               During combat:<br />
-              • The <strong>Current Turn</strong> panel shows whose turn it is<br />
+              • The <strong>Current Turn</strong> panel shows the active vehicle/creature with crew and weapons<br />
               • Use <strong>"Next Turn"</strong> to advance through the initiative order<br />
               • Use <strong>"Next Round"</strong> when all turns are complete
             </Typography>
             <Typography variant="body2">
-              Track damage, healing, and vehicle mishaps using the controls in each panel.
+              Switch to the <strong>Vehicles</strong> tab to deal damage, manage mishaps, and track crew HP.
+            </Typography>
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <GpsFixedIcon color="primary" />
+              <Typography fontWeight={600}>6. Target Status Panel</Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Typography variant="body2" paragraph>
+              During combat, the <strong>Target Status</strong> panel (right sidebar) shows tactical information
+              for attacking enemy targets from the current turn's vehicle.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>For each target, you'll see:</strong>
+            </Typography>
+            <Typography variant="body2" component="div" sx={{ pl: 2 }}>
+              • <strong>Cover:</strong> None, Half (+2 AC), Three-quarters (+5 AC), or Full<br />
+              • <strong>Attack arc:</strong> Which direction you're attacking from<br />
+              • <strong>Distance:</strong> How far away the target is in feet<br />
+              • <strong>Range status:</strong> Whether your weapons can reach the target<br />
+              • <strong>Elevation modifier:</strong> Attack bonus/penalty based on height difference
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              Range is automatically extended when firing from higher elevation (10% per 10 ft).
             </Typography>
           </AccordionDetails>
         </Accordion>
@@ -161,7 +239,7 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <CasinoIcon color="primary" />
-              <Typography fontWeight={600}>5. Chase Complications</Typography>
+              <Typography fontWeight={600}>7. Chase Complications</Typography>
             </Box>
           </AccordionSummary>
           <AccordionDetails>
@@ -184,7 +262,7 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <SaveIcon color="primary" />
-              <Typography fontWeight={600}>6. Saving & Loading</Typography>
+              <Typography fontWeight={600}>8. Saving & Loading</Typography>
             </Box>
           </AccordionSummary>
           <AccordionDetails>
