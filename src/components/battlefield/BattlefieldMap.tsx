@@ -18,8 +18,9 @@ import {
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { useCombat } from '../../context/CombatContext';
+import { useSettings } from '../../context/SettingsContext';
 import { Vehicle, Position, ScaleName, Creature, CrewAssignment, ElevationZone } from '../../types';
-import { SCALES, formatDistance, getScaleForDistance, calculateMovementPerRound } from '../../data/scaleConfig';
+import { SCALES, formatDistance, formatDistanceWithUnit, getScaleForDistance, calculateMovementPerRound } from '../../data/scaleConfig';
 import { getVehicleElevation } from '../../utils/elevationCalculator';
 import { useBroadcastSource } from '../../hooks/useBroadcastChannel';
 import { featureFlags } from '../../config/featureFlags';
@@ -62,6 +63,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
+  const { unitSystem } = useSettings();
 
   // Measure container width and re-measure when phase changes (panel appears/disappears)
   useEffect(() => {
@@ -575,8 +577,8 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
         type: 'LOG_ACTION',
         payload: {
           type: 'movement',
-          action: `${creature.name} moved ${formatDistance(actualFeetMoved)}`,
-          details: `${formatDistance(newRemainingMovement)} remaining`,
+          action: `${creature.name} moved ${formatDistanceWithUnit(actualFeetMoved, unitSystem)}`,
+          details: `${formatDistanceWithUnit(newRemainingMovement, unitSystem)} remaining`,
         },
       });
 
@@ -689,8 +691,8 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
       type: 'LOG_ACTION',
       payload: {
         type: 'movement',
-        action: `${vehicle.name} moved ${formatDistance(actualFeetMoved)}`,
-        details: `${formatDistance(newRemainingMovement)} remaining`,
+        action: `${vehicle.name} moved ${formatDistanceWithUnit(actualFeetMoved, unitSystem)}`,
+        details: `${formatDistanceWithUnit(newRemainingMovement, unitSystem)} remaining`,
       },
     });
 
@@ -1344,6 +1346,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
       phase: state.phase,
       dmViewport: { width, height },
       showVehicleHealth: state.playerViewSettings?.showVehicleHealth ?? true,
+      unitSystem,
     });
   }, [
     state.vehicles,
@@ -1360,6 +1363,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     broadcast,
     width,
     height,
+    unitSystem,
   ]);
 
   // Get grid size in screen pixels
@@ -1398,7 +1402,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
             <div className="distance-display">
               <span className="text-xs text-muted">Closest:</span>
               <span className="font-mono font-bold">
-                {formatDistance(minEngagementDist)}
+                {formatDistanceWithUnit(minEngagementDist, unitSystem)}
               </span>
             </div>
           )}
@@ -1616,7 +1620,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                           {/* Show calculated map size */}
                           {imageBounds && (
                             <div className="text-xs text-muted" style={{ marginBottom: 'var(--spacing-sm)' }}>
-                              Map size: {formatDistance(imageBounds.widthFeet)} × {formatDistance(imageBounds.heightFeet)}
+                              Map size: {formatDistanceWithUnit(imageBounds.widthFeet, unitSystem)} × {formatDistanceWithUnit(imageBounds.heightFeet, unitSystem)}
                             </div>
                           )}
                           <button
@@ -1949,6 +1953,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
             vehicles={state.vehicles}
             distances={distances}
             worldToScreen={worldToScreen}
+            unitSystem={unitSystem}
           />
 
           {/* Movement Range Indicator - shows remaining movement for current turn vehicle */}
@@ -1959,6 +1964,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
               remainingMovement={getRemainingMovement(currentTurnVehicle)}
               maxMovement={getMaxMovement(currentTurnVehicle)}
               pixelsPerFoot={pixelsPerFoot}
+              unitSystem={unitSystem}
             />
           )}
 
@@ -1970,6 +1976,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
               remainingMovement={getCreatureRemainingMovement(currentTurnCreature)}
               maxMovement={getCreatureMaxMovement(currentTurnCreature)}
               pixelsPerFoot={pixelsPerFoot}
+              unitSystem={unitSystem}
             />
           )}
 
@@ -1996,6 +2003,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                 creatures={state.creatures}
                 elevationZones={state.elevationZones}
                 allVehicles={state.vehicles}
+                unitSystem={unitSystem}
               />
             );
           })}
@@ -2086,7 +2094,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
           </div>
           <span className="text-xs text-muted">|</span>
           <span className="text-xs text-muted">
-            Grid: {formatDistance(gridFeet)} per square
+            Grid: {formatDistanceWithUnit(gridFeet, unitSystem)} per square
           </span>
         </div>
       </div>
@@ -2204,9 +2212,10 @@ interface WeaponRangeArcsProps {
   tokenSize: number;
   vehicleType: 'party' | 'enemy';
   facing: number;
+  unitSystem: 'imperial' | 'metric';
 }
 
-function WeaponRangeArcs({ weaponRanges, pixelsPerFoot, tokenSize, vehicleType, facing }: WeaponRangeArcsProps) {
+function WeaponRangeArcs({ weaponRanges, pixelsPerFoot, tokenSize, vehicleType, facing, unitSystem }: WeaponRangeArcsProps) {
   const baseColor = vehicleType === 'party' ? '34, 197, 94' : '255, 69, 0';
   const maxRange = Math.max(weaponRanges.front, weaponRanges.rear, weaponRanges.left, weaponRanges.right);
   const svgSize = maxRange * pixelsPerFoot * 2 + 20;
@@ -2285,7 +2294,7 @@ function WeaponRangeArcs({ weaponRanges, pixelsPerFoot, tokenSize, vehicleType, 
               // Counter-rotate text so it stays readable
               transform={`rotate(${-facing}, ${center + (radius * 0.6) * Math.cos((((startAngle + endAngle) / 2) - 90) * Math.PI / 180)}, ${center + (radius * 0.6) * Math.sin((((startAngle + endAngle) / 2) - 90) * Math.PI / 180)})`}
             >
-              {range}ft
+              {formatDistanceWithUnit(range, unitSystem)}
             </text>
           </g>
         );
@@ -2492,6 +2501,7 @@ interface VehicleTokenProps {
   creatures: Creature[];
   elevationZones: ElevationZone[];
   allVehicles: Vehicle[];
+  unitSystem: 'imperial' | 'metric';
 }
 
 function VehicleToken({
@@ -2509,6 +2519,7 @@ function VehicleToken({
   creatures,
   elevationZones,
   allVehicles,
+  unitSystem,
 }: VehicleTokenProps) {
   const [isHovered, setIsHovered] = useState(false);
   const isInoperative = vehicle.isInoperative || vehicle.currentHp === 0;
@@ -2580,6 +2591,7 @@ function VehicleToken({
           tokenSize={tokenSize}
           vehicleType={vehicle.type}
           facing={vehicle.facing}
+          unitSystem={unitSystem}
         />
       )}
 
@@ -3455,9 +3467,10 @@ interface DistanceLinesProps {
   vehicles: Vehicle[];
   distances: { from: string; to: string; distance: number }[];
   worldToScreen: (pos: Position) => Position;
+  unitSystem: 'imperial' | 'metric';
 }
 
-function DistanceLines({ vehicles, distances, worldToScreen }: DistanceLinesProps) {
+function DistanceLines({ vehicles, distances, worldToScreen, unitSystem }: DistanceLinesProps) {
   return (
     <svg
       style={{
@@ -3513,7 +3526,7 @@ function DistanceLines({ vehicles, distances, worldToScreen }: DistanceLinesProp
               fontSize="12"
               fontFamily="var(--font-mono)"
             >
-              {formatDistance(distance)}
+              {formatDistanceWithUnit(distance, unitSystem)}
             </text>
           </g>
         );
@@ -3532,6 +3545,7 @@ interface MovementRangeIndicatorProps {
   remainingMovement: number;
   maxMovement: number;
   pixelsPerFoot: number;
+  unitSystem: 'imperial' | 'metric';
 }
 
 function MovementRangeIndicator({
@@ -3540,6 +3554,7 @@ function MovementRangeIndicator({
   remainingMovement,
   maxMovement,
   pixelsPerFoot,
+  unitSystem,
 }: MovementRangeIndicatorProps) {
   // Convert remaining movement (in feet) to screen pixels
   const radiusPixels = remainingMovement * pixelsPerFoot;
@@ -3612,7 +3627,7 @@ function MovementRangeIndicator({
         fontFamily="var(--font-mono)"
         filter="url(#movementGlow)"
       >
-        {Math.round(remainingMovement)} ft remaining
+        {formatDistanceWithUnit(remainingMovement, unitSystem)} remaining
       </text>
     </svg>
   );
@@ -3628,6 +3643,7 @@ interface CreatureMovementRangeIndicatorProps {
   remainingMovement: number;
   maxMovement: number;
   pixelsPerFoot: number;
+  unitSystem: 'imperial' | 'metric';
 }
 
 function CreatureMovementRangeIndicator({
@@ -3636,6 +3652,7 @@ function CreatureMovementRangeIndicator({
   remainingMovement,
   maxMovement,
   pixelsPerFoot,
+  unitSystem,
 }: CreatureMovementRangeIndicatorProps) {
   // Convert remaining movement (in feet) to screen pixels
   const radiusPixels = remainingMovement * pixelsPerFoot;
@@ -3709,7 +3726,7 @@ function CreatureMovementRangeIndicator({
         fontFamily="var(--font-mono)"
         filter="url(#creatureMovementGlow)"
       >
-        {Math.round(remainingMovement)} ft remaining
+        {formatDistanceWithUnit(remainingMovement, unitSystem)} remaining
       </text>
     </svg>
   );

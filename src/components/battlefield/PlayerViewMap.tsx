@@ -5,7 +5,7 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { useBroadcastReceiver, BattlefieldSyncState } from '../../hooks/useBroadcastChannel';
-import { SCALES } from '../../data/scaleConfig';
+import { SCALES, formatDistanceWithUnit } from '../../data/scaleConfig';
 import { Vehicle, Creature, Position, VehicleWeapon, CrewAssignment, ElevationZone } from '../../types';
 import { featureFlags } from '../../config/featureFlags';
 
@@ -61,6 +61,7 @@ export function PlayerViewMap() {
 
   const { width, height } = dimensions;
   const currentScale = SCALES[state.scale];
+  const unitSystem = state.unitSystem || 'imperial'; // Default to imperial if not set
 
   // Calculate scale factor to fill the player's viewport while maintaining proportions
   // This scales everything (tokens, background, grid) together
@@ -210,7 +211,7 @@ export function PlayerViewMap() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                {zone.name}: {zone.elevation >= 0 ? '+' : ''}{zone.elevation} ft
+                {zone.name}: {zone.elevation >= 0 ? '+' : ''}{formatDistanceWithUnit(Math.abs(zone.elevation), unitSystem)}
               </div>
             </div>
           );
@@ -229,6 +230,7 @@ export function PlayerViewMap() {
         <PlayerViewDistanceLines
           vehicles={state.vehicles}
           worldToScreen={worldToScreen}
+          unitSystem={unitSystem}
         />
 
         {/* Vehicle Tokens */}
@@ -266,6 +268,7 @@ export function PlayerViewMap() {
                   tokenSize={tokenSize}
                   vehicleType={vehicle.type}
                   facing={vehicle.facing}
+                  unitSystem={unitSystem}
                 />
               )}
               {/* Vehicle Icon */}
@@ -402,9 +405,11 @@ function PlayerViewGrid({
 function PlayerViewDistanceLines({
   vehicles,
   worldToScreen,
+  unitSystem,
 }: {
   vehicles: Vehicle[];
   worldToScreen: (pos: Position) => { x: number; y: number };
+  unitSystem: 'imperial' | 'metric';
 }) {
   const partyVehicles = vehicles.filter((v) => v.type === 'party');
   const enemyVehicles = vehicles.filter((v) => v.type === 'enemy');
@@ -444,10 +449,7 @@ function PlayerViewDistanceLines({
       {lines.map((line, i) => {
         const midX = (line.from.x + line.to.x) / 2;
         const midY = (line.from.y + line.to.y) / 2;
-        const distanceText =
-          line.distance >= 5280
-            ? `${(line.distance / 5280).toFixed(1)} mi`
-            : `${Math.round(line.distance)} ft`;
+        const distanceText = formatDistanceWithUnit(line.distance, unitSystem);
 
         return (
           <g key={i}>
@@ -552,6 +554,7 @@ interface PlayerViewWeaponRangeArcsProps {
   tokenSize: number;
   vehicleType: 'party' | 'enemy';
   facing: number;
+  unitSystem: 'imperial' | 'metric';
 }
 
 function PlayerViewWeaponRangeArcs({
@@ -560,6 +563,7 @@ function PlayerViewWeaponRangeArcs({
   tokenSize,
   vehicleType,
   facing,
+  unitSystem,
 }: PlayerViewWeaponRangeArcsProps) {
   const baseColor = vehicleType === 'party' ? '34, 197, 94' : '255, 69, 0';
   const maxRange = Math.max(weaponRanges.front, weaponRanges.rear, weaponRanges.left, weaponRanges.right);
@@ -630,7 +634,7 @@ function PlayerViewWeaponRangeArcs({
               fontWeight="bold"
               transform={`rotate(${-facing}, ${center + (radius * 0.6) * Math.cos((((startAngle + endAngle) / 2) - 90) * Math.PI / 180)}, ${center + (radius * 0.6) * Math.sin((((startAngle + endAngle) / 2) - 90) * Math.PI / 180)})`}
             >
-              {range}ft
+              {formatDistanceWithUnit(range, unitSystem)}
             </text>
           </g>
         );
