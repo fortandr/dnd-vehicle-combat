@@ -505,14 +505,25 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
             Crew Positions
           </Typography>
           <Stack spacing={1}>
-            {vehicle.template.zones.map((zone) => (
-              <CrewZone
-                key={zone.id}
-                zone={zone}
-                vehicleId={vehicle.id}
-                assignments={crewAssignments.filter((a) => a.zoneId === zone.id)}
-              />
-            ))}
+            {vehicle.template.zones.map((zone) => {
+              // If weapon station upgrade is enabled, reduce passenger_area capacity by 1
+              // (the custom weapon station converts one passenger seat)
+              const adjustedZone = (vehicle.hasWeaponStationUpgrade && zone.id === 'passenger_area')
+                ? { ...zone, capacity: Math.max(0, zone.capacity - 1) }
+                : zone;
+
+              // Don't show passenger area if capacity reduced to 0
+              if (adjustedZone.capacity === 0) return null;
+
+              return (
+                <CrewZone
+                  key={zone.id}
+                  zone={adjustedZone}
+                  vehicleId={vehicle.id}
+                  assignments={crewAssignments.filter((a) => a.zoneId === zone.id)}
+                />
+              );
+            })}
             {/* Custom Weapon Station Zone (if upgrade installed) */}
             {vehicle.hasWeaponStationUpgrade && (() => {
               const wsConfig = getWeaponStationUpgrade(vehicle.template.id);
@@ -1102,16 +1113,55 @@ function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
   );
 
   // Get other zones on this vehicle that the selected creature could move to
-  const otherZones = vehicle?.template.zones.filter((z) => z.id !== zone.id) || [];
+  // Include the custom weapon station if upgrade is enabled
+  const baseOtherZones = vehicle?.template.zones.filter((z) => z.id !== zone.id) || [];
+  const otherZones = (() => {
+    if (!vehicle) return baseOtherZones;
+    const wsConfig = getWeaponStationUpgrade(vehicle.template.id);
+
+    // Add custom weapon station zone if upgrade is enabled and we're not already in it
+    if (vehicle.hasWeaponStationUpgrade && zone.id !== wsConfig.zoneId) {
+      const customZone: VehicleZone = {
+        id: wsConfig.zoneId,
+        name: wsConfig.zoneName,
+        cover: wsConfig.cover,
+        capacity: wsConfig.capacity,
+        canAttackOut: true,
+        visibleFromArcs: wsConfig.visibleFromArcs,
+      };
+      return [...baseOtherZones, customZone];
+    }
+    return baseOtherZones;
+  })();
 
   // Check if a zone has capacity for another crew member
   const getZoneAvailableCapacity = (zoneId: string): number => {
-    const zoneTemplate = vehicle?.template.zones.find((z) => z.id === zoneId);
+    if (!vehicle) return 0;
+    const wsConfig = getWeaponStationUpgrade(vehicle.template.id);
+
+    // Check if it's the custom weapon station
+    if (zoneId === wsConfig.zoneId) {
+      if (!vehicle.hasWeaponStationUpgrade) return 0;
+      const currentAssignments = state.crewAssignments.filter(
+        (a) => a.vehicleId === vehicleId && a.zoneId === zoneId
+      ).length;
+      return wsConfig.capacity - currentAssignments;
+    }
+
+    // Regular zone from template
+    const zoneTemplate = vehicle.template.zones.find((z) => z.id === zoneId);
     if (!zoneTemplate) return 0;
+
+    // Adjust passenger_area capacity if weapon station upgrade is enabled
+    let capacity = zoneTemplate.capacity;
+    if (vehicle.hasWeaponStationUpgrade && zoneId === 'passenger_area') {
+      capacity = Math.max(0, capacity - 1);
+    }
+
     const currentAssignments = state.crewAssignments.filter(
       (a) => a.vehicleId === vehicleId && a.zoneId === zoneId
     ).length;
-    return zoneTemplate.capacity - currentAssignments;
+    return capacity - currentAssignments;
   };
 
   const handleAssign = (creatureId: string) => {
