@@ -29,6 +29,7 @@ import {
   ElevationZone,
 } from '../types';
 import { getScaleForDistance, SCALES } from '../data/scaleConfig';
+import { getWeaponStationUpgrade } from '../data/vehicleTemplates';
 import { logAnalyticsEvent } from '../firebase';
 import { v4 as uuid } from 'uuid';
 import { loadCurrentEncounter } from '../hooks/useLocalStorage';
@@ -93,6 +94,7 @@ type CombatAction =
   | { type: 'SWAP_VEHICLE_WEAPON'; payload: { vehicleId: string; weaponIndex: number; newWeapon: VehicleWeapon } }
   | { type: 'SET_VEHICLE_ARMOR'; payload: { vehicleId: string; armorUpgradeId: string } }
   | { type: 'TOGGLE_VEHICLE_GADGET'; payload: { vehicleId: string; gadgetId: string } }
+  | { type: 'TOGGLE_WEAPON_STATION_UPGRADE'; payload: { vehicleId: string } }
   | { type: 'UPDATE_VEHICLE'; payload: { id: string; updates: Partial<Vehicle> } }
   | { type: 'ADD_CREATURE'; payload: Creature }
   | { type: 'REMOVE_CREATURE'; payload: string }
@@ -488,6 +490,39 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
               ? currentGadgets.filter((id) => id !== gadgetId)
               : [...currentGadgets, gadgetId],
           };
+        }),
+      };
+
+    case 'TOGGLE_WEAPON_STATION_UPGRADE':
+      return {
+        ...state,
+        vehicles: state.vehicles.map((v) => {
+          if (v.id !== action.payload.vehicleId) return v;
+          const weaponStationConfig = getWeaponStationUpgrade(v.template.id);
+          const hasUpgrade = v.hasWeaponStationUpgrade;
+          if (hasUpgrade) {
+            // Remove the weapon station: remove the weapon and mark as not having upgrade
+            return {
+              ...v,
+              hasWeaponStationUpgrade: false,
+              weapons: v.weapons.filter((w) => w.zoneId !== weaponStationConfig.zoneId),
+            };
+          } else {
+            // Add the weapon station: add the default weapon with vehicle-specific arcs
+            const newWeapon: VehicleWeapon = {
+              ...weaponStationConfig.defaultWeapon,
+              id: `${weaponStationConfig.defaultWeapon.id}_custom`,
+              zoneId: weaponStationConfig.zoneId,
+              visibleFromArcs: weaponStationConfig.visibleFromArcs,
+              isSwappableStation: true,
+              currentAmmunition: 10,
+            };
+            return {
+              ...v,
+              hasWeaponStationUpgrade: true,
+              weapons: [...v.weapons, newWeapon],
+            };
+          }
         }),
       };
 
@@ -1641,6 +1676,7 @@ interface CombatContextValue {
   swapVehicleWeapon: (vehicleId: string, weaponIndex: number, newWeapon: VehicleWeapon) => void;
   setVehicleArmor: (vehicleId: string, armorUpgradeId: string) => void;
   toggleVehicleGadget: (vehicleId: string, gadgetId: string) => void;
+  toggleWeaponStationUpgrade: (vehicleId: string) => void;
   loadPartyPreset: (vehicles: Vehicle[], creatures: Creature[], crewAssignments: CrewAssignment[]) => void;
   toggleAutoRollComplications: () => void;
   logComplication: (roll: number, complicationName: string | null, details?: string) => void;
@@ -2019,6 +2055,12 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
     []
   );
 
+  const toggleWeaponStationUpgrade = useCallback(
+    (vehicleId: string) =>
+      dispatch({ type: 'TOGGLE_WEAPON_STATION_UPGRADE', payload: { vehicleId } }),
+    []
+  );
+
   const loadPartyPreset = useCallback(
     (vehicles: Vehicle[], creatures: Creature[], crewAssignments: CrewAssignment[]) =>
       dispatch({ type: 'LOAD_PARTY_PRESET', payload: { vehicles, creatures, crewAssignments } }),
@@ -2165,6 +2207,7 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
     swapVehicleWeapon,
     setVehicleArmor,
     toggleVehicleGadget,
+    toggleWeaponStationUpgrade,
     loadPartyPreset,
     toggleAutoRollComplications,
     logComplication,

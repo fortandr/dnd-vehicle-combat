@@ -219,6 +219,7 @@ export interface Vehicle {
   // Upgrades
   armorUpgradeId?: string; // ID of armor upgrade (default: 'none')
   gadgetIds?: string[]; // IDs of installed magical gadgets
+  hasWeaponStationUpgrade?: boolean; // Whether custom weapon station is installed
   // Status
   isInoperative?: boolean; // True when HP reaches 0 - crew ejected, vehicle disabled
   // Temporary effects from complications

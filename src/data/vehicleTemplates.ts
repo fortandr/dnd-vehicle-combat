@@ -156,6 +156,81 @@ export const MAGICAL_GADGETS: MagicalGadget[] = [
 ];
 
 // ==========================================
+// Weapon Station Upgrade (Custom addition)
+// Can be added to any vehicle except Devil's Ride
+// ==========================================
+
+export interface WeaponStationUpgrade {
+  id: string;
+  name: string;
+  description: string;
+  zoneId: string;
+  zoneName: string;
+  cover: 'none' | 'half' | 'three_quarters' | 'full';
+  capacity: number;
+  visibleFromArcs: ('front' | 'rear' | 'left' | 'right')[];
+  defaultWeapon: WeaponTemplate;
+}
+
+// Vehicle-specific weapon station configurations
+const WEAPON_STATION_CONFIGS: Record<string, { zoneName: string; visibleFromArcs: ('front' | 'rear' | 'left' | 'right')[]; description: string }> = {
+  buzz_killer: {
+    zoneName: 'Rear Weapon Station',
+    visibleFromArcs: ['rear', 'left', 'right'],
+    description: 'A custom-mounted weapon platform at the rear of the vehicle. 270° arc of fire covering rear, port, and starboard.',
+  },
+  tormentor: {
+    zoneName: 'Rear Weapon Station',
+    visibleFromArcs: ['rear', 'left', 'right'],
+    description: 'A custom-mounted weapon platform at the rear of the vehicle. 270° arc of fire covering rear, port, and starboard.',
+  },
+  scavenger: {
+    zoneName: 'Front Weapon Station',
+    visibleFromArcs: ['front', 'left', 'right'],
+    description: 'A custom-mounted weapon platform at the front of the vehicle. 270° arc of fire covering front, port, and starboard.',
+  },
+  demon_grinder: {
+    zoneName: 'Front Weapon Station',
+    visibleFromArcs: ['front', 'left', 'right'],
+    description: 'A custom-mounted weapon platform at the front of the vehicle. 270° arc of fire covering front, port, and starboard.',
+  },
+};
+
+// Default config for any other vehicle
+const DEFAULT_WEAPON_STATION_CONFIG = {
+  zoneName: 'Custom Weapon Station',
+  visibleFromArcs: ['front', 'left', 'right'] as ('front' | 'rear' | 'left' | 'right')[],
+  description: 'A custom-mounted weapon platform added to the vehicle. Includes a swappable weapon station with a standard harpoon flinger.',
+};
+
+// Base weapon station upgrade (use getWeaponStationUpgrade for vehicle-specific config)
+export const WEAPON_STATION_UPGRADE: WeaponStationUpgrade = {
+  id: 'custom_weapon_station',
+  name: 'Custom Weapon Station',
+  description: DEFAULT_WEAPON_STATION_CONFIG.description,
+  zoneId: 'custom_weapon_station',
+  zoneName: DEFAULT_WEAPON_STATION_CONFIG.zoneName,
+  cover: 'half',
+  capacity: 1,
+  visibleFromArcs: DEFAULT_WEAPON_STATION_CONFIG.visibleFromArcs,
+  defaultWeapon: HARPOON_FLINGER_STANDARD,
+};
+
+// Get vehicle-specific weapon station configuration
+export function getWeaponStationUpgrade(vehicleTemplateId: string): WeaponStationUpgrade {
+  const config = WEAPON_STATION_CONFIGS[vehicleTemplateId] || DEFAULT_WEAPON_STATION_CONFIG;
+  return {
+    ...WEAPON_STATION_UPGRADE,
+    zoneName: config.zoneName,
+    visibleFromArcs: config.visibleFromArcs,
+    description: config.description,
+  };
+}
+
+// Vehicles that cannot have the weapon station upgrade
+export const WEAPON_STATION_EXCLUDED_VEHICLES = ['devils_ride'];
+
+// ==========================================
 // Standard Vehicle Weapons
 // ==========================================
 

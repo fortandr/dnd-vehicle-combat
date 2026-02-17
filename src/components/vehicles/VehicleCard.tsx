@@ -41,7 +41,7 @@ import { Vehicle, VehicleZone, CrewAssignment, Mishap, VehicleWeapon } from '../
 import { useCombat } from '../../context/CombatContext';
 import { getMishapResult, getMishapSeverity, canRepairMishap, getRepairDescription, checkMishapFromDamage, rollMishapForVehicle } from '../../data/mishapTable';
 import { v4 as uuid } from 'uuid';
-import { SWAPPABLE_WEAPONS, ARMOR_UPGRADES, MAGICAL_GADGETS } from '../../data/vehicleTemplates';
+import { SWAPPABLE_WEAPONS, ARMOR_UPGRADES, MAGICAL_GADGETS, getWeaponStationUpgrade, WEAPON_STATION_EXCLUDED_VEHICLES } from '../../data/vehicleTemplates';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
 
 interface VehicleCardProps {
@@ -114,7 +114,7 @@ function getEffectiveDamageThreshold(vehicle: Vehicle): number {
 }
 
 export function VehicleCard({ vehicle }: VehicleCardProps) {
-  const { state, applyMishap, dispatch, removeVehicle, swapVehicleWeapon, setVehicleArmor, toggleVehicleGadget } = useCombat();
+  const { state, applyMishap, dispatch, removeVehicle, swapVehicleWeapon, setVehicleArmor, toggleVehicleGadget, toggleWeaponStationUpgrade } = useCombat();
   const [damageAmount, setDamageAmount] = useState('');
   const [lastMishapResult, setLastMishapResult] = useState<{ roll: number; mishap: Mishap } | null>(null);
   const [showMishapResult, setShowMishapResult] = useState(false);
@@ -513,6 +513,26 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                 assignments={crewAssignments.filter((a) => a.zoneId === zone.id)}
               />
             ))}
+            {/* Custom Weapon Station Zone (if upgrade installed) */}
+            {vehicle.hasWeaponStationUpgrade && (() => {
+              const wsConfig = getWeaponStationUpgrade(vehicle.template.id);
+              return (
+                <CrewZone
+                  key={wsConfig.zoneId}
+                  zone={{
+                    id: wsConfig.zoneId,
+                    name: wsConfig.zoneName,
+                    cover: wsConfig.cover,
+                    capacity: wsConfig.capacity,
+                    canAttackOut: true,
+                    visibleFromArcs: wsConfig.visibleFromArcs,
+                    description: wsConfig.description,
+                  }}
+                  vehicleId={vehicle.id}
+                  assignments={crewAssignments.filter((a) => a.zoneId === wsConfig.zoneId)}
+                />
+              );
+            })()}
           </Stack>
         </Box>
 
@@ -685,6 +705,55 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                 </Paper>
               )}
             </Box>
+
+            {/* Custom Weapon Station Upgrade - not available for Devil's Ride */}
+            {!WEAPON_STATION_EXCLUDED_VEHICLES.includes(vehicle.template.id) && (() => {
+              const wsConfig = getWeaponStationUpgrade(vehicle.template.id);
+              return (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                    Weapon Station Upgrade
+                  </Typography>
+                  <Paper
+                    sx={{
+                      p: 1,
+                      bgcolor: vehicle.hasWeaponStationUpgrade ? withOpacity('#f59e0b', 0.1) : '#242424',
+                      border: vehicle.hasWeaponStationUpgrade ? 1 : 0,
+                      borderColor: '#f59e0b',
+                      cursor: 'pointer',
+                      '&:hover': { bgcolor: vehicle.hasWeaponStationUpgrade ? withOpacity('#f59e0b', 0.15) : '#2a2a2a' },
+                    }}
+                    onClick={() => toggleWeaponStationUpgrade(vehicle.id)}
+                  >
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={vehicle.hasWeaponStationUpgrade || false}
+                          size="small"
+                          sx={{ p: 0.5, mr: 1 }}
+                        />
+                      }
+                      label={
+                        <Box>
+                          <Typography variant="body2" fontWeight={600}>
+                            {wsConfig.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {wsConfig.zoneName} • {wsConfig.cover} cover
+                          </Typography>
+                        </Box>
+                      }
+                      sx={{ m: 0, width: '100%' }}
+                    />
+                    {vehicle.hasWeaponStationUpgrade && (
+                      <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#f59e0b' }}>
+                        {wsConfig.description}
+                      </Typography>
+                    )}
+                  </Paper>
+                </Box>
+              );
+            })()}
 
             {/* Magical Gadgets */}
             <Box>
