@@ -982,7 +982,13 @@ function CrewHPSection({ vehicleId, assignments }: CrewHPSectionProps) {
 
   const crewData = assignments.map((a) => {
     const creature = state.creatures.find((c) => c.id === a.creatureId);
-    const zone = vehicle?.template.zones.find((z) => z.id === a.zoneId);
+    let zone = vehicle?.template.zones.find((z) => z.id === a.zoneId);
+    if (!zone && vehicle?.hasWeaponStationUpgrade) {
+      const wsConfig = getWeaponStationUpgrade(vehicle.template.id);
+      if (a.zoneId === wsConfig.zoneId) {
+        zone = { id: wsConfig.zoneId, name: wsConfig.zoneName, cover: wsConfig.cover, capacity: wsConfig.capacity, canAttackOut: true, visibleFromArcs: wsConfig.visibleFromArcs };
+      }
+    }
     return { creature, zone, assignment: a };
   }).filter((c) => c.creature);
 
