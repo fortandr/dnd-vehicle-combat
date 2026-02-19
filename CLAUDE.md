@@ -78,7 +78,7 @@ The app uses a storage abstraction layer that switches between localStorage and 
 
 ### Deploy to Firebase
 ```bash
-npm run build && npx firebase deploy
+npm run build && npx firebase deploy --force
 ```
 
 ### Run locally

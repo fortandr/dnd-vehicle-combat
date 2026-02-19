@@ -14,6 +14,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.7.0',
+    date: '2026-02-19',
+    changes: [
+      { type: 'feature', description: 'Added custom weapon station upgrade for vehicles' },
+      { type: 'fix', description: 'Fixed custom weapon station to properly convert passenger seat' },
+      { type: 'improvement', description: 'Extended metric units to BattlefieldMap, PlayerViewMap, TargetStatus, and VehicleCard (community contribution by @fuinotto)' },
+      { type: 'fix', description: 'Fixed Firebase deploy hanging in non-interactive environments' },
+    ],
+  },
+  {
     version: '1.6.0',
     date: '2026-02-19',
     changes: [
