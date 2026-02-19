@@ -22,6 +22,7 @@ import { useSettings } from '../../context/SettingsContext';
 import { Vehicle, Position, ScaleName, Creature, CrewAssignment, ElevationZone } from '../../types';
 import { SCALES, formatDistance, formatDistanceWithUnit, getScaleForDistance, calculateMovementPerRound } from '../../data/scaleConfig';
 import { getVehicleElevation } from '../../utils/elevationCalculator';
+import { resolveZone } from '../../data/vehicleTemplates';
 import { useBroadcastSource } from '../../hooks/useBroadcastChannel';
 import { featureFlags } from '../../config/featureFlags';
 
@@ -4021,7 +4022,7 @@ function getWeaponRangesByArc(
 
     // Always use the zone template's visibleFromArcs as the authoritative source
     // This ensures saved encounters get correct arcs even if weapon data was saved incorrectly
-    const zone = vehicle.template.zones.find((z) => z.id === weapon.zoneId);
+    const zone = resolveZone(vehicle, weapon.zoneId);
     const arcs = zone?.visibleFromArcs || weapon.visibleFromArcs || ['front', 'rear', 'left', 'right'];
 
     for (const arc of arcs) {

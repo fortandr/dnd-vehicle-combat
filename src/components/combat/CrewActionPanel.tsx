@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import { Vehicle, Creature, VehicleZone } from '../../types';
+import { resolveZone } from '../../data/vehicleTemplates';
 import { useCombat } from '../../context/CombatContext';
 import {
   calculateCoverWithElevation,
@@ -84,7 +85,7 @@ export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
     .filter((a) => a.vehicleId === vehicle.id)
     .map((a) => ({
       creature: state.creatures.find((c) => c.id === a.creatureId),
-      zone: vehicle.template.zones.find((z) => z.id === a.zoneId),
+      zone: resolveZone(vehicle, a.zoneId),
       assignment: a,
     }))
     .filter((c) => c.creature);
@@ -123,7 +124,7 @@ export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
       (a) => a.creatureId === attackerCreatureId
     );
     const attackerZone = attackerAssignment
-      ? vehicle.template.zones.find((z) => z.id === attackerAssignment.zoneId)
+      ? resolveZone(vehicle, attackerAssignment.zoneId)
       : undefined;
 
     // Add creatures on other vehicles
@@ -136,7 +137,7 @@ export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
 
       vehicleCrewAssignments.forEach((assignment) => {
         const targetCreature = state.creatures.find((c) => c.id === assignment.creatureId);
-        const targetZone = targetVehicle.template.zones.find((z) => z.id === assignment.zoneId);
+        const targetZone = resolveZone(targetVehicle, assignment.zoneId);
 
         if (targetCreature && targetZone) {
           const cover = calculateCoverWithElevation(vehicle, targetVehicle, targetZone, state.elevationZones);

@@ -41,7 +41,7 @@ import { Vehicle, VehicleZone, CrewAssignment, Mishap, VehicleWeapon } from '../
 import { useCombat } from '../../context/CombatContext';
 import { getMishapResult, getMishapSeverity, canRepairMishap, getRepairDescription, checkMishapFromDamage, rollMishapForVehicle } from '../../data/mishapTable';
 import { v4 as uuid } from 'uuid';
-import { SWAPPABLE_WEAPONS, ARMOR_UPGRADES, MAGICAL_GADGETS, getWeaponStationUpgrade, WEAPON_STATION_EXCLUDED_VEHICLES } from '../../data/vehicleTemplates';
+import { SWAPPABLE_WEAPONS, ARMOR_UPGRADES, MAGICAL_GADGETS, getWeaponStationUpgrade, WEAPON_STATION_EXCLUDED_VEHICLES, resolveZone } from '../../data/vehicleTemplates';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
 
 interface VehicleCardProps {
@@ -982,13 +982,7 @@ function CrewHPSection({ vehicleId, assignments }: CrewHPSectionProps) {
 
   const crewData = assignments.map((a) => {
     const creature = state.creatures.find((c) => c.id === a.creatureId);
-    let zone = vehicle?.template.zones.find((z) => z.id === a.zoneId);
-    if (!zone && vehicle?.hasWeaponStationUpgrade) {
-      const wsConfig = getWeaponStationUpgrade(vehicle.template.id);
-      if (a.zoneId === wsConfig.zoneId) {
-        zone = { id: wsConfig.zoneId, name: wsConfig.zoneName, cover: wsConfig.cover, capacity: wsConfig.capacity, canAttackOut: true, visibleFromArcs: wsConfig.visibleFromArcs };
-      }
-    }
+    const zone = vehicle ? resolveZone(vehicle, a.zoneId) : undefined;
     return { creature, zone, assignment: a };
   }).filter((c) => c.creature);
 
@@ -1244,7 +1238,7 @@ function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
     .filter((a) => a.vehicleId === vehicleId && a.creatureId !== selectedCreatureId)
     .map((a) => {
       const creature = state.creatures.find((c) => c.id === a.creatureId);
-      const crewZone = vehicle?.template.zones.find((z) => z.id === a.zoneId);
+      const crewZone = vehicle ? resolveZone(vehicle, a.zoneId) : undefined;
       return { assignment: a, creature, zone: crewZone };
     })
     .filter((c) => c.creature && c.creature.currentHp > 0); // Only living crew can swap

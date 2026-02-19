@@ -29,7 +29,7 @@ import {
   ElevationZone,
 } from '../types';
 import { getScaleForDistance, SCALES } from '../data/scaleConfig';
-import { getWeaponStationUpgrade } from '../data/vehicleTemplates';
+import { getWeaponStationUpgrade, resolveZone } from '../data/vehicleTemplates';
 import { logAnalyticsEvent } from '../firebase';
 import { v4 as uuid } from 'uuid';
 import { loadCurrentEncounter } from '../hooks/useLocalStorage';
@@ -359,14 +359,29 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         vehicles: [...state.vehicles, action.payload],
       };
 
-    case 'REMOVE_VEHICLE':
+    case 'REMOVE_VEHICLE': {
+      const removedVehicleId = action.payload;
+      const newInitiativeOrder = state.initiativeOrder.filter(
+        (id) => id !== removedVehicleId
+      );
+      // Adjust currentTurnIndex if the removed vehicle was before/at the current turn
+      let newTurnIndex = state.currentTurnIndex;
+      const removedIndex = state.initiativeOrder.indexOf(removedVehicleId);
+      if (removedIndex !== -1 && removedIndex < state.currentTurnIndex) {
+        newTurnIndex = Math.max(0, newTurnIndex - 1);
+      } else if (removedIndex === state.currentTurnIndex && newTurnIndex >= newInitiativeOrder.length) {
+        newTurnIndex = Math.max(0, newInitiativeOrder.length - 1);
+      }
       return {
         ...state,
-        vehicles: state.vehicles.filter((v) => v.id !== action.payload),
+        vehicles: state.vehicles.filter((v) => v.id !== removedVehicleId),
         crewAssignments: state.crewAssignments.filter(
-          (a) => a.vehicleId !== action.payload
+          (a) => a.vehicleId !== removedVehicleId
         ),
+        initiativeOrder: newInitiativeOrder,
+        currentTurnIndex: newTurnIndex,
       };
+    }
 
     case 'UPDATE_VEHICLE': {
       const vehicle = state.vehicles.find((v) => v.id === action.payload.id);
@@ -562,7 +577,7 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         const assignment = state.crewAssignments.find((a) => a.creatureId === creature.id);
         if (assignment) {
           const vehicle = state.vehicles.find((v) => v.id === assignment.vehicleId);
-          const zone = vehicle?.template.zones.find((z) => z.id === assignment.zoneId);
+          const zone = vehicle ? resolveZone(vehicle, assignment.zoneId) : undefined;
           logEntries.push(
             createLogEntry(
               state.round,
@@ -1090,7 +1105,7 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         const assignment = state.crewAssignments.find((a) => a.creatureId === creature.id);
         if (assignment) {
           const vehicle = state.vehicles.find((v) => v.id === assignment.vehicleId);
-          const zone = vehicle?.template.zones.find((z) => z.id === assignment.zoneId);
+          const zone = vehicle ? resolveZone(vehicle, assignment.zoneId) : undefined;
           logEntries.push(
             createLogEntry(
               state.round,

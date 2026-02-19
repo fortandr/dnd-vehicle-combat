@@ -20,6 +20,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { useCombat } from '../../context/CombatContext';
 import { Vehicle, Mishap, Creature, VehicleZone } from '../../types';
+import { resolveZone } from '../../data/vehicleTemplates';
 import { getMishapResult, getMishapSeverity, checkMishapFromDamage, canRepairMishap, getRepairDescription, rollMishapForVehicle } from '../../data/mishapTable';
 import { v4 as uuid } from 'uuid';
 import { factionColors, withOpacity } from '../../theme/customColors';
@@ -165,7 +166,7 @@ export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsP
     .filter((a) => a.vehicleId === vehicle.id)
     .map((a) => {
       const creature = state.creatures.find((c) => c.id === a.creatureId);
-      const zone = vehicle.template.zones.find((z) => z.id === a.zoneId);
+      const zone = resolveZone(vehicle, a.zoneId);
       return { creature, zone, assignment: a };
     })
     .filter((c) => c.creature);

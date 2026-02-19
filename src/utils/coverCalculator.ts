@@ -4,6 +4,7 @@
  */
 
 import { Vehicle, VehicleZone, Position, CoverType, ElevationZone } from '../types';
+import { resolveZone } from '../data/vehicleTemplates';
 import {
   getVehicleElevation,
   getPositionElevation,
@@ -237,7 +238,7 @@ export function getTargetsWithCover(
   return targetCreatures
     .map((tc) => {
       const creature = creatures.find((c) => c.id === tc.creatureId);
-      const zone = targetVehicle.template.zones.find((z) => z.id === tc.zoneId);
+      const zone = resolveZone(targetVehicle, tc.zoneId);
 
       if (!creature || !zone) return null;
 

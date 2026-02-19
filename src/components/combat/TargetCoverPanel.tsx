@@ -13,6 +13,7 @@ import {
 import { useCombat } from '../../context/CombatContext';
 import { useSettings } from '../../context/SettingsContext';
 import { Vehicle, Creature, VehicleZone, Position, VehicleWeapon } from '../../types';
+import { resolveZone } from '../../data/vehicleTemplates';
 import {
   calculateCoverWithElevation,
   calculateCoverFromPositionWithElevation,
@@ -97,7 +98,7 @@ export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFa
       .filter((a) => a.vehicleId === targetVehicle.id)
       .map((a) => {
         const creature = state.creatures.find((c) => c.id === a.creatureId);
-        const zone = targetVehicle.template.zones.find((z) => z.id === a.zoneId);
+        const zone = resolveZone(targetVehicle, a.zoneId);
         if (!creature || !zone) return null;
 
         // Calculate cover from vehicle or from creature position (with elevation)

@@ -26,6 +26,8 @@ export const changelog: ChangelogEntry[] = [
       { type: 'fix', description: 'Fixed loading encounters with corrupted timestamps from earlier saves' },
       { type: 'fix', description: 'Fixed map resize warning dialog spamming on every slider tick — now debounced so it appears once after adjusting' },
       { type: 'fix', description: 'Fixed Firebase deploy hanging in non-interactive environments' },
+      { type: 'fix', description: 'Fixed crew zone lookups failing for custom weapon stations across all panels (unified resolveZone utility)' },
+      { type: 'fix', description: 'Fixed removing a vehicle during combat leaving stale entries in initiative order' },
     ],
   },
   {

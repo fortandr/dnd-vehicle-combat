@@ -8,6 +8,7 @@ import { useBroadcastReceiver, BattlefieldSyncState } from '../../hooks/useBroad
 import { SCALES, formatDistanceWithUnit } from '../../data/scaleConfig';
 import { Vehicle, Creature, Position, VehicleWeapon, CrewAssignment, ElevationZone } from '../../types';
 import { featureFlags } from '../../config/featureFlags';
+import { resolveZone } from '../../data/vehicleTemplates';
 
 export function PlayerViewMap() {
   const { state, isConnected } = useBroadcastReceiver();
@@ -531,7 +532,7 @@ function getWeaponRangesByArc(
 
     // Always use the zone template's visibleFromArcs as the authoritative source
     // This ensures saved encounters get correct arcs even if weapon data was saved incorrectly
-    const zone = vehicle.template.zones.find((z) => z.id === weapon.zoneId);
+    const zone = resolveZone(vehicle, weapon.zoneId);
     const arcs = zone?.visibleFromArcs || weapon.visibleFromArcs || ['front', 'rear', 'left', 'right'];
 
     for (const arc of arcs) {

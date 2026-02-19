@@ -230,6 +230,20 @@ export function getWeaponStationUpgrade(vehicleTemplateId: string): WeaponStatio
 // Vehicles that cannot have the weapon station upgrade
 export const WEAPON_STATION_EXCLUDED_VEHICLES = ['devils_ride'];
 
+// Resolve a zone by ID, including custom weapon station fallback.
+// Use this instead of vehicle.template.zones.find() when looking up crew assignment zones.
+export function resolveZone(vehicle: { template: { id: string; zones: VehicleZone[] }; hasWeaponStationUpgrade?: boolean }, zoneId: string): VehicleZone | undefined {
+  const zone = vehicle.template.zones.find((z) => z.id === zoneId);
+  if (zone) return zone;
+  if (vehicle.hasWeaponStationUpgrade) {
+    const wsConfig = getWeaponStationUpgrade(vehicle.template.id);
+    if (zoneId === wsConfig.zoneId) {
+      return { id: wsConfig.zoneId, name: wsConfig.zoneName, cover: wsConfig.cover, capacity: wsConfig.capacity, canAttackOut: true, visibleFromArcs: wsConfig.visibleFromArcs };
+    }
+  }
+  return undefined;
+}
+
 // ==========================================
 // Standard Vehicle Weapons
 // ==========================================

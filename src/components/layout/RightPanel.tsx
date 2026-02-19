@@ -13,6 +13,7 @@ import {
   Paper,
 } from '@mui/material';
 import { useCombat } from '../../context/CombatContext';
+import { resolveZone } from '../../data/vehicleTemplates';
 import { TargetCoverPanel } from '../combat/TargetCoverPanel';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
 import {
@@ -203,7 +204,7 @@ function CurrentTurnInfo() {
       .filter((a) => a.vehicleId === currentTurnVehicle.id)
       .map((a) => {
         const creature = state.creatures.find((c) => c.id === a.creatureId);
-        const zone = currentTurnVehicle.template.zones.find((z) => z.id === a.zoneId);
+        const zone = resolveZone(currentTurnVehicle, a.zoneId);
         // Find weapon at this zone
         const weapon = currentTurnVehicle.weapons.find((w) => w.zoneId === a.zoneId);
         return { creature, zone, weapon, isDriver: creature?.id === currentTurnDriver?.id };
@@ -508,7 +509,7 @@ function CurrentTurnInfo() {
   const vehicle = assignment
     ? state.vehicles.find((v) => v.id === assignment.vehicleId)
     : null;
-  const zone = vehicle?.template.zones.find((z) => z.id === assignment?.zoneId);
+  const zone = vehicle && assignment ? resolveZone(vehicle, assignment.zoneId) : undefined;
 
   const coverColor = zone ? coverColors[zone.cover as keyof typeof coverColors] : undefined;
 

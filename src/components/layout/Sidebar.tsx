@@ -47,6 +47,7 @@ import SkullIcon from '@mui/icons-material/Dangerous';
 import Tooltip from '@mui/material/Tooltip';
 import { useCombat } from '../../context/CombatContext';
 import { Creature, Statblock } from '../../types';
+import { resolveZone } from '../../data/vehicleTemplates';
 import { factionColors, withOpacity } from '../../theme/customColors';
 
 // Quick presets for NPCs/Enemies
@@ -550,7 +551,7 @@ export function Sidebar() {
     const vehicle = state.vehicles.find(v => v.id === assignment.vehicleId);
     if (!vehicle) return undefined;
 
-    const zone = vehicle.template.zones.find(z => z.id === assignment.zoneId);
+    const zone = resolveZone(vehicle, assignment.zoneId);
     const isDriver = assignment.zoneId === 'helm' || assignment.zoneId === 'rider';
 
     return {
@@ -613,7 +614,7 @@ export function Sidebar() {
                     .filter((a) => a.vehicleId === vehicle.id)
                     .map((a) => ({
                       creature: state.creatures.find((c) => c.id === a.creatureId),
-                      zone: vehicle.template.zones.find((z) => z.id === a.zoneId),
+                      zone: resolveZone(vehicle, a.zoneId),
                     }))
                     .filter((c) => c.creature);
 
