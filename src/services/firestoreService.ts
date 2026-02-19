@@ -39,6 +39,23 @@ function getFirestore() {
   return db;
 }
 
+// Recursively strip undefined values from an object (Firestore rejects undefined fields)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function stripUndefined(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) return obj.map(stripUndefined);
+  if (typeof obj === 'object' && !(obj instanceof Timestamp)) {
+    const cleaned: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = stripUndefined(value);
+      }
+    }
+    return cleaned;
+  }
+  return obj;
+}
+
 // Convert Firestore Timestamp to ISO string
 function timestampToString(timestamp: Timestamp | string | undefined): string {
   if (!timestamp) return new Date().toISOString();
@@ -60,12 +77,12 @@ export const firestoreService: StorageService = {
     const firestore = getFirestore();
 
     const encounterRef = doc(firestore, 'users', userId, 'encounters', id);
-    await setDoc(encounterRef, {
+    await setDoc(encounterRef, stripUndefined({
       name,
       data,
       savedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    });
+    }));
   },
 
   async loadEncounter(id: string): Promise<SavedEncounter | null> {
@@ -125,10 +142,10 @@ export const firestoreService: StorageService = {
     const firestore = getFirestore();
 
     const currentRef = doc(firestore, 'users', userId, 'current', 'encounter');
-    await setDoc(currentRef, {
+    await setDoc(currentRef, stripUndefined({
       data,
       updatedAt: serverTimestamp(),
-    });
+    }));
   },
 
   async loadCurrentEncounter(): Promise<unknown | null> {
@@ -171,11 +188,11 @@ export const firestoreService: StorageService = {
     const firestore = getFirestore();
 
     const presetRef = doc(firestore, 'users', userId, 'partyPresets', id);
-    await setDoc(presetRef, {
+    await setDoc(presetRef, stripUndefined({
       name,
       data,
       savedAt: serverTimestamp(),
-    });
+    }));
   },
 
   async listPartyPresets(): Promise<PartyPreset[]> {
@@ -215,10 +232,10 @@ export const firestoreService: StorageService = {
     const archiveData = archive as CombatArchive;
 
     const archiveRef = doc(firestore, 'users', userId, 'combatArchives', archiveData.id);
-    await setDoc(archiveRef, {
+    await setDoc(archiveRef, stripUndefined({
       ...archiveData,
       completedAt: serverTimestamp(),
-    });
+    }));
   },
 
   async listCombatArchives(): Promise<CombatArchive[]> {
