@@ -39,29 +39,22 @@ function getFirestore() {
   return db;
 }
 
-// Recursively strip undefined values from an object (Firestore rejects undefined fields)
-// Only recurses into plain objects — preserves Timestamp, FieldValue sentinels, Dates, etc.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function stripUndefined(obj: any): any {
-  if (obj === null || obj === undefined) return null;
-  if (Array.isArray(obj)) return obj.map(stripUndefined);
-  if (typeof obj === 'object' && Object.getPrototypeOf(obj) === Object.prototype) {
-    const cleaned: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (value !== undefined) {
-        cleaned[key] = stripUndefined(value);
-      }
-    }
-    return cleaned;
-  }
-  return obj;
+// Sanitize user data for Firestore by round-tripping through JSON.
+// This strips undefined, class instances, circular refs, and any non-serializable values.
+function cleanForFirestore(data: unknown): unknown {
+  return JSON.parse(JSON.stringify(data));
 }
 
 // Convert Firestore Timestamp to ISO string
-function timestampToString(timestamp: Timestamp | string | undefined): string {
+// Also handles corrupted timestamps stored as plain {seconds, nanoseconds} objects
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function timestampToString(timestamp: any): string {
   if (!timestamp) return new Date().toISOString();
   if (typeof timestamp === 'string') return timestamp;
-  return timestamp.toDate().toISOString();
+  if (typeof timestamp.toDate === 'function') return timestamp.toDate().toISOString();
+  // Handle corrupted timestamps (plain objects with seconds field)
+  if (typeof timestamp.seconds === 'number') return new Date(timestamp.seconds * 1000).toISOString();
+  return new Date().toISOString();
 }
 
 // ==========================================
@@ -78,12 +71,12 @@ export const firestoreService: StorageService = {
     const firestore = getFirestore();
 
     const encounterRef = doc(firestore, 'users', userId, 'encounters', id);
-    await setDoc(encounterRef, stripUndefined({
+    await setDoc(encounterRef, {
       name,
-      data,
+      data: cleanForFirestore(data),
       savedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }));
+    });
   },
 
   async loadEncounter(id: string): Promise<SavedEncounter | null> {
@@ -143,10 +136,10 @@ export const firestoreService: StorageService = {
     const firestore = getFirestore();
 
     const currentRef = doc(firestore, 'users', userId, 'current', 'encounter');
-    await setDoc(currentRef, stripUndefined({
-      data,
+    await setDoc(currentRef, {
+      data: cleanForFirestore(data),
       updatedAt: serverTimestamp(),
-    }));
+    });
   },
 
   async loadCurrentEncounter(): Promise<unknown | null> {
@@ -189,11 +182,11 @@ export const firestoreService: StorageService = {
     const firestore = getFirestore();
 
     const presetRef = doc(firestore, 'users', userId, 'partyPresets', id);
-    await setDoc(presetRef, stripUndefined({
+    await setDoc(presetRef, {
       name,
-      data,
+      data: cleanForFirestore(data),
       savedAt: serverTimestamp(),
-    }));
+    });
   },
 
   async listPartyPresets(): Promise<PartyPreset[]> {
@@ -233,10 +226,11 @@ export const firestoreService: StorageService = {
     const archiveData = archive as CombatArchive;
 
     const archiveRef = doc(firestore, 'users', userId, 'combatArchives', archiveData.id);
-    await setDoc(archiveRef, stripUndefined({
-      ...archiveData,
+    const { id: _id, ...cleanArchive } = archiveData;
+    await setDoc(archiveRef, {
+      ...cleanForFirestore(cleanArchive) as Record<string, unknown>,
       completedAt: serverTimestamp(),
-    }));
+    });
   },
 
   async listCombatArchives(): Promise<CombatArchive[]> {
