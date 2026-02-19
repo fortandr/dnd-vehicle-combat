@@ -16,7 +16,8 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { db, auth } from '../firebase';
+import { ref, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, auth, storage } from '../firebase';
 import type { StorageService } from './storageService';
 import type { SavedEncounter, PartyPreset, CombatArchive } from './localStorageService';
 
@@ -45,6 +46,40 @@ function cleanForFirestore(data: unknown): unknown {
   return JSON.parse(JSON.stringify(data));
 }
 
+// Upload a data URL image to Firebase Storage and return the download URL
+async function uploadBattlemapImage(userId: string, imageKey: string, dataUrl: string): Promise<string> {
+  if (!storage) throw new Error('Firebase Storage is not initialized');
+  const imageRef = ref(storage, `users/${userId}/battlemap-images/${imageKey}`);
+  await uploadString(imageRef, dataUrl, 'data_url');
+  return getDownloadURL(imageRef);
+}
+
+// Delete a battlemap image from Firebase Storage (best-effort)
+async function deleteBattlemapImage(userId: string, imageKey: string): Promise<void> {
+  if (!storage) return;
+  try {
+    const imageRef = ref(storage, `users/${userId}/battlemap-images/${imageKey}`);
+    await deleteObject(imageRef);
+  } catch {
+    // Ignore — file may not exist
+  }
+}
+
+// Extract background image data URL from combat state, upload to Storage,
+// and replace with download URL. Returns cleaned data ready for Firestore.
+async function extractAndUploadImage(userId: string, imageKey: string, data: unknown): Promise<unknown> {
+  const cleaned = cleanForFirestore(data) as Record<string, unknown>;
+  const battlefield = cleaned.battlefield as Record<string, unknown> | undefined;
+  const bgImage = battlefield?.backgroundImage as Record<string, unknown> | undefined;
+
+  if (bgImage?.url && typeof bgImage.url === 'string' && bgImage.url.startsWith('data:')) {
+    const downloadUrl = await uploadBattlemapImage(userId, imageKey, bgImage.url);
+    bgImage.url = downloadUrl;
+  }
+
+  return cleaned;
+}
+
 // Convert Firestore Timestamp to ISO string
 // Also handles corrupted timestamps stored as plain {seconds, nanoseconds} objects
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,10 +105,11 @@ export const firestoreService: StorageService = {
     const userId = getUserId();
     const firestore = getFirestore();
 
+    const cleanedData = await extractAndUploadImage(userId, `encounter-${id}`, data);
     const encounterRef = doc(firestore, 'users', userId, 'encounters', id);
     await setDoc(encounterRef, {
       name,
-      data: cleanForFirestore(data),
+      data: cleanedData,
       savedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -124,6 +160,7 @@ export const firestoreService: StorageService = {
 
     const encounterRef = doc(firestore, 'users', userId, 'encounters', id);
     await deleteDoc(encounterRef);
+    await deleteBattlemapImage(userId, `encounter-${id}`);
   },
 
   // ==========================================
@@ -135,9 +172,10 @@ export const firestoreService: StorageService = {
     const userId = getUserId();
     const firestore = getFirestore();
 
+    const cleanedData = await extractAndUploadImage(userId, 'current', data);
     const currentRef = doc(firestore, 'users', userId, 'current', 'encounter');
     await setDoc(currentRef, {
-      data: cleanForFirestore(data),
+      data: cleanedData,
       updatedAt: serverTimestamp(),
     });
   },
