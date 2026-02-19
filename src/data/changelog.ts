@@ -19,6 +19,7 @@ export const changelog: ChangelogEntry[] = [
     changes: [
       { type: 'feature', description: 'Added custom weapon station upgrade for vehicles' },
       { type: 'fix', description: 'Fixed custom weapon station to properly convert passenger seat' },
+      { type: 'fix', description: 'Fixed Crew HP panel showing "-" for crew assigned to custom weapon stations' },
       { type: 'improvement', description: 'Extended metric units to BattlefieldMap, PlayerViewMap, TargetStatus, and VehicleCard (community contribution by @fuinotto)' },
       { type: 'fix', description: 'Fixed encounter saves failing when battlemap background image is set — images now uploaded to Firebase Storage instead of stored inline' },
       { type: 'fix', description: 'Fixed encounter saves failing with undefined field values in Firestore' },
