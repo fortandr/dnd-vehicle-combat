@@ -423,7 +423,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                 </Typography>
               )}
               {!hasSpeedReduction && (
-                <Typography variant="caption" color="text.secondary">Speed</Typography>
+                <Typography variant="caption" color="text.secondary">Speed (ft)</Typography>
               )}
             </Paper>
           </Tooltip>

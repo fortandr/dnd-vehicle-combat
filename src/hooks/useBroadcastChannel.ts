@@ -19,6 +19,7 @@ export interface BattlefieldSyncState {
   phase: CombatPhase;
   dmViewport?: { width: number; height: number };
   showVehicleHealth?: boolean; // Whether to show vehicle HP on player view
+  unitSystem?: 'imperial' | 'metric';
 }
 
 const CHANNEL_NAME = 'avernus-battlefield-sync';

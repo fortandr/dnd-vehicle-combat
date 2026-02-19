@@ -11,6 +11,7 @@ import {
   Stack,
 } from '@mui/material';
 import { useCombat } from '../../context/CombatContext';
+import { useSettings } from '../../context/SettingsContext';
 import { Vehicle, Creature, VehicleZone, Position, VehicleWeapon } from '../../types';
 import {
   calculateCoverWithElevation,
@@ -22,6 +23,7 @@ import {
   parseWeaponRange,
   getModifiedWeaponRange,
 } from '../../utils/elevationCalculator';
+import { formatDistanceWithUnit } from '../../data/scaleConfig';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
 
 // Calculate distance between two positions
@@ -66,6 +68,7 @@ interface TargetCoverPanelProps {
 
 export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFaction }: TargetCoverPanelProps) {
   const { state } = useCombat();
+  const { unitSystem } = useSettings();
 
   // Determine which faction we're attacking (opposite of attacker)
   const targetFaction = attackerVehicle
@@ -168,7 +171,7 @@ export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFa
                 </Box>
                 {distance > 0 && (
                   <Typography variant="caption" fontFamily="monospace" color="text.secondary">
-                    {distance} ft
+                    {formatDistanceWithUnit(distance, unitSystem)}
                   </Typography>
                 )}
               </Box>
@@ -191,6 +194,7 @@ export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFa
                     baseRange={target.baseRange}
                     extendedRange={target.extendedRange}
                     inRange={target.inRange}
+                    unitSystem={unitSystem}
                   />
                 ))}
               </Stack>
@@ -210,9 +214,10 @@ interface TargetStatusCardProps {
   baseRange: number;
   extendedRange: number;
   inRange: boolean;
+  unitSystem: 'imperial' | 'metric';
 }
 
-function TargetStatusCard({ creature, zone, cover, distance, baseRange, extendedRange, inRange }: TargetStatusCardProps) {
+function TargetStatusCard({ creature, zone, cover, distance, baseRange, extendedRange, inRange, unitSystem }: TargetStatusCardProps) {
   const getCoverChipColor = (coverType: string): 'error' | 'warning' | 'success' | 'default' => {
     switch (coverType) {
       case 'none': return 'error';
@@ -299,7 +304,7 @@ function TargetStatusCard({ creature, zone, cover, distance, baseRange, extended
         >
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
             <Typography variant="caption" color="text.secondary">
-              {inRange ? '🎯' : '📏'} {distance} ft away
+              {inRange ? '🎯' : '📏'} {formatDistanceWithUnit(distance, unitSystem)} away
             </Typography>
             <Chip
               label={inRange ? 'In Range' : 'Out of Range'}
@@ -315,12 +320,12 @@ function TargetStatusCard({ creature, zone, cover, distance, baseRange, extended
           </Box>
           {extendedRange > baseRange && (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
-              Range: {baseRange} ft → {extendedRange} ft (elevation bonus)
+              Range: {formatDistanceWithUnit(baseRange, unitSystem)} → {formatDistanceWithUnit(extendedRange, unitSystem)} (elevation bonus)
             </Typography>
           )}
           {extendedRange === baseRange && (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
-              Max range: {baseRange} ft
+              Max range: {formatDistanceWithUnit(baseRange, unitSystem)}
             </Typography>
           )}
         </Box>
