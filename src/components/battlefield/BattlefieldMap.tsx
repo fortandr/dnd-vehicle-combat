@@ -51,6 +51,8 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     oldValue: number;
     newValue: number;
   } | null>(null);
+  const preResizeRef = useRef<{ type: 'feetPerPixel' | 'scale'; oldValue: number } | null>(null);
+  const resizeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isDrawingZone, setIsDrawingZone] = useState(false);
   const [zoneDrawStart, setZoneDrawStart] = useState<Position | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1183,36 +1185,17 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   };
 
   // Handle resize confirmation from dialog
+  // The map resize has already been applied — this only handles position scaling
   const handleResizeConfirm = (scalePositions: boolean) => {
-    if (!pendingResize || !state.battlefield.backgroundImage) {
+    if (!pendingResize) {
       setShowResizeWarning(false);
       setPendingResize(null);
       return;
     }
 
-    const { type, oldValue, newValue } = pendingResize;
-
-    // Calculate the scale factor for positions
-    // If feetPerPixel increases, the map gets bigger, so positions should scale up
-    // If scale increases, the map gets bigger, so positions should scale up
-    const scaleFactor = newValue / oldValue;
-
-    // Apply scaling first if requested
     if (scalePositions) {
+      const scaleFactor = pendingResize.newValue / pendingResize.oldValue;
       applyProportionalScaling(scaleFactor);
-    }
-
-    // Then apply the new map setting
-    if (type === 'feetPerPixel') {
-      setBackgroundImage({
-        ...state.battlefield.backgroundImage,
-        feetPerPixel: newValue,
-      });
-    } else {
-      setBackgroundImage({
-        ...state.battlefield.backgroundImage,
-        scale: newValue,
-      });
     }
 
     setShowResizeWarning(false);
@@ -1223,8 +1206,21 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     if (state.battlefield.backgroundImage) {
       const oldScale = state.battlefield.backgroundImage.scale || 1;
       if (hasMapContent() && scale !== oldScale) {
-        setPendingResize({ type: 'scale', oldValue: oldScale, newValue: scale });
-        setShowResizeWarning(true);
+        // Capture the original value before the user started adjusting
+        if (!preResizeRef.current || preResizeRef.current.type !== 'scale') {
+          preResizeRef.current = { type: 'scale', oldValue: oldScale };
+        }
+        // Apply the change immediately so the user sees the result
+        setBackgroundImage({ ...state.battlefield.backgroundImage, scale });
+        // Debounce the dialog — only show after user stops adjusting
+        if (resizeDebounceRef.current) clearTimeout(resizeDebounceRef.current);
+        resizeDebounceRef.current = setTimeout(() => {
+          if (preResizeRef.current) {
+            setPendingResize({ type: 'scale', oldValue: preResizeRef.current.oldValue, newValue: scale });
+            setShowResizeWarning(true);
+            preResizeRef.current = null;
+          }
+        }, 600);
       } else {
         setBackgroundImage({
           ...state.battlefield.backgroundImage,
@@ -1238,8 +1234,21 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     if (state.battlefield.backgroundImage) {
       const oldFpp = state.battlefield.backgroundImage.feetPerPixel || 1;
       if (hasMapContent() && feetPerPixel !== oldFpp) {
-        setPendingResize({ type: 'feetPerPixel', oldValue: oldFpp, newValue: feetPerPixel });
-        setShowResizeWarning(true);
+        // Capture the original value before the user started adjusting
+        if (!preResizeRef.current || preResizeRef.current.type !== 'feetPerPixel') {
+          preResizeRef.current = { type: 'feetPerPixel', oldValue: oldFpp };
+        }
+        // Apply the change immediately so the user sees the result
+        setBackgroundImage({ ...state.battlefield.backgroundImage, feetPerPixel });
+        // Debounce the dialog — only show after user stops adjusting
+        if (resizeDebounceRef.current) clearTimeout(resizeDebounceRef.current);
+        resizeDebounceRef.current = setTimeout(() => {
+          if (preResizeRef.current) {
+            setPendingResize({ type: 'feetPerPixel', oldValue: preResizeRef.current.oldValue, newValue: feetPerPixel });
+            setShowResizeWarning(true);
+            preResizeRef.current = null;
+          }
+        }, 600);
       } else {
         setBackgroundImage({
           ...state.battlefield.backgroundImage,
