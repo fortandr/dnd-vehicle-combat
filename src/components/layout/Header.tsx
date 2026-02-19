@@ -27,6 +27,8 @@ import {
   ListItemIcon,
   ListItemText,
   Tooltip,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -79,6 +81,7 @@ export function Header() {
   const [showHelpGuide, setShowHelpGuide] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showChangelogDialog, setShowChangelogDialog] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
   const [currentComplicationResult, setCurrentComplicationResult] = useState<{
     roll: number;
     rollRange: string;
@@ -177,31 +180,48 @@ export function Header() {
   }, [state.round, state.phase, state.autoRollComplications, state.scale, prevRound, logComplication, startComplicationResolution]);
 
   const handleSave = async () => {
-    // Update the encounter name in state
-    setEncounterName(saveName);
-    // Mark as saved to enable auto-save
-    markAsSaved();
-    // Save to named encounters list
-    await storageService.saveEncounter(state.id, saveName, { ...state, name: saveName, hasBeenSaved: true });
-    // Force immediate auto-save
-    setTimeout(() => forceSave(), 100);
-    setShowSaveModal(false);
-    // Track analytics
-    logAnalyticsEvent('encounter_saved', { vehicle_count: state.vehicles.length, creature_count: state.creatures.length });
+    try {
+      // Update the encounter name in state
+      setEncounterName(saveName);
+      // Mark as saved to enable auto-save
+      markAsSaved();
+      // Save to named encounters list
+      await storageService.saveEncounter(state.id, saveName, { ...state, name: saveName, hasBeenSaved: true });
+      // Force immediate auto-save
+      setTimeout(() => forceSave(), 100);
+      setShowSaveModal(false);
+      setSnackbar({ open: true, message: 'Encounter saved!', severity: 'success' });
+      // Track analytics
+      logAnalyticsEvent('encounter_saved', { vehicle_count: state.vehicles.length, creature_count: state.creatures.length });
+    } catch (error) {
+      console.error('Failed to save encounter:', error);
+      setSnackbar({ open: true, message: 'Failed to save encounter. Please try again.', severity: 'error' });
+    }
   };
 
   // Quick save for already-saved encounters
   const handleQuickSave = async () => {
-    // Save to named encounters list with current state
-    await storageService.saveEncounter(state.id, state.name, state);
-    // Force immediate auto-save
-    forceSave();
+    try {
+      // Save to named encounters list with current state
+      await storageService.saveEncounter(state.id, state.name, state);
+      // Force immediate auto-save
+      forceSave();
+      setSnackbar({ open: true, message: 'Encounter saved!', severity: 'success' });
+    } catch (error) {
+      console.error('Failed to quick save encounter:', error);
+      setSnackbar({ open: true, message: 'Failed to save encounter. Please try again.', severity: 'error' });
+    }
   };
 
   const handleOpenLoad = async () => {
-    const encounters = await storageService.listEncounters();
-    setSavedEncounters(encounters as SavedEncounter[]);
-    setShowLoadModal(true);
+    try {
+      const encounters = await storageService.listEncounters();
+      setSavedEncounters(encounters as SavedEncounter[]);
+      setShowLoadModal(true);
+    } catch (error) {
+      console.error('Failed to load encounters list:', error);
+      setSnackbar({ open: true, message: 'Failed to load encounters list. Please try again.', severity: 'error' });
+    }
   };
 
   const handleLoad = (encounter: SavedEncounter) => {
@@ -212,9 +232,14 @@ export function Header() {
   };
 
   const handleDelete = async (id: string) => {
-    await storageService.deleteEncounter(id);
-    const encounters = await storageService.listEncounters();
-    setSavedEncounters(encounters as SavedEncounter[]);
+    try {
+      await storageService.deleteEncounter(id);
+      const encounters = await storageService.listEncounters();
+      setSavedEncounters(encounters as SavedEncounter[]);
+    } catch (error) {
+      console.error('Failed to delete encounter:', error);
+      setSnackbar({ open: true, message: 'Failed to delete encounter. Please try again.', severity: 'error' });
+    }
   };
 
   const handleNew = () => {
@@ -223,7 +248,7 @@ export function Header() {
     }
   };
 
-  const handleFinishCombat = () => {
+  const handleFinishCombat = async () => {
     // Create archive from current state
     const archive: CombatArchive = {
       id: uuid(),
@@ -254,7 +279,12 @@ export function Header() {
     };
 
     // Save to archives
-    storageService.saveCombatArchive(archive);
+    try {
+      await storageService.saveCombatArchive(archive);
+    } catch (error) {
+      console.error('Failed to save combat archive:', error);
+      setSnackbar({ open: true, message: 'Failed to save combat archive, but combat will still end.', severity: 'error' });
+    }
 
     // Set current archive for display
     setCurrentArchive(archive);
@@ -840,6 +870,23 @@ export function Header() {
 
       {/* Changelog Dialog */}
       <ChangelogDialog open={showChangelogDialog} onClose={() => setShowChangelogDialog(false)} />
+
+      {/* Save/Load feedback */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </>
   );
 }

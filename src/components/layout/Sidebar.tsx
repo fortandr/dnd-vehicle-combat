@@ -284,6 +284,9 @@ export function Sidebar() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Open5e quantity state
+  const [addQuantity, setAddQuantity] = useState(1);
+
   // Add NPC menu state
   const [addNpcMenuAnchor, setAddNpcMenuAnchor] = useState<null | HTMLElement>(null);
 
@@ -334,17 +337,27 @@ export function Sidebar() {
     }, 300);
   }, []);
 
-  // Add monster from Open5e
+  // Add monster(s) from Open5e
   const handleAddOpen5eMonster = (monster: Open5eMonster) => {
-    const npcCount = state.creatures.filter(c => c.statblock.type !== 'pc').length;
-    const offsetX = (npcCount % 5) * 30 - 60;
-    const offsetY = Math.floor(npcCount / 5) * 30 + 50;
+    const qty = Math.max(1, Math.min(addQuantity, 20));
+    const existingNpcCount = state.creatures.filter(c => c.statblock.type !== 'pc').length;
 
-    const creature = convertOpen5eToCreature(monster, { x: offsetX, y: offsetY });
-    addCreature(creature);
+    for (let i = 0; i < qty; i++) {
+      const index = existingNpcCount + i;
+      const offsetX = (index % 5) * 30 - 60;
+      const offsetY = Math.floor(index / 5) * 30 + 50;
+
+      const creature = convertOpen5eToCreature(monster, { x: offsetX, y: offsetY });
+      // Number the creatures when adding more than one
+      if (qty > 1) {
+        creature.name = `${monster.name} ${i + 1}`;
+      }
+      addCreature(creature);
+    }
     setShowOpen5eSearch(false);
     setSearchQuery('');
     setSearchResults([]);
+    setAddQuantity(1);
   };
 
   const handleAddPC = (classPreset?: { name: string; hp: number; ac: number }) => {
@@ -1019,6 +1032,7 @@ export function Sidebar() {
           setSearchQuery('');
           setSearchResults([]);
           setSearchError(null);
+          setAddQuantity(1);
         }}
         maxWidth="sm"
         fullWidth
@@ -1046,6 +1060,33 @@ export function Sidebar() {
             }}
           />
 
+          {/* Quantity Selector */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <Typography variant="body2" color="text.secondary">Quantity:</Typography>
+            <IconButton
+              size="small"
+              onClick={() => setAddQuantity(q => Math.max(1, q - 1))}
+              disabled={addQuantity <= 1}
+            >
+              <RemoveIcon fontSize="small" />
+            </IconButton>
+            <Typography variant="body1" fontWeight={600} sx={{ minWidth: 24, textAlign: 'center' }}>
+              {addQuantity}
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={() => setAddQuantity(q => Math.min(20, q + 1))}
+              disabled={addQuantity >= 20}
+            >
+              <AddIcon fontSize="small" />
+            </IconButton>
+            {addQuantity > 1 && (
+              <Typography variant="caption" color="text.secondary">
+                (will be numbered, e.g. "Goblin 1", "Goblin 2")
+              </Typography>
+            )}
+          </Box>
+
           {searchError && searchResults.length === 0 && (
             <Typography color="text.secondary" align="center" sx={{ py: 2 }}>
               {searchError}
@@ -1066,6 +1107,14 @@ export function Sidebar() {
                             size="small"
                             sx={{ height: 18, fontSize: '0.625rem' }}
                           />
+                          {addQuantity > 1 && (
+                            <Chip
+                              label={`+${addQuantity}`}
+                              size="small"
+                              color="primary"
+                              sx={{ height: 18, fontSize: '0.625rem' }}
+                            />
+                          )}
                         </Box>
                       }
                       secondary={

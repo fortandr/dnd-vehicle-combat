@@ -14,6 +14,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.6.0',
+    date: '2026-02-19',
+    changes: [
+      { type: 'feature', description: 'Added quantity selector when adding monsters from Open5e — add multiple of the same creature at once' },
+      { type: 'fix', description: 'Fixed encounter saves silently failing with no feedback — save/load/delete operations now show success or error notifications' },
+      { type: 'fix', description: 'Fixed combat archive save being fire-and-forget (now properly awaited)' },
+    ],
+  },
+  {
     version: '1.5.0',
     date: '2026-01-29',
     changes: [
