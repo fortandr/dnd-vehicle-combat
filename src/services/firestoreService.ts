@@ -40,11 +40,12 @@ function getFirestore() {
 }
 
 // Recursively strip undefined values from an object (Firestore rejects undefined fields)
+// Only recurses into plain objects — preserves Timestamp, FieldValue sentinels, Dates, etc.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function stripUndefined(obj: any): any {
   if (obj === null || obj === undefined) return null;
   if (Array.isArray(obj)) return obj.map(stripUndefined);
-  if (typeof obj === 'object' && !(obj instanceof Timestamp)) {
+  if (typeof obj === 'object' && Object.getPrototypeOf(obj) === Object.prototype) {
     const cleaned: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       if (value !== undefined) {
