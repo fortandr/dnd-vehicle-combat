@@ -70,6 +70,8 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   const [showHpBars, setShowHpBars] = useState(true);
   // Track which vehicle the DM is hovering over (for hover-only arcs/distance lines + player view sync)
   const [focusedVehicleId, setFocusedVehicleId] = useState<string | null>(null);
+  // Reposition mode: allows free dragging of any token during combat without movement cost
+  const [repositionMode, setRepositionMode] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
@@ -532,6 +534,26 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
         return;
       }
 
+      // Reposition mode: free movement without movement cost (DM correction tool)
+      if (repositionMode) {
+        const newPosition = constrainToImageBounds({
+          x: creature.position.x + worldDelta.x,
+          y: creature.position.y + worldDelta.y,
+        });
+        dispatch({
+          type: 'UPDATE_CREATURE',
+          payload: { id: creatureId, updates: { position: newPosition } },
+        });
+        dispatch({
+          type: 'LOG_ACTION',
+          payload: {
+            type: 'movement',
+            action: `${creature.name} repositioned by DM`,
+          },
+        });
+        return;
+      }
+
       // During combat, enforce movement limits
       const remainingMovement = getCreatureRemainingMovement(creature);
 
@@ -639,6 +661,23 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
       });
       updateVehiclePosition(vehicle.id, newPosition);
       // Note: Don't auto-fit during setup - it interferes with dragging
+      return;
+    }
+
+    // Reposition mode: free movement without movement cost (DM correction tool)
+    if (repositionMode) {
+      const newPosition = constrainToImageBounds({
+        x: vehicle.position.x + worldDelta.x,
+        y: vehicle.position.y + worldDelta.y,
+      });
+      updateVehiclePosition(vehicle.id, newPosition);
+      dispatch({
+        type: 'LOG_ACTION',
+        payload: {
+          type: 'movement',
+          action: `${vehicle.name} repositioned by DM`,
+        },
+      });
       return;
     }
 
@@ -1507,6 +1546,18 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                 <div className="text-xs text-muted" style={{ marginTop: 2 }}>
                   Hover tokens to reveal hidden overlays
                 </div>
+                {state.phase === 'combat' && (
+                  <>
+                    <div style={{ borderTop: '1px solid var(--color-border)', margin: '6px 0 4px' }} />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                      <input type="checkbox" checked={repositionMode} onChange={() => setRepositionMode(!repositionMode)} />
+                      Reposition Mode
+                    </label>
+                    <div className="text-xs text-muted" style={{ marginTop: 2 }}>
+                      Freely move any token without movement cost
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -2056,8 +2107,8 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
           {state.vehicles.map((vehicle) => {
             const screenPos = worldToScreen(vehicle.position);
             const isThisVehicleTurn = currentTurnVehicle?.id === vehicle.id;
-            // In combat mode, only the current turn vehicle can be moved
-            const isDisabled = state.phase === 'combat' && !isThisVehicleTurn;
+            // In combat mode, only the current turn vehicle can be moved (unless reposition mode)
+            const isDisabled = state.phase === 'combat' && !isThisVehicleTurn && !repositionMode;
             return (
               <VehicleToken
                 key={vehicle.id}
@@ -2093,8 +2144,8 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
             .map((creature) => {
               const screenPos = worldToScreen(creature.position!);
               const isThisCreatureTurn = currentTurnCreature?.id === creature.id;
-              // In combat mode, only the current turn creature can be moved (or always allow in setup)
-              const canDrag = state.phase !== 'combat' || isThisCreatureTurn;
+              // In combat mode, only the current turn creature can be moved (or always allow in setup/reposition)
+              const canDrag = state.phase !== 'combat' || isThisCreatureTurn || repositionMode;
               return (
                 <CreatureToken
                   key={creature.id}
