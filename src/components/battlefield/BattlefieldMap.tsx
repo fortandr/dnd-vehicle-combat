@@ -63,6 +63,12 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  // Overlay visibility toggles (local UI state only - does not affect saved data)
+  const [showDistanceLines, setShowDistanceLines] = useState(true);
+  const [showRangeArcs, setShowRangeArcs] = useState(true);
+  const [showHpBars, setShowHpBars] = useState(true);
+  // Track which vehicle the DM is hovering over (for hover-only arcs/distance lines + player view sync)
+  const [focusedVehicleId, setFocusedVehicleId] = useState<string | null>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
@@ -1357,6 +1363,10 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
       dmViewport: { width, height },
       showVehicleHealth: state.playerViewSettings?.showVehicleHealth ?? true,
       unitSystem,
+      focusedVehicleId,
+      showDistanceLines,
+      showRangeArcs,
+      showHpBars,
     });
   }, [
     state.vehicles,
@@ -1374,6 +1384,10 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     width,
     height,
     unitSystem,
+    focusedVehicleId,
+    showDistanceLines,
+    showRangeArcs,
+    showHpBars,
   ]);
 
   // Get grid size in screen pixels
@@ -1446,6 +1460,34 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
             </button>
             <button className="btn btn-secondary text-xs" onClick={handleResetView}>
               Reset
+            </button>
+          </div>
+
+          {/* Overlay Toggles */}
+          <div className="flex items-center gap-sm" style={{ borderLeft: '1px solid var(--color-border)', paddingLeft: 'var(--spacing-sm)' }}>
+            <button
+              className={`btn btn-secondary text-xs ${showDistanceLines ? 'btn-active' : ''}`}
+              onClick={() => setShowDistanceLines(!showDistanceLines)}
+              title={showDistanceLines ? 'Hide distance lines' : 'Show distance lines'}
+              style={{ opacity: showDistanceLines ? 1 : 0.5 }}
+            >
+              Dist
+            </button>
+            <button
+              className={`btn btn-secondary text-xs ${showRangeArcs ? 'btn-active' : ''}`}
+              onClick={() => setShowRangeArcs(!showRangeArcs)}
+              title={showRangeArcs ? 'Hide weapon range arcs (hover to show)' : 'Show weapon range arcs'}
+              style={{ opacity: showRangeArcs ? 1 : 0.5 }}
+            >
+              Arcs
+            </button>
+            <button
+              className={`btn btn-secondary text-xs ${showHpBars ? 'btn-active' : ''}`}
+              onClick={() => setShowHpBars(!showHpBars)}
+              title={showHpBars ? 'Hide HP bars and names' : 'Show HP bars and names'}
+              style={{ opacity: showHpBars ? 1 : 0.5 }}
+            >
+              HP
             </button>
           </div>
 
@@ -1958,10 +2000,10 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
             mapCenter={mapCenter}
           />
 
-          {/* Distance Lines */}
+          {/* Distance Lines - when toggled off, only show for focused/hovered vehicle */}
           <DistanceLines
             vehicles={state.vehicles}
-            distances={distances}
+            distances={showDistanceLines ? distances : distances.filter(d => d.from === focusedVehicleId || d.to === focusedVehicleId)}
             worldToScreen={worldToScreen}
             unitSystem={unitSystem}
           />
@@ -2014,6 +2056,9 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                 elevationZones={state.elevationZones}
                 allVehicles={state.vehicles}
                 unitSystem={unitSystem}
+                showRangeArcs={showRangeArcs}
+                showHpBars={showHpBars}
+                onHover={setFocusedVehicleId}
               />
             );
           })}
@@ -2041,6 +2086,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                   showMovement={state.phase === 'combat'}
                   isCurrentTurn={isThisCreatureTurn}
                   disabled={!canDrag}
+                  showHpBars={showHpBars}
                 />
               );
             })}
@@ -2512,6 +2558,9 @@ interface VehicleTokenProps {
   elevationZones: ElevationZone[];
   allVehicles: Vehicle[];
   unitSystem: 'imperial' | 'metric';
+  showRangeArcs: boolean;
+  showHpBars: boolean;
+  onHover?: (vehicleId: string | null) => void;
 }
 
 function VehicleToken({
@@ -2530,6 +2579,9 @@ function VehicleToken({
   elevationZones,
   allVehicles,
   unitSystem,
+  showRangeArcs,
+  showHpBars,
+  onHover,
 }: VehicleTokenProps) {
   const [isHovered, setIsHovered] = useState(false);
   const isInoperative = vehicle.isInoperative || vehicle.currentHp === 0;
@@ -2589,12 +2641,11 @@ function VehicleToken({
   return (
     <div
       style={{ ...style, position: 'absolute' }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => { setIsHovered(true); onHover?.(vehicle.id); }}
+      onMouseLeave={() => { setIsHovered(false); onHover?.(null); }}
     >
-      {/* Weapon Range Arcs - drawn behind the token, showing range per direction */}
-      {/* Don't show weapon ranges for inoperative vehicles */}
-      {maxWeaponRange > 0 && !isInoperative && (
+      {/* Weapon Range Arcs - shown when globally enabled OR when this token is hovered */}
+      {maxWeaponRange > 0 && !isInoperative && (showRangeArcs || isHovered) && (
         <WeaponRangeArcs
           weaponRanges={weaponRangesByArc}
           pixelsPerFoot={pixelsPerFoot}
@@ -2721,7 +2772,8 @@ function VehicleToken({
         </div>
       </div>
 
-      {/* Info panel below token - always horizontal */}
+      {/* Info panel below token - shown when HP bars enabled or when hovered */}
+      {(showHpBars || isHovered) && (
       <div
         style={{
           position: 'absolute',
@@ -2787,6 +2839,7 @@ function VehicleToken({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -3756,9 +3809,11 @@ interface CreatureTokenProps {
   isCurrentTurn?: boolean;
   disabled?: boolean;
   onPositionUpdate?: (creatureId: string, newPosition: Position) => void;
+  showHpBars?: boolean;
 }
 
-function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovement = 0, maxMovement = 0, showMovement = false, isCurrentTurn = false, disabled = false, onPositionUpdate }: CreatureTokenProps) {
+function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovement = 0, maxMovement = 0, showMovement = false, isCurrentTurn = false, disabled = false, onPositionUpdate, showHpBars = true }: CreatureTokenProps) {
+  const [isHovered, setIsHovered] = useState(false);
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `creature-${creature.id}`,
     disabled: disabled,
@@ -3820,6 +3875,8 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
       {...listeners}
       {...attributes}
       onMouseDown={handleMouseDown}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Token circle */}
       <div
@@ -3844,7 +3901,8 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
         {creature.name.charAt(0).toUpperCase()}
       </div>
 
-      {/* Name and HP bar below */}
+      {/* Name and HP bar below - shown when HP bars enabled or when hovered */}
+      {(showHpBars || isHovered) && (
       <div
         style={{
           position: 'absolute',
@@ -3915,6 +3973,7 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

@@ -20,6 +20,11 @@ export interface BattlefieldSyncState {
   dmViewport?: { width: number; height: number };
   showVehicleHealth?: boolean; // Whether to show vehicle HP on player view
   unitSystem?: 'imperial' | 'metric';
+  // Overlay visibility state from DM view
+  focusedVehicleId?: string | null; // Vehicle DM is hovering over
+  showDistanceLines?: boolean;
+  showRangeArcs?: boolean;
+  showHpBars?: boolean;
 }
 
 const CHANNEL_NAME = 'avernus-battlefield-sync';

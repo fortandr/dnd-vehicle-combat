@@ -227,11 +227,12 @@ export function PlayerViewMap() {
           scale={state.scale}
         />
 
-        {/* Distance Lines */}
+        {/* Distance Lines - respect DM overlay toggles */}
         <PlayerViewDistanceLines
           vehicles={state.vehicles}
           worldToScreen={worldToScreen}
           unitSystem={unitSystem}
+          focusedVehicleId={state.showDistanceLines === false ? (state.focusedVehicleId || null) : undefined}
         />
 
         {/* Vehicle Tokens */}
@@ -261,8 +262,8 @@ export function PlayerViewMap() {
                 transform: 'translate(-50%, -50%)',
               }}
             >
-              {/* Weapon Range Arcs - only show for operational vehicles with manned weapons */}
-              {maxWeaponRange > 0 && !isInoperative && (
+              {/* Weapon Range Arcs - respect DM overlay toggles, show on hover */}
+              {maxWeaponRange > 0 && !isInoperative && (state.showRangeArcs !== false || state.focusedVehicleId === vehicle.id) && (
                 <PlayerViewWeaponRangeArcs
                   weaponRanges={weaponRangesByArc}
                   pixelsPerFoot={pixelsPerFoot}
@@ -290,8 +291,10 @@ export function PlayerViewMap() {
                   color={borderColor}
                 />
               </div>
-              <div className="token-label">{vehicle.name}</div>
-              {state.showVehicleHealth !== false && (
+              {(state.showHpBars !== false || state.focusedVehicleId === vehicle.id) && (
+                <div className="token-label">{vehicle.name}</div>
+              )}
+              {state.showVehicleHealth !== false && (state.showHpBars !== false || state.focusedVehicleId === vehicle.id) && (
                 <div className="token-hp">
                   {vehicle.currentHp}/{vehicle.template.maxHp}
                 </div>
@@ -407,10 +410,12 @@ function PlayerViewDistanceLines({
   vehicles,
   worldToScreen,
   unitSystem,
+  focusedVehicleId,
 }: {
   vehicles: Vehicle[];
   worldToScreen: (pos: Position) => { x: number; y: number };
   unitSystem: 'imperial' | 'metric';
+  focusedVehicleId?: string | null; // When set, only show lines involving this vehicle
 }) {
   const partyVehicles = vehicles.filter((v) => v.type === 'party');
   const enemyVehicles = vehicles.filter((v) => v.type === 'enemy');
@@ -423,6 +428,8 @@ function PlayerViewDistanceLines({
 
   partyVehicles.forEach((pv) => {
     enemyVehicles.forEach((ev) => {
+      // If focusedVehicleId is set, only show lines involving that vehicle
+      if (focusedVehicleId !== undefined && focusedVehicleId !== pv.id && focusedVehicleId !== ev.id) return;
       const from = worldToScreen(pv.position);
       const to = worldToScreen(ev.position);
       const distance = Math.sqrt(
