@@ -34,6 +34,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   const { state, updateVehiclePosition, updateVehicleFacing, setScale, setBackgroundImage, dispatch, currentTurnVehicle, currentTurnCreature } = useCombat();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showBackgroundControls, setShowBackgroundControls] = useState(false);
+  const [showLayersPanel, setShowLayersPanel] = useState(false);
   const [bgPanelTab, setBgPanelTab] = useState<'background' | 'elevation'>('background');
   const [showElevationControls, setShowElevationControls] = useState(false);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
@@ -1463,32 +1464,51 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
             </button>
           </div>
 
-          {/* Overlay Toggles */}
-          <div className="flex items-center gap-sm" style={{ borderLeft: '1px solid var(--color-border)', paddingLeft: 'var(--spacing-sm)' }}>
+          {/* Overlay Toggles - dropdown */}
+          <div className="flex items-center gap-sm" style={{ position: 'relative' }}>
             <button
-              className={`btn btn-secondary text-xs ${showDistanceLines ? 'btn-active' : ''}`}
-              onClick={() => setShowDistanceLines(!showDistanceLines)}
-              title={showDistanceLines ? 'Hide distance lines' : 'Show distance lines'}
-              style={{ opacity: showDistanceLines ? 1 : 0.5 }}
+              className={`btn btn-secondary text-xs ${(!showDistanceLines || !showRangeArcs || !showHpBars) ? 'btn-active' : ''}`}
+              onClick={() => setShowLayersPanel(!showLayersPanel)}
+              title="Toggle map overlays"
             >
-              Dist
+              Layers
             </button>
-            <button
-              className={`btn btn-secondary text-xs ${showRangeArcs ? 'btn-active' : ''}`}
-              onClick={() => setShowRangeArcs(!showRangeArcs)}
-              title={showRangeArcs ? 'Hide weapon range arcs (hover to show)' : 'Show weapon range arcs'}
-              style={{ opacity: showRangeArcs ? 1 : 0.5 }}
-            >
-              Arcs
-            </button>
-            <button
-              className={`btn btn-secondary text-xs ${showHpBars ? 'btn-active' : ''}`}
-              onClick={() => setShowHpBars(!showHpBars)}
-              title={showHpBars ? 'Hide HP bars and names' : 'Show HP bars and names'}
-              style={{ opacity: showHpBars ? 1 : 0.5 }}
-            >
-              HP
-            </button>
+            {showLayersPanel && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  zIndex: 100,
+                  background: 'var(--color-bg-secondary)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  minWidth: '160px',
+                  marginTop: '4px',
+                  padding: 'var(--spacing-sm)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--spacing-xs)',
+                }}
+              >
+                <div className="text-xs font-bold" style={{ marginBottom: 2 }}>Overlays</div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                  <input type="checkbox" checked={showDistanceLines} onChange={() => setShowDistanceLines(!showDistanceLines)} />
+                  Distance Lines
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                  <input type="checkbox" checked={showRangeArcs} onChange={() => setShowRangeArcs(!showRangeArcs)} />
+                  Weapon Arcs
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                  <input type="checkbox" checked={showHpBars} onChange={() => setShowHpBars(!showHpBars)} />
+                  HP Bars &amp; Names
+                </label>
+                <div className="text-xs text-muted" style={{ marginTop: 2 }}>
+                  Hover tokens to reveal hidden overlays
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Player View Button */}
