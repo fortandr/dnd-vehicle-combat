@@ -316,6 +316,8 @@ export function PlayerViewMap() {
             // Min 20px for visibility, no max to scale properly with vehicles
             const tokenSize = Math.max(20, scaledSize);
             const isPC = creature.statblock.type === 'pc';
+            const isDead = !isPC && creature.currentHp === 0;
+            const isInDeathSaves = isPC && creature.currentHp === 0;
 
             return (
               <div
@@ -330,9 +332,45 @@ export function PlayerViewMap() {
               >
                 <div
                   className={`token-circle ${isPC ? 'pc' : 'npc'}`}
-                  style={{ width: tokenSize, height: tokenSize }}
+                  style={{
+                    width: tokenSize,
+                    height: tokenSize,
+                    position: 'relative',
+                    opacity: isDead ? 0.5 : isInDeathSaves ? 0.7 : 1,
+                    filter: isDead ? 'grayscale(1) brightness(0.6)' : 'none',
+                  }}
                 >
                   <span className="token-letter">{creature.name.charAt(0)}</span>
+                  {isDead && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        fontSize: Math.max(tokenSize * 0.7, 16),
+                        fontWeight: 'bold',
+                        color: '#dc2626',
+                        textShadow: '0 0 4px #000, 0 0 8px #000',
+                        lineHeight: 1,
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      ✕
+                    </span>
+                  )}
+                  {isInDeathSaves && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: -2,
+                        borderRadius: '50%',
+                        border: '2px solid #f59e0b',
+                        animation: 'pulse 2s ease-in-out infinite',
+                        pointerEvents: 'none',
+                      }}
+                    />
+                  )}
                 </div>
                 {state.showHpBars !== false && (
                   <div className="token-label">{creature.name}</div>

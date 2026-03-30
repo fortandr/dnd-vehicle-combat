@@ -3908,6 +3908,8 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
   const hpPercent = (creature.currentHp / creature.statblock.maxHp) * 100;
   const isAlive = creature.currentHp > 0;
   const isPC = creature.statblock.type === 'pc';
+  const isDead = !isPC && creature.currentHp === 0; // NPCs at 0 HP are dead
+  const isInDeathSaves = isPC && creature.currentHp === 0; // PCs at 0 HP are making death saves
 
   // z-index priority: dragging > current turn > default
   // Current turn token must be clickable even when overlapping with other tokens
@@ -3964,12 +3966,45 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
           fontSize: Math.max(10, tokenSize * 0.4),
           fontWeight: 'bold',
           color: isAlive ? 'var(--color-text-primary)' : '#666',
-          opacity: isAlive ? 1 : 0.6,
+          opacity: isDead ? 0.5 : isInDeathSaves ? 0.7 : 1,
           cursor: disabled ? 'not-allowed' : isDragging ? 'grabbing' : 'grab',
+          filter: isDead ? 'grayscale(1) brightness(0.6)' : 'none',
+          position: 'relative',
         }}
-        title={`${creature.name}\nHP: ${creature.currentHp}/${creature.statblock.maxHp}\nAC: ${creature.statblock.ac}${isCurrentTurn ? '\n(Current Turn)' : ''}`}
+        title={`${creature.name}\nHP: ${creature.currentHp}/${creature.statblock.maxHp}\nAC: ${creature.statblock.ac}${isDead ? '\n(DEAD)' : isInDeathSaves ? '\n(Death Saves)' : ''}${isCurrentTurn ? '\n(Current Turn)' : ''}`}
       >
         {creature.name.charAt(0).toUpperCase()}
+
+        {/* Dead indicator - red X overlay */}
+        {isDead && (
+          <span
+            style={{
+              position: 'absolute',
+              fontSize: Math.max(tokenSize * 0.7, 16),
+              fontWeight: 'bold',
+              color: '#dc2626',
+              textShadow: '0 0 4px #000, 0 0 8px #000',
+              lineHeight: 1,
+              pointerEvents: 'none',
+            }}
+          >
+            ✕
+          </span>
+        )}
+
+        {/* Death saves indicator - pulsing yellow border */}
+        {isInDeathSaves && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: -2,
+              borderRadius: '50%',
+              border: '2px solid #f59e0b',
+              animation: 'pulse 2s ease-in-out infinite',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
       </div>
 
       {/* Name and HP bar below - shown when HP bars enabled or when hovered */}
