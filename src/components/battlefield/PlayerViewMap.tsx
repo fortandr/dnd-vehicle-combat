@@ -334,7 +334,9 @@ export function PlayerViewMap() {
                 >
                   <span className="token-letter">{creature.name.charAt(0)}</span>
                 </div>
-                <div className="token-label">{creature.name}</div>
+                {state.showHpBars !== false && (
+                  <div className="token-label">{creature.name}</div>
+                )}
               </div>
             );
           })}
