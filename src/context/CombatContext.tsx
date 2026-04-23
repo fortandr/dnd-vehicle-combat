@@ -27,6 +27,7 @@ import {
   SpeedModifier,
   ComplicationResolutionStatus,
   ElevationZone,
+  MoveHistoryEntry,
 } from '../types';
 import { getScaleForDistance, SCALES } from '../data/scaleConfig';
 import { getWeaponStationUpgrade, resolveZone } from '../data/vehicleTemplates';
@@ -75,6 +76,8 @@ export const initialCombatState: CombatState = {
   playerViewSettings: {
     showVehicleHealth: true,
   },
+  movementUsed: {},
+  moveHistory: [],
 };
 
 // ==========================================
@@ -147,6 +150,12 @@ type CombatAction =
   // Logging
   | { type: 'LOG_ACTION'; payload: Omit<LogEntry, 'id' | 'timestamp' | 'round'> }
   | { type: 'CLEAR_LOG' }
+
+  // Per-round movement tracking
+  | { type: 'TRACK_MOVEMENT'; payload: { id: string; delta: number } }
+  | { type: 'RESET_MOVEMENT_TRACKING' }
+  | { type: 'PUSH_MOVE_HISTORY'; payload: MoveHistoryEntry }
+  | { type: 'POP_MOVE_HISTORY' }
 
   // Complications
   | { type: 'TOGGLE_AUTO_ROLL_COMPLICATIONS' }
@@ -285,6 +294,8 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         crewAssignments: migratedCrewAssignments,
         initiativeOrder: migratedInitiativeOrder,
         actionLog: action.payload.actionLog || [],
+        movementUsed: action.payload.movementUsed || {},
+        moveHistory: action.payload.moveHistory || [],
       };
     }
 
@@ -782,6 +793,8 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         round: 1,
         initiativeOrder: initiativeEntries.map((e) => e.id),
         currentTurnIndex: 0,
+        movementUsed: {},
+        moveHistory: [],
         actionLog: [
           ...state.actionLog,
           createLogEntry(1, 'round_start', 'Combat begins! Round 1'),
@@ -901,6 +914,8 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         currentTurnIndex: 0,
         vehicles: updatedVehicles,
         initiativeOrder: resortedInitiativeOrder,
+        movementUsed: {},
+        moveHistory: [],
         actionLog: [
           ...state.actionLog,
           createLogEntry(newRound, 'round_start', `Round ${newRound} begins`),
@@ -926,6 +941,8 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         round: 0,
         currentTurnIndex: 0,
         initiativeOrder: [],
+        movementUsed: {},
+        moveHistory: [],
         vehicles: state.vehicles.map((v) => ({
           ...v,
           currentHp: v.template.maxHp,
@@ -947,6 +964,8 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         phase: 'setup',
         round: 0,
         currentTurnIndex: 0,
+        movementUsed: {},
+        moveHistory: [],
         actionLog: [
           ...state.actionLog,
           createLogEntry(state.round, 'system', 'Returned to setup phase'),
@@ -1284,6 +1303,38 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
       return {
         ...state,
         actionLog: [],
+      };
+
+    // ========== Movement Tracking ==========
+    case 'TRACK_MOVEMENT': {
+      const current = state.movementUsed[action.payload.id] || 0;
+      return {
+        ...state,
+        movementUsed: {
+          ...state.movementUsed,
+          [action.payload.id]: Math.max(0, current + action.payload.delta),
+        },
+      };
+    }
+
+    case 'RESET_MOVEMENT_TRACKING':
+      return {
+        ...state,
+        movementUsed: {},
+        moveHistory: [],
+      };
+
+    case 'PUSH_MOVE_HISTORY':
+      return {
+        ...state,
+        moveHistory: [...state.moveHistory, action.payload],
+      };
+
+    case 'POP_MOVE_HISTORY':
+      if (state.moveHistory.length === 0) return state;
+      return {
+        ...state,
+        moveHistory: state.moveHistory.slice(0, -1),
       };
 
     // ========== Complications ==========

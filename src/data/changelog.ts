@@ -14,6 +14,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.8.0',
+    date: '2026-04-22',
+    changes: [
+      { type: 'feature', description: 'Added combat log export — copy as Markdown (for pasting into Claude to generate recaps), copy as JSON, or download as .md' },
+      { type: 'fix', description: 'Fixed vehicle movement distance resetting when switching between the Map and Vehicles tabs mid-turn — partial movement now persists for the full round' },
+      { type: 'improvement', description: 'Undo stack for battlefield moves also persists across tab switches' },
+    ],
+  },
+  {
     version: '1.7.0',
     date: '2026-02-19',
     changes: [

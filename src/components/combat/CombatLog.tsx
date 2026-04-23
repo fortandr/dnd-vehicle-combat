@@ -3,6 +3,7 @@
  * Displays action log entries for the encounter
  */
 
+import { useState } from 'react';
 import {
   Box,
   Card,
@@ -11,8 +12,25 @@ import {
   Chip,
   Stack,
   Paper,
+  IconButton,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Tooltip,
+  Snackbar,
 } from '@mui/material';
+import IosShareIcon from '@mui/icons-material/IosShare';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DataObjectIcon from '@mui/icons-material/DataObject';
+import DownloadIcon from '@mui/icons-material/Download';
 import { useCombat } from '../../context/CombatContext';
+import {
+  formatLogAsMarkdown,
+  formatLogAsJson,
+  buildLogFilename,
+  downloadText,
+} from '../../utils/exportLog';
 
 function getLogBorderColor(type: string): string {
   const colors: Record<string, string> = {
@@ -68,19 +86,80 @@ function formatTime(timestamp: Date | string): string {
 
 export function CombatLog() {
   const { state } = useCombat();
+  const [exportMenuAnchor, setExportMenuAnchor] = useState<null | HTMLElement>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const recentLogs = [...state.actionLog].reverse().slice(0, 50);
+  const hasEntries = state.actionLog.length > 0;
+
+  const closeExportMenu = () => setExportMenuAnchor(null);
+
+  const copyToClipboard = async (text: string, successMessage: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setToastMessage(successMessage);
+    } catch {
+      setToastMessage('Copy failed — clipboard access denied');
+    }
+  };
+
+  const handleCopyMarkdown = () => {
+    copyToClipboard(formatLogAsMarkdown(state), 'Markdown copied to clipboard');
+    closeExportMenu();
+  };
+
+  const handleCopyJson = () => {
+    copyToClipboard(formatLogAsJson(state), 'JSON copied to clipboard');
+    closeExportMenu();
+  };
+
+  const handleDownloadMarkdown = () => {
+    downloadText(buildLogFilename(state, 'md'), formatLogAsMarkdown(state), 'text/markdown');
+    closeExportMenu();
+  };
 
   return (
     <Card>
       <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-          <Typography variant="subtitle2" color="text.secondary">
-            Combat Log
-          </Typography>
-          {state.actionLog.length > 0 && (
-            <Chip label={state.actionLog.length} size="small" variant="outlined" sx={{ height: 20 }} />
-          )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="subtitle2" color="text.secondary">
+              Combat Log
+            </Typography>
+            {hasEntries && (
+              <Chip label={state.actionLog.length} size="small" variant="outlined" sx={{ height: 20 }} />
+            )}
+          </Box>
+          <Tooltip title={hasEntries ? 'Export log' : 'Nothing to export yet'}>
+            <span>
+              <IconButton
+                size="small"
+                onClick={(e) => setExportMenuAnchor(e.currentTarget)}
+                disabled={!hasEntries}
+                aria-label="Export combat log"
+              >
+                <IosShareIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Menu
+            anchorEl={exportMenuAnchor}
+            open={Boolean(exportMenuAnchor)}
+            onClose={closeExportMenu}
+          >
+            <MenuItem onClick={handleCopyMarkdown}>
+              <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
+              <ListItemText primary="Copy as Markdown" secondary="Paste into Claude for a recap" />
+            </MenuItem>
+            <MenuItem onClick={handleCopyJson}>
+              <ListItemIcon><DataObjectIcon fontSize="small" /></ListItemIcon>
+              <ListItemText primary="Copy as JSON" secondary="Structured, for tooling" />
+            </MenuItem>
+            <MenuItem onClick={handleDownloadMarkdown}>
+              <ListItemIcon><DownloadIcon fontSize="small" /></ListItemIcon>
+              <ListItemText primary="Download .md" secondary="For long logs that clipboard may truncate" />
+            </MenuItem>
+          </Menu>
         </Box>
 
         {state.actionLog.length === 0 ? (
@@ -122,6 +201,13 @@ export function CombatLog() {
           </Box>
         )}
       </CardContent>
+      <Snackbar
+        open={toastMessage !== null}
+        autoHideDuration={2500}
+        onClose={() => setToastMessage(null)}
+        message={toastMessage ?? ''}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Card>
   );
 }

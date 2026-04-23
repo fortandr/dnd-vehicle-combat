@@ -103,27 +103,11 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
 
   const width = containerWidth;
 
-  // Track movement used per vehicle this round: { vehicleId: feetMoved }
-  const [movementUsed, setMovementUsed] = useState<Record<string, number>>({});
-  const [lastRound, setLastRound] = useState(state.round);
-
-  // Movement history for undo functionality
-  interface MoveHistoryEntry {
-    type: 'vehicle' | 'creature';
-    id: string;
-    previousPosition: Position;
-    feetMoved: number;
-  }
-  const [moveHistory, setMoveHistory] = useState<MoveHistoryEntry[]>([]);
-
-  // Reset movement tracking and history when round changes
-  useEffect(() => {
-    if (state.round !== lastRound) {
-      setMovementUsed({});
-      setMoveHistory([]);
-      setLastRound(state.round);
-    }
-  }, [state.round, lastRound]);
+  // Movement used and undo history live in CombatContext so they survive tab
+  // switches. Reset in the reducer on NEXT_ROUND/START_COMBAT/RESET_COMBAT/
+  // RETURN_TO_SETUP — no local bookkeeping needed here.
+  const movementUsed = state.movementUsed;
+  const moveHistory = state.moveHistory;
 
   // Undo last movement
   const handleUndoMove = () => {
@@ -136,10 +120,10 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
       updateVehiclePosition(lastMove.id, lastMove.previousPosition);
 
       // Restore movement used
-      setMovementUsed((prev) => ({
-        ...prev,
-        [lastMove.id]: Math.max(0, (prev[lastMove.id] || 0) - lastMove.feetMoved),
-      }));
+      dispatch({
+        type: 'TRACK_MOVEMENT',
+        payload: { id: lastMove.id, delta: -lastMove.feetMoved },
+      });
 
       // Log the undo
       const vehicle = state.vehicles.find((v) => v.id === lastMove.id);
@@ -158,10 +142,10 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
       });
 
       // Restore movement used
-      setMovementUsed((prev) => ({
-        ...prev,
-        [`creature-${lastMove.id}`]: Math.max(0, (prev[`creature-${lastMove.id}`] || 0) - lastMove.feetMoved),
-      }));
+      dispatch({
+        type: 'TRACK_MOVEMENT',
+        payload: { id: `creature-${lastMove.id}`, delta: -lastMove.feetMoved },
+      });
 
       // Log the undo
       const creature = state.creatures.find((c) => c.id === lastMove.id);
@@ -175,7 +159,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     }
 
     // Remove from history
-    setMoveHistory((prev) => prev.slice(0, -1));
+    dispatch({ type: 'POP_MOVE_HISTORY' });
   };
 
   const currentScale = SCALES[state.scale];
@@ -588,21 +572,21 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
       const newRemainingMovement = remainingMovement - actualFeetMoved;
 
       // Record move for undo
-      setMoveHistory((prev) => [
-        ...prev,
-        {
+      dispatch({
+        type: 'PUSH_MOVE_HISTORY',
+        payload: {
           type: 'creature',
           id: creature.id,
           previousPosition: { x: creature.position?.x ?? 0, y: creature.position?.y ?? 0 },
           feetMoved: actualFeetMoved,
         },
-      ]);
+      });
 
       // Track movement used
-      setMovementUsed((prev) => ({
-        ...prev,
-        [`creature-${creature.id}`]: (prev[`creature-${creature.id}`] || 0) + actualFeetMoved,
-      }));
+      dispatch({
+        type: 'TRACK_MOVEMENT',
+        payload: { id: `creature-${creature.id}`, delta: actualFeetMoved },
+      });
 
       // Log the movement
       dispatch({
@@ -719,21 +703,21 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     const newRemainingMovement = remainingMovement - actualFeetMoved;
 
     // Record move for undo
-    setMoveHistory((prev) => [
-      ...prev,
-      {
+    dispatch({
+      type: 'PUSH_MOVE_HISTORY',
+      payload: {
         type: 'vehicle',
         id: vehicle.id,
         previousPosition: { ...vehicle.position },
         feetMoved: actualFeetMoved,
       },
-    ]);
+    });
 
     // Track movement used
-    setMovementUsed((prev) => ({
-      ...prev,
-      [vehicle.id]: (prev[vehicle.id] || 0) + actualFeetMoved,
-    }));
+    dispatch({
+      type: 'TRACK_MOVEMENT',
+      payload: { id: vehicle.id, delta: actualFeetMoved },
+    });
 
     // Log the movement
     dispatch({

@@ -437,6 +437,20 @@ export interface CombatState {
   playerViewSettings: {
     showVehicleHealth: boolean;
   };
+
+  // Per-round movement tracking. Keys are vehicle ids, or `creature-${id}`
+  // for creatures on foot. Reset whenever the round advances.
+  movementUsed: Record<string, number>;
+
+  // Undo stack for movement actions this round. Reset alongside movementUsed.
+  moveHistory: MoveHistoryEntry[];
+}
+
+export interface MoveHistoryEntry {
+  type: 'vehicle' | 'creature';
+  id: string;
+  previousPosition: Position;
+  feetMoved: number;
 }
 
 export interface Environment {
