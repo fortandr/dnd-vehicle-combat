@@ -182,10 +182,15 @@ export interface VehicleAbilityScores {
   con: number;
 }
 
+// Origin tier of a vehicle template. Undefined is treated as 'builtin' for
+// backward compatibility with encounters saved before the library existed.
+export type TemplateSource = 'builtin' | 'personal' | 'community';
+
 export interface VehicleTemplate {
   id: string;
   name: string;
   description: string;
+  source?: TemplateSource; // Which tier this template came from (see templateRegistry)
   maxHp: number;
   ac: number;
   speed: number; // Base speed in feet

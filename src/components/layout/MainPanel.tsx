@@ -41,7 +41,7 @@ import { VehicleCard } from '../vehicles/VehicleCard';
 import { ScaleIndicator } from '../combat/ScaleIndicator';
 import { BattlefieldMap } from '../battlefield/BattlefieldMap';
 import { CombatLog } from '../combat/CombatLog';
-import { VEHICLE_TEMPLATES } from '../../data/vehicleTemplates';
+import { getAvailableTemplates, resolveTemplate } from '../../data/templateRegistry';
 import { Vehicle, VehicleWeapon, Creature, CrewAssignment } from '../../types';
 import { factionColors, scaleColors, withOpacity } from '../../theme/customColors';
 import { storageService, PartyPreset } from '../../services/storageService';
@@ -60,7 +60,7 @@ export function MainPanel() {
   const [partyPresetMenuAnchor, setPartyPresetMenuAnchor] = useState<null | HTMLElement>(null);
 
   const handleAddVehicle = (templateId: string, type: 'party' | 'enemy') => {
-    const template = VEHICLE_TEMPLATES.find((t) => t.id === templateId);
+    const template = resolveTemplate(templateId);
     if (template) {
       const weapons: VehicleWeapon[] = template.weapons.map((w) => {
         // Find the matching zone for this weapon to get proper arcs
@@ -407,7 +407,7 @@ export function MainPanel() {
         </DialogTitle>
         <DialogContent>
           <Stack spacing={1.5} sx={{ mt: 1 }}>
-            {VEHICLE_TEMPLATES.map((template) => {
+            {getAvailableTemplates().map((template) => {
               const hoverColor = showAddModal === 'party' ? factionColors.party : factionColors.enemy;
               return (
                 <Card
