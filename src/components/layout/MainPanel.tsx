@@ -3,7 +3,7 @@
  * Central area for battlefield map and vehicle cards
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { v4 as uuid } from 'uuid';
 import {
   Box,
@@ -13,6 +13,7 @@ import {
   Card,
   CardContent,
   CardActionArea,
+  CardActions,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -36,13 +37,16 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import GroupIcon from '@mui/icons-material/Group';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import EditIcon from '@mui/icons-material/Edit';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useCombat } from '../../context/CombatContext';
 import { VehicleCard } from '../vehicles/VehicleCard';
+import { VehicleTemplateEditor } from '../vehicles/VehicleTemplateEditor';
 import { ScaleIndicator } from '../combat/ScaleIndicator';
 import { BattlefieldMap } from '../battlefield/BattlefieldMap';
 import { CombatLog } from '../combat/CombatLog';
-import { getAvailableTemplates, resolveTemplate } from '../../data/templateRegistry';
-import { Vehicle, VehicleWeapon, Creature, CrewAssignment } from '../../types';
+import { getBuiltInTemplates, resolveTemplate, setPersonalTemplates } from '../../data/templateRegistry';
+import { Vehicle, VehicleWeapon, VehicleTemplate, Creature, CrewAssignment } from '../../types';
 import { factionColors, scaleColors, withOpacity } from '../../theme/customColors';
 import { storageService, PartyPreset } from '../../services/storageService';
 
@@ -58,6 +62,70 @@ export function MainPanel() {
   const [partyPresets, setPartyPresets] = useState<PartyPreset[]>([]);
   const [vehicleMenuAnchor, setVehicleMenuAnchor] = useState<null | HTMLElement>(null);
   const [partyPresetMenuAnchor, setPartyPresetMenuAnchor] = useState<null | HTMLElement>(null);
+  const [personalTemplates, setPersonalTemplatesState] = useState<VehicleTemplate[]>([]);
+  const [templateEditorOpen, setTemplateEditorOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<VehicleTemplate | null>(null);
+
+  // Load the user's personal vehicle templates into the registry cache (used by
+  // resolveTemplate) and local state (used by the picker) whenever the
+  // add-vehicle dialog opens.
+  useEffect(() => {
+    if (!showAddModal) return;
+    let cancelled = false;
+    storageService
+      .listVehicleTemplates()
+      .then((list) => {
+        if (cancelled) return;
+        setPersonalTemplates(list);
+        setPersonalTemplatesState(list);
+      })
+      .catch((error) => console.error('Failed to load vehicle templates:', error));
+    return () => {
+      cancelled = true;
+    };
+  }, [showAddModal]);
+
+  const reloadPersonalTemplates = async () => {
+    const list = await storageService.listVehicleTemplates();
+    setPersonalTemplates(list);
+    setPersonalTemplatesState(list);
+  };
+
+  const handleCreateTemplate = () => {
+    setEditingTemplate(null);
+    setTemplateEditorOpen(true);
+  };
+
+  const handleEditTemplate = (template: VehicleTemplate) => {
+    setEditingTemplate(template);
+    setTemplateEditorOpen(true);
+  };
+
+  const handleDuplicateTemplate = (template: VehicleTemplate) => {
+    setEditingTemplate({ ...template, id: uuid(), name: `${template.name} (Copy)`, source: 'personal' });
+    setTemplateEditorOpen(true);
+  };
+
+  const handleSaveTemplate = async (template: VehicleTemplate) => {
+    try {
+      await storageService.saveVehicleTemplate(template);
+      await reloadPersonalTemplates();
+    } catch (error) {
+      console.error('Failed to save vehicle template:', error);
+      alert('Failed to save vehicle template. Check console for details.');
+    }
+  };
+
+  const handleDeleteTemplate = async (template: VehicleTemplate) => {
+    if (!window.confirm(`Delete template “${template.name}”? This cannot be undone.`)) return;
+    try {
+      await storageService.deleteVehicleTemplate(template.id);
+      await reloadPersonalTemplates();
+    } catch (error) {
+      console.error('Failed to delete vehicle template:', error);
+      alert('Failed to delete vehicle template. Check console for details.');
+    }
+  };
 
   const handleAddVehicle = (templateId: string, type: 'party' | 'enemy') => {
     const template = resolveTemplate(templateId);
@@ -406,9 +474,19 @@ export function MainPanel() {
           Add {showAddModal === 'party' ? 'Party' : 'Enemy'} Vehicle
         </DialogTitle>
         <DialogContent>
-          <Stack spacing={1.5} sx={{ mt: 1 }}>
-            {getAvailableTemplates().map((template) => {
+          <Button
+            startIcon={<AddIcon />}
+            variant="outlined"
+            fullWidth
+            sx={{ mt: 1, mb: 2 }}
+            onClick={handleCreateTemplate}
+          >
+            Create Custom Vehicle
+          </Button>
+          <Stack spacing={1.5}>
+            {[...getBuiltInTemplates(), ...personalTemplates].map((template) => {
               const hoverColor = showAddModal === 'party' ? factionColors.party : factionColors.enemy;
+              const isPersonal = template.source === 'personal';
               return (
                 <Card
                   key={template.id}
@@ -448,9 +526,31 @@ export function MainPanel() {
                             color: scaleColors.tactical,
                           }}
                         />
+                        {isPersonal && (
+                          <Chip label="Custom" size="small" color="primary" variant="outlined" />
+                        )}
                       </Stack>
                     </CardContent>
                   </CardActionArea>
+                  <CardActions sx={{ justifyContent: 'flex-end', pt: 0 }}>
+                    {isPersonal ? (
+                      <>
+                        <IconButton size="small" aria-label="edit template" onClick={() => handleEditTemplate(template)}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" aria-label="duplicate template" onClick={() => handleDuplicateTemplate(template)}>
+                          <ContentCopyIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" aria-label="delete template" onClick={() => handleDeleteTemplate(template)}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </>
+                    ) : (
+                      <Button size="small" startIcon={<ContentCopyIcon fontSize="small" />} onClick={() => handleDuplicateTemplate(template)}>
+                        Duplicate &amp; edit
+                      </Button>
+                    )}
+                  </CardActions>
                 </Card>
               );
             })}
@@ -462,6 +562,14 @@ export function MainPanel() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Vehicle Template Editor */}
+      <VehicleTemplateEditor
+        open={templateEditorOpen}
+        initial={editingTemplate}
+        onClose={() => setTemplateEditorOpen(false)}
+        onSave={handleSaveTemplate}
+      />
 
       {/* Save Party Preset Dialog */}
       <Dialog

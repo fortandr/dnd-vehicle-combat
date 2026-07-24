@@ -36,6 +36,16 @@ export function setPersonalTemplates(templates: VehicleTemplate[]): void {
   personalTemplates = templates.map((t) => ({ ...t, source: 'personal' as const }));
 }
 
+/** The shipped built-in (Avernus) templates. */
+export function getBuiltInTemplates(): VehicleTemplate[] {
+  return [...BUILTIN_TEMPLATES];
+}
+
+/** The currently loaded personal-library templates. */
+export function getPersonalTemplates(): VehicleTemplate[] {
+  return [...personalTemplates];
+}
+
 /** Every template a user can currently add to an encounter, across all tiers. */
 export function getAvailableTemplates(): VehicleTemplate[] {
   return [...BUILTIN_TEMPLATES, ...personalTemplates];

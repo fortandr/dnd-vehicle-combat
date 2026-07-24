@@ -4,6 +4,7 @@
  */
 
 import { isAuthEnabled } from '../firebase';
+import type { VehicleTemplate } from '../types';
 import { localStorageService } from './localStorageService';
 import { firestoreService } from './firestoreService';
 
@@ -35,6 +36,11 @@ export interface StorageService {
   listCombatArchives(): Promise<unknown[]>;
   getCombatArchive(id: string): Promise<unknown | null>;
   deleteCombatArchive(id: string): Promise<void>;
+
+  // Vehicle templates (personal library)
+  saveVehicleTemplate(template: VehicleTemplate): Promise<void>;
+  listVehicleTemplates(): Promise<VehicleTemplate[]>;
+  deleteVehicleTemplate(id: string): Promise<void>;
 }
 
 /**

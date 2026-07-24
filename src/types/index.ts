@@ -186,6 +186,29 @@ export interface VehicleAbilityScores {
 // backward compatibility with encounters saved before the library existed.
 export type TemplateSource = 'builtin' | 'personal' | 'community';
 
+// The medium a vehicle operates in. Undefined is treated as 'land' for
+// backward compatibility with Avernus war machines saved before this existed.
+export type VehicleEnvironment = 'land' | 'water' | 'air';
+
+// Kind of destructible component in the faithful component model.
+export type VehicleComponentKind = 'hull' | 'control' | 'movement' | 'weapon' | 'other';
+
+// A destructible part of a vehicle with its own AC/HP — the faithful component
+// model used by e.g. Ghosts of Saltmarsh ships (hull, helm, sails, oars, weapon
+// stations). Optional: single-HP vehicles (Avernus war machines) omit it and use
+// VehicleTemplate.maxHp/ac/damageThreshold instead.
+export interface VehicleComponent {
+  id: string;
+  name: string;
+  kind: VehicleComponentKind;
+  ac: number;
+  maxHp: number;
+  damageThreshold?: number;
+  speed?: number; // For 'movement' components, in feet
+  crewRequired?: number;
+  description?: string;
+}
+
 export interface VehicleTemplate {
   id: string;
   name: string;
@@ -206,6 +229,8 @@ export interface VehicleTemplate {
   reactions?: StatblockFeature[]; // Reactions (e.g., Juke)
   size: 'large' | 'huge' | 'gargantuan';
   immunities?: string[];
+  environment?: VehicleEnvironment; // Default 'land' when unset
+  components?: VehicleComponent[]; // Per-part HP model (e.g. Saltmarsh ships)
 }
 
 export interface Vehicle {

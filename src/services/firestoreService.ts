@@ -20,6 +20,7 @@ import { ref, uploadString, getDownloadURL, deleteObject } from 'firebase/storag
 import { db, auth, storage } from '../firebase';
 import type { StorageService } from './storageService';
 import type { SavedEncounter, PartyPreset, CombatArchive } from './localStorageService';
+import type { VehicleTemplate } from '../types';
 
 // ==========================================
 // Helper Functions
@@ -314,5 +315,45 @@ export const firestoreService: StorageService = {
 
     const archiveRef = doc(firestore, 'users', userId, 'combatArchives', id);
     await deleteDoc(archiveRef);
+  },
+
+  // ==========================================
+  // Vehicle Templates (personal library)
+  // ==========================================
+
+  async saveVehicleTemplate(template: VehicleTemplate): Promise<void> {
+    const userId = getUserId();
+    const firestore = getFirestore();
+
+    const templateRef = doc(firestore, 'users', userId, 'vehicleTemplates', template.id);
+    await setDoc(templateRef, {
+      name: template.name,
+      data: cleanForFirestore(template),
+      savedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  },
+
+  async listVehicleTemplates(): Promise<VehicleTemplate[]> {
+    const userId = getUserId();
+    const firestore = getFirestore();
+
+    const templatesRef = collection(firestore, 'users', userId, 'vehicleTemplates');
+    const q = query(templatesRef, orderBy('savedAt', 'desc'));
+    const snapshot = await getDocs(q);
+
+    return snapshot.docs.map((doc) => ({
+      ...(doc.data().data as VehicleTemplate),
+      id: doc.id,
+      source: 'personal' as const,
+    }));
+  },
+
+  async deleteVehicleTemplate(id: string): Promise<void> {
+    const userId = getUserId();
+    const firestore = getFirestore();
+
+    const templateRef = doc(firestore, 'users', userId, 'vehicleTemplates', id);
+    await deleteDoc(templateRef);
   },
 };

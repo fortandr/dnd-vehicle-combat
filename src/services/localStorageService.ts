@@ -4,6 +4,7 @@
  */
 
 import type { StorageService } from './storageService';
+import type { VehicleTemplate } from '../types';
 
 // ==========================================
 // Types
@@ -51,6 +52,7 @@ const ENCOUNTERS_KEY = 'avernus-saved-encounters';
 const CURRENT_ENCOUNTER_KEY = 'avernus-current-encounter';
 const PARTY_PRESETS_KEY = 'avernus-party-presets';
 const COMBAT_ARCHIVES_KEY = 'avernus-combat-archives';
+const VEHICLE_TEMPLATES_KEY = 'avernus-vehicle-templates';
 
 // ==========================================
 // Local Storage Service Implementation
@@ -189,5 +191,38 @@ export const localStorageService: StorageService = {
   async deleteCombatArchive(id: string): Promise<void> {
     const archives = (await this.listCombatArchives()).filter((a) => (a as CombatArchive).id !== id);
     window.localStorage.setItem(COMBAT_ARCHIVES_KEY, JSON.stringify(archives));
+  },
+
+  // ==========================================
+  // Vehicle Templates (personal library)
+  // ==========================================
+
+  async saveVehicleTemplate(template: VehicleTemplate): Promise<void> {
+    const templates = await this.listVehicleTemplates();
+    const existingIndex = templates.findIndex((t) => t.id === template.id);
+
+    const stored: VehicleTemplate = { ...template, source: 'personal' };
+
+    if (existingIndex >= 0) {
+      templates[existingIndex] = stored;
+    } else {
+      templates.push(stored);
+    }
+
+    window.localStorage.setItem(VEHICLE_TEMPLATES_KEY, JSON.stringify(templates));
+  },
+
+  async listVehicleTemplates(): Promise<VehicleTemplate[]> {
+    try {
+      const item = window.localStorage.getItem(VEHICLE_TEMPLATES_KEY);
+      return item ? JSON.parse(item) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  async deleteVehicleTemplate(id: string): Promise<void> {
+    const templates = (await this.listVehicleTemplates()).filter((t) => t.id !== id);
+    window.localStorage.setItem(VEHICLE_TEMPLATES_KEY, JSON.stringify(templates));
   },
 };

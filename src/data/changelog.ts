@@ -14,6 +14,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.0.0',
+    date: '2026-07-24',
+    changes: [
+      { type: 'feature', description: 'Renamed the app to VVTT (Vehicular Virtual Table Top), now hosted at vvtt.lukantan.com' },
+      { type: 'feature', description: 'Added a personal vehicle library — create, edit, duplicate, and delete your own custom vehicle templates right from the Add Vehicle dialog' },
+      { type: 'feature', description: 'Vehicle templates now support a per-component HP model (hull, helm, sails/oars, weapon stations) so ships can be represented faithfully' },
+      { type: 'feature', description: 'Added an environment field (land / water / air) to vehicles — groundwork for naval and aerial combat beyond Avernus' },
+      { type: 'improvement', description: 'Vehicle templates are now served through a registry that merges the built-in Avernus vehicles with your personal library' },
+    ],
+  },
+  {
     version: '1.8.0',
     date: '2026-04-22',
     changes: [
