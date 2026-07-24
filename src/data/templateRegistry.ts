@@ -14,10 +14,12 @@
  */
 import { VehicleTemplate } from '../types';
 import { VEHICLE_TEMPLATES } from './vehicleTemplates';
+import { NAVAL_TEMPLATES } from './navalTemplates';
 
-// Tag the shipped Avernus templates as 'builtin' here, so the source-of-truth
-// data file stays free of registry concerns. Copied once at module load.
-const BUILTIN_TEMPLATES: VehicleTemplate[] = VEHICLE_TEMPLATES.map((t) => ({
+// Tag the shipped templates (Avernus war machines + Saltmarsh ships) as
+// 'builtin' here, so the source-of-truth data files stay free of registry
+// concerns. Copied once at module load.
+const BUILTIN_TEMPLATES: VehicleTemplate[] = [...VEHICLE_TEMPLATES, ...NAVAL_TEMPLATES].map((t) => ({
   ...t,
   source: 'builtin' as const,
 }));

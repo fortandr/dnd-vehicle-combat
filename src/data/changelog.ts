@@ -20,6 +20,7 @@ export const changelog: ChangelogEntry[] = [
       { type: 'feature', description: 'Renamed the app to VVTT (Vehicular Virtual Table Top), now hosted at vvtt.lukantan.com' },
       { type: 'feature', description: 'Added a personal vehicle library — create, edit, duplicate, and delete your own custom vehicle templates right from the Add Vehicle dialog' },
       { type: 'feature', description: 'Vehicle templates now support a per-component HP model (hull, helm, sails/oars, weapon stations) so ships can be represented faithfully' },
+      { type: 'feature', description: 'Added six built-in ships from Ghosts of Saltmarsh — rowboat, keelboat, longship, sailing ship, warship, and galley — each with full per-component stats' },
       { type: 'feature', description: 'Added an environment field (land / water / air) to vehicles — groundwork for naval and aerial combat beyond Avernus' },
       { type: 'improvement', description: 'Vehicle templates are now served through a registry that merges the built-in Avernus vehicles with your personal library' },
     ],

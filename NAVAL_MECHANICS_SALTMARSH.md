@@ -98,14 +98,68 @@ Format per component: **AC / HP** (DT = damage threshold; speed-loss where noted
 (Full descriptions are in DMG ch. 8 "Siege Equipment"; Saltmarsh references them by name.)
 
 ## Naval hazards (≈ the Avernus "chase complications" analog)
-Roll d20 for **Hazard Type** and d20 for **Hazard DC** each day/encounter. Types include
-**Fog**, **Storm**, crew-illness/plague, and combat hazards. Officers roll to contribute;
-outcomes have four success/failure tiers. Full tables not transcribed here — flag for the
-naval ruleset pack.
+
+Sea travel hazards are resolved with a **group check** by the ship's officers + crew. Each
+hazard names which officers roll and what ability check; the crew rolls one d20 + its quality
+score. Outcomes have **four tiers**: Total Success (every roll succeeded), Success, Failure,
+Total Failure (every roll failed).
+
+**Determining a hazard:** at the start of each day of an ocean voyage, roll d20 — on a **20**, a
+hazard occurs. Then roll type and DC:
+
+| d20 | Hazard Type | | d20 | Hazard DC |
+|---|---|---|---|---|
+| 1–3 | Crew conflict | | 1–9 | 10 |
+| 4–6 | Fire | | 10–17 | 15 |
+| 7–9 | Fog | | 18–19 | 20 |
+| 10–12 | Infestation | | 20 | 25 |
+| 13–20 | Storm | | | |
+
+### Crew Conflict — Captain (Cha/Intimidation), First Mate (Cha/Intimidation), Cook (Int/brewer's supplies)
+DCs: 10 minor scuffle/theft · 15 brawl/valuable theft · 20 large brawl+injuries · 25 murder/serious brawl.
+- **Total Success:** crew quality +1 for 1d4 days, hazard ends.
+- **Success:** hazard ends.
+- **Failure:** crew quality −1.
+- **Total Failure:** crew quality −1 **and the crew mutinies**.
+
+### Fire — Captain (Int/water vehicles), First Mate (Cha/Intimidation), Bosun (Str/carpenter's tools), Surgeon (Int/Medicine)
+Group check = 5 minutes of work. DCs: 10 lantern-size · 15 campfire · 20 bonfire · 25 flammable-hold blaze.
+- **Total Success:** extinguished, cosmetic damage only.
+- **Success:** extinguished, but the hull + 1d3 random components take **6d6 fire**.
+- **Failure:** hull + 1d3 components take **6d6 fire**, fire continues (re-check).
+- **Total Failure:** crew quality −1; hull + 1d3 components take **6d6 fire**; fire continues (re-check).
+
+### Fog — Captain (Int/water vehicles), Quartermaster (Wis/Nature)
+DCs: 10 light · 15 moderate · 20 heavy · 25 very heavy.
+- **Total Success:** no effect; crew quality +1 for 1d3 days.
+- **Success:** no effect.
+- **Failure:** travel pace & speed **halved** for the day.
+- **Total Failure:** half speed **and moves in a random direction**.
+
+### Infestation — Captain (Int/water vehicles), First Mate (Cha/Persuasion), Surgeon (Int/Medicine), Cook (Con/cook's utensils)
+DCs: 10 minor bug/rat, cold · 15 persistent, flu · 20 serious, contagious/spoiled food · 25 lethal plague.
+- **Total Success:** crew quality +1 for 1d4 days, hazard ends.
+- **Success:** hazard ends.
+- **Failure:** crew quality −1.
+- **Total Failure:** crew quality −1; ship at **half speed** that day.
+
+### Storm — Captain (Int/water vehicles), First Mate (Cha/Intimidation), Bosun (Str/carpenter's tools), Quartermaster (Wis/Nature)
+DCs: 10 heavy gale · 15 strong storm · 20 typical hurricane · 25 overwhelming hurricane.
+- **Total Success:** unscathed; crew quality +1 for 1d4 days.
+- **Success:** unscathed.
+- **Failure:** **every component takes 4d10 bludgeoning**; crew quality −1; half speed that day.
+- **Total Failure:** **every component takes 10d10 bludgeoning**; crew quality −2; 10% of crew washed
+  overboard and lost; blown off course (random direction).
+
+### Crew quality score
+Starts at **+4**, ranges **−10 to +10**. Modifies the crew's d20 roll in every group check and their
+passive Perception (10 + quality). Rises with good morale/health/leadership and shore leave (+1/day
+in port if ≤3); falls with casualties, hardship, and failed hazards.
 
 ## Repairs
-A component (other than a destroyed hull) at >0 HP can be repaired: a **Strength check with
-carpenter's tools**, restoring HP equal to **1d6 + crew's quality score** (min 1).
+At the end of the day the **bosun** makes a **Strength check with carpenter's tools**. On a **15+**,
+each damaged component regains HP equal to **1d6 + crew quality** (min 1). A non-hull component that
+was at 0 HP becomes functional again.
 
 ## Superior Ship Upgrades (≈ the Avernus "gadgets/armor" analog)
 Optional per-component upgrades (15,000 gp, 1d4 weeks in port). Examples: **Churning Hull**
