@@ -334,8 +334,8 @@ export function Header() {
         <Toolbar sx={{ gap: 3, justifyContent: 'space-between' }}>
           {/* Left side - Title and encounter name */}
           <Stack direction="row" spacing={2} alignItems="center">
-            <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 700 }}>
-              5e Vehicular Combat
+            <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 700 }} title="Vehicular Virtual Table Top">
+              VVTT
             </Typography>
             <Divider orientation="vertical" flexItem />
             <Stack direction="row" spacing={1} alignItems="center">

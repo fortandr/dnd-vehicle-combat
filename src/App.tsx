@@ -146,7 +146,7 @@ function AppContent() {
           }}
         >
           <Typography variant="body2" color="text.disabled">
-            Avernus Vehicle Combat Tracker • Based on Descent into Avernus (5e)
+            VVTT — Vehicular Virtual Table Top • Based on Descent into Avernus (5e)
           </Typography>
         </Box>
 

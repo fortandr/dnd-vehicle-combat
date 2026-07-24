@@ -4,8 +4,11 @@
 
 **5e Vehicle Combat Tracker** - A web app for running vehicular chase combat encounters in D&D 5e, based on rules from Baldur's Gate: Descent into Avernus.
 
-**Live URL:** https://e-vehicle-combat.web.app
+**Live URL:** https://vvtt.lukantan.com (custom domain — "Vehicular Virtual Table Top")
+**Firebase URL:** https://e-vehicle-combat.web.app (still active)
 **GitHub:** https://github.com/fortandr/dnd-vehicle-combat
+
+> Custom domain `vvtt.lukantan.com` is a CNAME (managed at GoDaddy) → `e-vehicle-combat.web.app`, with a Firebase-managed SSL cert. It's also registered in **Firebase Auth → Authorized domains** (required for Google Sign-In to work there).
 
 ## Tech Stack
 

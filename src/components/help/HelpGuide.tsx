@@ -37,7 +37,7 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Typography variant="h5" component="span" sx={{ color: 'primary.main', fontWeight: 700 }}>
-          5e Vehicle Combat Tracker
+          VVTT
         </Typography>
         <Typography variant="subtitle1" color="text.secondary" sx={{ ml: 1 }}>
           Quick Start Guide

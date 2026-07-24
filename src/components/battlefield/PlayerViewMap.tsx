@@ -52,7 +52,8 @@ export function PlayerViewMap() {
     return (
       <div className="player-view-waiting">
         <div className="waiting-content">
-          <h1>5e Vehicular Combat</h1>
+          <h1>VVTT</h1>
+          <p className="text-muted">Vehicular Virtual Table Top</p>
           <p>Waiting for connection from DM screen...</p>
           <p className="text-muted">Open the main combat tracker to sync</p>
         </div>

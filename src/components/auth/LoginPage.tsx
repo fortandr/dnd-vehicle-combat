@@ -43,13 +43,13 @@ export function LoginPage() {
             textShadow: '0 0 20px rgba(255, 107, 53, 0.3)',
           }}
         >
-          5e Vehicle Combat
+          VVTT
         </Typography>
         <Typography
           variant="subtitle1"
           sx={{ color: '#888', mb: 4 }}
         >
-          Avernus Chase Tracker
+          Vehicular Virtual Table Top
         </Typography>
 
         {/* Decorative divider */}
