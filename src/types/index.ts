@@ -232,6 +232,7 @@ export interface VehicleTemplate {
   size: 'large' | 'huge' | 'gargantuan';
   immunities?: string[];
   environment?: VehicleEnvironment; // Default 'land' when unset
+  pack?: string; // Content pack this vehicle belongs to (e.g. 'avernus', 'naval') — gates pack-specific customization
   components?: VehicleComponent[]; // Per-part HP model (e.g. Saltmarsh ships)
   lengthFt?: number; // Real length bow→stern in feet — gives a rectangular map footprint (else square by size)
   beamFt?: number; // Real width (beam) in feet — paired with lengthFt

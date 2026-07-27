@@ -728,3 +728,12 @@ export const VEHICLE_TEMPLATES: VehicleTemplate[] = [
 export function getVehicleTemplate(id: string): VehicleTemplate | undefined {
   return VEHICLE_TEMPLATES.find(v => v.id === id);
 }
+
+// Infernal war machines from Descent into Avernus. Used to gate the Avernus
+// customization pack (armor upgrades, magical gadgets, weapon stations) so it
+// only appears on these vehicles — not ships or other-campaign vehicles.
+export const AVERNUS_VEHICLE_IDS = new Set(VEHICLE_TEMPLATES.map((t) => t.id));
+
+export function isAvernusVehicle(template: { id: string; pack?: string }): boolean {
+  return template.pack === 'avernus' || AVERNUS_VEHICLE_IDS.has(template.id);
+}

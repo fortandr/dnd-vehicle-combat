@@ -41,7 +41,7 @@ import { Vehicle, VehicleZone, CrewAssignment, Mishap, VehicleWeapon, Creature, 
 import { useCombat } from '../../context/CombatContext';
 import { getMishapResult, getMishapSeverity, canRepairMishap, getRepairDescription, checkMishapFromDamage, rollMishapForVehicle } from '../../data/mishapTable';
 import { v4 as uuid } from 'uuid';
-import { SWAPPABLE_WEAPONS, ARMOR_UPGRADES, MAGICAL_GADGETS, getWeaponStationUpgrade, WEAPON_STATION_EXCLUDED_VEHICLES, resolveZone } from '../../data/vehicleTemplates';
+import { SWAPPABLE_WEAPONS, ARMOR_UPGRADES, MAGICAL_GADGETS, getWeaponStationUpgrade, WEAPON_STATION_EXCLUDED_VEHICLES, resolveZone, isAvernusVehicle } from '../../data/vehicleTemplates';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
 
 interface VehicleCardProps {
@@ -595,7 +595,8 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
           </Box>
         )}
 
-        {/* Vehicle Customization */}
+        {/* Vehicle Customization — Avernus war machines only (armor / gadgets / weapon stations) */}
+        {isAvernusVehicle(vehicle.template) && (
         <Accordion
           disableGutters
           sx={{
@@ -819,6 +820,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
             </Box>
           </AccordionDetails>
         </Accordion>
+        )}
 
         {/* Active Mishaps */}
         {vehicle.activeMishaps.length > 0 && (

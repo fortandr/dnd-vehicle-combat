@@ -14,6 +14,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.1.2',
+    date: '2026-07-27',
+    changes: [
+      { type: 'fix', description: 'Vehicle customization (Avernus armor upgrades, magical gadgets, and weapon stations) now only appears on Avernus war machines — ships and other-campaign vehicles no longer show infernal upgrades. Groundwork for per-pack content.' },
+    ],
+  },
+  {
     version: '2.1.1',
     date: '2026-07-27',
     changes: [

@@ -312,4 +312,4 @@ export const NAVAL_TEMPLATES: VehicleTemplate[] = [
   SAILING_SHIP,
   WARSHIP,
   GALLEY,
-];
+].map((t) => ({ ...t, pack: 'naval' }));
