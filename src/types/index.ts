@@ -166,6 +166,7 @@ export interface WeaponTemplate {
   properties?: string[]; // e.g., "requires 2 crew"
   specialEffect?: string;
   crewRequired?: number;
+  zoneId?: string; // Explicit crew-station zone this weapon lives in (ships set this; Avernus vehicles rely on id-pattern matching)
 }
 
 export interface VehicleWeapon extends WeaponTemplate {

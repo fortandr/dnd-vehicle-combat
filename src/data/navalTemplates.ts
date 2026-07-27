@@ -6,6 +6,11 @@
  * helm, sails/oars, and weapon stations carry their own AC/HP. The core
  * maxHp/ac/damageThreshold mirror the HULL so the ships stay playable in the
  * current single-HP engine until per-component combat lands (see the plan doc).
+ *
+ * Crew stations: like the Avernus vehicles, each ship gets a Helm, one station
+ * per weapon (capacity 1, so a gunner can be assigned), and a Deck Crew / Rowers
+ * station holding the remaining crew. Station capacities sum to crewCapacity.
+ * Each weapon sets `zoneId` so it maps to its own station on add.
  */
 import type { VehicleTemplate, VehicleComponent, WeaponTemplate, VehicleZone, CoverType } from '../types';
 
@@ -13,7 +18,9 @@ import type { VehicleTemplate, VehicleComponent, WeaponTemplate, VehicleZone, Co
 // mishap trigger far out of reach so it never fires.
 const NAVAL_MISHAP_THRESHOLD = 999;
 
-// ---- Siege weapon builders (firing stats; identical across ships) ----
+const ALL_ARCS: ('front' | 'rear' | 'left' | 'right')[] = ['front', 'rear', 'left', 'right'];
+
+// ---- Siege weapon builders (firing stats; each sits in its own station) ----
 function ballistaWeapon(id: string): WeaponTemplate {
   return {
     id,
@@ -23,6 +30,7 @@ function ballistaWeapon(id: string): WeaponTemplate {
     range: '120/480 ft',
     crewRequired: 1,
     properties: ['Requires 1 crew'],
+    zoneId: `st_${id}`,
   };
 }
 function mangonelWeapon(id: string): WeaponTemplate {
@@ -35,6 +43,7 @@ function mangonelWeapon(id: string): WeaponTemplate {
     crewRequired: 1,
     properties: ['Requires 1 crew', "Can't hit within 60 ft"],
     specialEffect: "Can't hit targets within 60 feet of it.",
+    zoneId: `st_${id}`,
   };
 }
 
@@ -75,15 +84,16 @@ const NAVAL_RAM: VehicleComponent = {
   description: 'On a crash, the ship has advantage on crash saves and the crash damage applies to the ram, not the ship.',
 };
 
-// ---- Zone builders ----
+// ---- Zone (crew station) builders ----
 function helmZone(): VehicleZone {
-  return { id: 'helm', name: 'Helm', cover: 'half', capacity: 1, canAttackOut: false, visibleFromArcs: ['front', 'rear', 'left', 'right'] };
+  return { id: 'helm', name: 'Helm', cover: 'half', capacity: 1, canAttackOut: false, visibleFromArcs: ALL_ARCS };
 }
-function weaponDeck(capacity: number, cover: CoverType = 'half'): VehicleZone {
-  return { id: 'weapon_deck', name: 'Weapon Deck', cover, capacity, canAttackOut: true, visibleFromArcs: ['front', 'rear', 'left', 'right'] };
+// A single-gunner station for the weapon whose id is `weaponId` (matches its zoneId).
+function weaponStation(weaponId: string, label: string): VehicleZone {
+  return { id: `st_${weaponId}`, name: label, cover: 'half', capacity: 1, canAttackOut: true, visibleFromArcs: ALL_ARCS };
 }
-function deck(capacity: number, cover: CoverType = 'half'): VehicleZone {
-  return { id: 'deck', name: 'Deck', cover, capacity, canAttackOut: true, visibleFromArcs: ['front', 'rear', 'left', 'right'] };
+function crewDeck(capacity: number, name = 'Deck Crew', cover: CoverType = 'half'): VehicleZone {
+  return { id: 'deck_crew', name, cover, capacity, canAttackOut: true, visibleFromArcs: ALL_ARCS };
 }
 
 export const ROWBOAT: VehicleTemplate = {
@@ -101,7 +111,7 @@ export const ROWBOAT: VehicleTemplate = {
   abilityScores: { str: 11, dex: 8, con: 11 },
   size: 'large',
   environment: 'water',
-  zones: [deck(4, 'none')],
+  zones: [crewDeck(2, 'Oars & Deck', 'none')],
   weapons: [],
   components: [
     hull(11, 50),
@@ -123,7 +133,7 @@ export const KEELBOAT: VehicleTemplate = {
   abilityScores: { str: 16, dex: 7, con: 13 },
   size: 'gargantuan',
   environment: 'water',
-  zones: [helmZone(), weaponDeck(6)],
+  zones: [helmZone(), weaponStation('ballista', 'Ballista'), crewDeck(1)],
   weapons: [ballistaWeapon('ballista')],
   components: [
     hull(15, 100, 10),
@@ -148,7 +158,7 @@ export const LONGSHIP: VehicleTemplate = {
   abilityScores: { str: 20, dex: 6, con: 17 },
   size: 'gargantuan',
   environment: 'water',
-  zones: [helmZone(), deck(40)],
+  zones: [helmZone(), crewDeck(39, 'Rowers & Deck')],
   weapons: [],
   components: [
     hull(15, 300, 15),
@@ -172,7 +182,12 @@ export const SAILING_SHIP: VehicleTemplate = {
   abilityScores: { str: 20, dex: 7, con: 17 },
   size: 'gargantuan',
   environment: 'water',
-  zones: [helmZone(), weaponDeck(30)],
+  zones: [
+    helmZone(),
+    weaponStation('ballista', 'Ballista'),
+    weaponStation('mangonel', 'Mangonel'),
+    crewDeck(27),
+  ],
   weapons: [ballistaWeapon('ballista'), mangonelWeapon('mangonel')],
   components: [
     hull(15, 300, 15),
@@ -197,7 +212,14 @@ export const WARSHIP: VehicleTemplate = {
   abilityScores: { str: 20, dex: 4, con: 20 },
   size: 'gargantuan',
   environment: 'water',
-  zones: [helmZone(), weaponDeck(40)],
+  zones: [
+    helmZone(),
+    weaponStation('ballista_1', 'Ballista 1'),
+    weaponStation('ballista_2', 'Ballista 2'),
+    weaponStation('mangonel_1', 'Mangonel 1'),
+    weaponStation('mangonel_2', 'Mangonel 2'),
+    crewDeck(35),
+  ],
   weapons: [
     ballistaWeapon('ballista_1'),
     ballistaWeapon('ballista_2'),
@@ -231,7 +253,16 @@ export const GALLEY: VehicleTemplate = {
   abilityScores: { str: 24, dex: 4, con: 20 },
   size: 'gargantuan',
   environment: 'water',
-  zones: [helmZone(), weaponDeck(80)],
+  zones: [
+    helmZone(),
+    weaponStation('ballista_1', 'Ballista 1'),
+    weaponStation('ballista_2', 'Ballista 2'),
+    weaponStation('ballista_3', 'Ballista 3'),
+    weaponStation('ballista_4', 'Ballista 4'),
+    weaponStation('mangonel_1', 'Mangonel 1'),
+    weaponStation('mangonel_2', 'Mangonel 2'),
+    crewDeck(73, 'Rowers & Deck'),
+  ],
   weapons: [
     ballistaWeapon('ballista_1'),
     ballistaWeapon('ballista_2'),

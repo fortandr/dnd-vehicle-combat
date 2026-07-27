@@ -9,6 +9,7 @@ import { SCALES, formatDistanceWithUnit } from '../../data/scaleConfig';
 import { Vehicle, Creature, Position, VehicleWeapon, CrewAssignment, ElevationZone } from '../../types';
 import { featureFlags } from '../../config/featureFlags';
 import { resolveZone } from '../../data/vehicleTemplates';
+import { renderShipIcon } from './shipIcons';
 
 export function PlayerViewMap() {
   const { state, isConnected } = useBroadcastReceiver();
@@ -704,6 +705,10 @@ interface PlayerViewVehicleIconProps {
 
 function PlayerViewVehicleIcon({ templateId, size, color }: PlayerViewVehicleIconProps) {
   const id = templateId.toLowerCase();
+
+  // Saltmarsh ships have their own shared top-down icons.
+  const shipIcon = renderShipIcon(id, size, color);
+  if (shipIcon) return shipIcon;
 
   if (id.includes('buzz') || id.includes('killer')) {
     // Buzz Killer - Hellish trike with massive saw blade front wheel

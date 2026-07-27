@@ -14,6 +14,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.1.0',
+    date: '2026-07-27',
+    changes: [
+      { type: 'feature', description: 'Added distinct top-down token icons for each ship type (rowboat, keelboat, longship, sailing ship, warship, galley) on both the DM and player battlefield views' },
+      { type: 'fix', description: 'Fixed ship crew stations — ships now show a Helm, a station per weapon, and a Deck Crew/Rowers station (e.g. the Sailing Ship has 4 stations for its 30 crew, not 2)' },
+    ],
+  },
+  {
     version: '2.0.0',
     date: '2026-07-24',
     changes: [

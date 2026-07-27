@@ -135,8 +135,15 @@ export function MainPanel() {
         let zoneId = '';
         let arcs: ('front' | 'rear' | 'left' | 'right')[] = ['front', 'rear', 'left', 'right'];
 
+        // Explicit station assignment (e.g. ships) takes priority over id-pattern matching.
+        const explicitZone = w.zoneId ? template.zones.find((z) => z.id === w.zoneId) : undefined;
+        if (explicitZone) {
+          zoneId = explicitZone.id;
+          arcs = explicitZone.visibleFromArcs;
+        }
+
         // Match weapon to zone by ID pattern
-        if (w.id.includes('port')) {
+        if (!zoneId && w.id.includes('port')) {
           const zone = template.zones.find((z) => z.id.includes('port'));
           if (zone) {
             zoneId = zone.id;

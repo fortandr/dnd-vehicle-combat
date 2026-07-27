@@ -24,6 +24,7 @@ import { SCALES, formatDistance, formatDistanceWithUnit, getScaleForDistance, ca
 import { getVehicleElevation } from '../../utils/elevationCalculator';
 import { resolveZone } from '../../data/vehicleTemplates';
 import { useBroadcastSource } from '../../hooks/useBroadcastChannel';
+import { renderShipIcon } from './shipIcons';
 import { featureFlags } from '../../config/featureFlags';
 
 interface BattlefieldMapProps {
@@ -2958,6 +2959,10 @@ interface VehicleIconProps {
 
 function VehicleIcon({ templateId, size, color }: VehicleIconProps) {
   const id = templateId.toLowerCase();
+
+  // Saltmarsh ships have their own shared top-down icons.
+  const shipIcon = renderShipIcon(id, size, color);
+  if (shipIcon) return shipIcon;
 
   // All icons are TOP-DOWN view, pointing UP (forward)
   // Circles indicate weapon stations
