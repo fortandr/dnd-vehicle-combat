@@ -38,6 +38,7 @@ import BuildIcon from '@mui/icons-material/Build';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
 import { Vehicle, VehicleZone, CrewAssignment, Mishap, VehicleWeapon, Creature, Statblock } from '../../types';
+import { getComponentHp, destroyedEffectLabel } from '../../utils/vehicleComponents';
 import { useCombat } from '../../context/CombatContext';
 import { getMishapResult, getMishapSeverity, canRepairMishap, getRepairDescription, checkMishapFromDamage, rollMishapForVehicle } from '../../data/mishapTable';
 import { v4 as uuid } from 'uuid';
@@ -949,6 +950,9 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
           </Box>
         )}
 
+        {/* Component combat — per-part HP & targeted damage (component vehicles only) */}
+        <ComponentDamageSection vehicle={vehicle} />
+
         {/* Deal Damage Section */}
         <Paper sx={{ p: 1.5, bgcolor: '#242424', mb: 2 }}>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
@@ -1593,4 +1597,83 @@ function formatCoverShort(cover: string): string {
     full: 'Full',
   };
   return labels[cover] || cover;
+}
+
+// ==========================================
+// Component Combat — per-part HP, targeted damage, and repair (ships)
+// ==========================================
+interface ComponentDamageSectionProps {
+  vehicle: Vehicle;
+}
+
+function ComponentDamageSection({ vehicle }: ComponentDamageSectionProps) {
+  const { damageVehicleComponent, setVehicleComponentHp } = useCombat();
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const components = vehicle.template.components ?? [];
+  if (components.length === 0) return null;
+
+  return (
+    <Box sx={{ mb: 2 }}>
+      <Typography variant="caption" fontWeight={600} sx={{ display: 'block', mb: 1 }}>
+        Components
+      </Typography>
+      <Stack spacing={0.75}>
+        {components.map((comp) => {
+          const cur = getComponentHp(vehicle, comp);
+          const pct = comp.maxHp > 0 ? (cur / comp.maxHp) * 100 : 0;
+          const destroyed = cur <= 0;
+          const barColor = pct > 50 ? '#10b981' : pct > 25 ? '#f59e0b' : '#ef4444';
+          const amt = amounts[comp.id] ?? '';
+          const applyDamage = () => {
+            const n = parseInt(amt, 10);
+            if (!Number.isFinite(n) || n <= 0) return;
+            damageVehicleComponent(vehicle.id, comp.id, n);
+            setAmounts((s) => ({ ...s, [comp.id]: '' }));
+          };
+          return (
+            <Paper key={comp.id} sx={{ p: 1, bgcolor: destroyed ? '#2a1a1a' : '#242424', opacity: destroyed ? 0.8 : 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5, gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+                  <Typography variant="body2" fontWeight={600} noWrap>
+                    {comp.name}
+                  </Typography>
+                  <Chip label={comp.kind} size="small" variant="outlined" sx={{ height: 16, fontSize: '0.55rem' }} />
+                  {destroyed && (
+                    <Chip label={destroyedEffectLabel(comp)} size="small" color="error" sx={{ height: 16, fontSize: '0.55rem' }} />
+                  )}
+                </Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                  {cur}/{comp.maxHp}{comp.damageThreshold ? ` · DT ${comp.damageThreshold}` : ''}
+                </Typography>
+              </Box>
+              <LinearProgress
+                variant="determinate"
+                value={Math.max(0, Math.min(100, pct))}
+                sx={{ height: 5, borderRadius: 1, mb: 0.75, bgcolor: '#111', '& .MuiLinearProgress-bar': { bgcolor: barColor } }}
+              />
+              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                <TextField
+                  type="number"
+                  size="small"
+                  placeholder="Dmg"
+                  value={amt}
+                  onChange={(e) => setAmounts((s) => ({ ...s, [comp.id]: e.target.value }))}
+                  onKeyDown={(e) => e.key === 'Enter' && applyDamage()}
+                  sx={{ width: 76 }}
+                />
+                <Button size="small" color="error" variant="outlined" onClick={applyDamage} disabled={!amt || parseInt(amt, 10) <= 0}>
+                  Damage
+                </Button>
+                {cur < comp.maxHp && (
+                  <Button size="small" variant="text" onClick={() => setVehicleComponentHp(vehicle.id, comp.id, comp.maxHp)}>
+                    Repair
+                  </Button>
+                )}
+              </Box>
+            </Paper>
+          );
+        })}
+      </Stack>
+    </Box>
+  );
 }

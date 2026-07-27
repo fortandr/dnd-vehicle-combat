@@ -125,6 +125,8 @@ type CombatAction =
 
   // Damage & Healing
   | { type: 'DEAL_DAMAGE_TO_VEHICLE'; payload: { vehicleId: string; amount: number; source?: string } }
+  | { type: 'DAMAGE_VEHICLE_COMPONENT'; payload: { vehicleId: string; componentId: string; amount: number } }
+  | { type: 'SET_VEHICLE_COMPONENT_HP'; payload: { vehicleId: string; componentId: string; hp: number } }
   | { type: 'HEAL_VEHICLE'; payload: { vehicleId: string; amount: number } }
   | { type: 'DEAL_DAMAGE_TO_CREATURE'; payload: { creatureId: string; amount: number; source?: string } }
   | { type: 'HEAL_CREATURE'; payload: { creatureId: string; amount: number } }
@@ -991,6 +993,46 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
       };
 
     // ========== Damage & Healing ==========
+    case 'DAMAGE_VEHICLE_COMPONENT': {
+      const { vehicleId, componentId, amount } = action.payload;
+      return {
+        ...state,
+        vehicles: state.vehicles.map((v) => {
+          if (v.id !== vehicleId) return v;
+          const comp = v.template.components?.find((c) => c.id === componentId);
+          if (!comp) return v;
+          // A hit below the component's damage threshold is superficial (no damage).
+          const applied = amount < (comp.damageThreshold ?? 0) ? 0 : amount;
+          if (comp.kind === 'hull') {
+            const newHp = Math.max(0, v.currentHp - applied);
+            const shouldEject = newHp === 0 && !v.isInoperative;
+            return { ...v, currentHp: newHp, isInoperative: shouldEject ? true : v.isInoperative };
+          }
+          const cur = v.componentHp?.[componentId] ?? comp.maxHp;
+          const newHp = Math.max(0, cur - applied);
+          return { ...v, componentHp: { ...(v.componentHp || {}), [componentId]: newHp } };
+        }),
+      };
+    }
+
+    case 'SET_VEHICLE_COMPONENT_HP': {
+      const { vehicleId, componentId, hp } = action.payload;
+      return {
+        ...state,
+        vehicles: state.vehicles.map((v) => {
+          if (v.id !== vehicleId) return v;
+          const comp = v.template.components?.find((c) => c.id === componentId);
+          if (!comp) return v;
+          const clamped = Math.max(0, Math.min(comp.maxHp, hp));
+          if (comp.kind === 'hull') {
+            const shouldEject = clamped === 0 && !v.isInoperative;
+            return { ...v, currentHp: clamped, isInoperative: shouldEject ? true : v.isInoperative };
+          }
+          return { ...v, componentHp: { ...(v.componentHp || {}), [componentId]: clamped } };
+        }),
+      };
+    }
+
     case 'DEAL_DAMAGE_TO_VEHICLE': {
       const vehicle = state.vehicles.find((v) => v.id === action.payload.vehicleId);
       if (!vehicle) return state;
@@ -1761,6 +1803,8 @@ interface CombatContextValue {
   setVehicleArmor: (vehicleId: string, armorUpgradeId: string) => void;
   toggleVehicleGadget: (vehicleId: string, gadgetId: string) => void;
   toggleNavalUpgrade: (vehicleId: string, upgradeId: string) => void;
+  damageVehicleComponent: (vehicleId: string, componentId: string, amount: number) => void;
+  setVehicleComponentHp: (vehicleId: string, componentId: string, hp: number) => void;
   toggleWeaponStationUpgrade: (vehicleId: string) => void;
   loadPartyPreset: (vehicles: Vehicle[], creatures: Creature[], crewAssignments: CrewAssignment[]) => void;
   toggleAutoRollComplications: () => void;
@@ -2140,6 +2184,18 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
     []
   );
 
+  const damageVehicleComponent = useCallback(
+    (vehicleId: string, componentId: string, amount: number) =>
+      dispatch({ type: 'DAMAGE_VEHICLE_COMPONENT', payload: { vehicleId, componentId, amount } }),
+    []
+  );
+
+  const setVehicleComponentHp = useCallback(
+    (vehicleId: string, componentId: string, hp: number) =>
+      dispatch({ type: 'SET_VEHICLE_COMPONENT_HP', payload: { vehicleId, componentId, hp } }),
+    []
+  );
+
   const toggleVehicleGadget = useCallback(
     (vehicleId: string, gadgetId: string) =>
       dispatch({ type: 'TOGGLE_VEHICLE_GADGET', payload: { vehicleId, gadgetId } }),
@@ -2299,6 +2355,8 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
     setVehicleArmor,
     toggleVehicleGadget,
     toggleNavalUpgrade,
+    damageVehicleComponent,
+    setVehicleComponentHp,
     toggleWeaponStationUpgrade,
     loadPartyPreset,
     toggleAutoRollComplications,

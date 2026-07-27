@@ -25,6 +25,7 @@ import { getVehicleElevation } from '../../utils/elevationCalculator';
 import { resolveZone } from '../../data/vehicleTemplates';
 import { useBroadcastSource } from '../../hooks/useBroadcastChannel';
 import { renderShipIcon } from './shipIcons';
+import { getPropulsionSpeedCap, isWeaponDestroyed, canVehicleTurn } from '../../utils/vehicleComponents';
 import { featureFlags } from '../../config/featureFlags';
 
 interface BattlefieldMapProps {
@@ -299,6 +300,9 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
         speed -= mishap.mechanicalEffect.speedReduction;
       }
     }
+
+    // Component combat: propulsion loss caps speed (0 if all movement components are destroyed).
+    speed = Math.min(speed, getPropulsionSpeedCap(vehicle));
 
     return Math.max(0, speed);
   };
@@ -2679,6 +2683,7 @@ function VehicleToken({
   const handleRotateLeft = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    if (!canVehicleTurn(vehicle)) return; // helm destroyed
     const newFacing = (vehicle.facing - 45 + 360) % 360;
     onRotate(vehicle.id, newFacing);
   };
@@ -2686,6 +2691,7 @@ function VehicleToken({
   const handleRotateRight = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    if (!canVehicleTurn(vehicle)) return; // helm destroyed
     const newFacing = (vehicle.facing + 45) % 360;
     onRotate(vehicle.id, newFacing);
   };
@@ -2712,9 +2718,9 @@ function VehicleToken({
         />
       )}
 
-      {/* Rotation Controls - only show on hover and when not disabled/inoperative */}
+      {/* Rotation Controls - only show on hover, when not disabled/inoperative, and if the helm survives */}
       {/* Wrapper div keeps hover state when moving to buttons */}
-      {!disabled && !isInoperative && (
+      {!disabled && !isInoperative && canVehicleTurn(vehicle) && (
         <div
           style={{
             position: 'absolute',
@@ -4191,6 +4197,9 @@ function getWeaponRangesByArc(
   const vehicleCrew = crewAssignments.filter((a) => a.vehicleId === vehicle.id);
 
   for (const weapon of vehicle.weapons) {
+    // Component combat: a destroyed weapon component can't fire.
+    if (isWeaponDestroyed(vehicle, weapon.id)) continue;
+
     // Check if this weapon's zone is manned by a living creature
     const crewAtStation = vehicleCrew.find((a) => a.zoneId === weapon.zoneId);
     if (!crewAtStation) continue; // No one at this station

@@ -256,6 +256,9 @@ export interface Vehicle {
   gadgetIds?: string[]; // IDs of installed magical gadgets (Avernus pack)
   navalUpgradeIds?: string[]; // IDs of installed Superior Ship Upgrades (naval pack)
   hasWeaponStationUpgrade?: boolean; // Whether custom weapon station is installed
+  // Component combat: current HP per component id (hull uses currentHp instead).
+  // Missing entries default to the component's max HP.
+  componentHp?: Record<string, number>;
   // Status
   isInoperative?: boolean; // True when HP reaches 0 - crew ejected, vehicle disabled
   // Temporary effects from complications

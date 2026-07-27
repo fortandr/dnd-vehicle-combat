@@ -14,6 +14,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.3.0',
+    date: '2026-07-27',
+    changes: [
+      { type: 'feature', description: 'Component combat for ships: each part (hull, helm, sails/oars, weapon stations) tracks its own HP in a new Components panel for targeted damage and repair, respecting per-part damage thresholds.' },
+      { type: 'feature', description: 'Destroyed components have consequences — a wrecked hull disables the ship, a destroyed helm stops it from turning, lost movement components cut its speed (0 if all propulsion is gone), and a destroyed weapon can no longer fire.' },
+    ],
+  },
+  {
     version: '2.2.0',
     date: '2026-07-27',
     changes: [
