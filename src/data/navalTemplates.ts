@@ -95,6 +95,10 @@ function weaponStation(weaponId: string, label: string): VehicleZone {
 function crewDeck(capacity: number, name = 'Deck Crew', cover: CoverType = 'half', bulk = true): VehicleZone {
   return { id: 'deck_crew', name, cover, capacity, canAttackOut: true, visibleFromArcs: ALL_ARCS, bulk };
 }
+// Ride-along passengers (the party) — book passenger capacity, shown as a bulk count.
+function passengers(capacity: number): VehicleZone {
+  return { id: 'passengers', name: 'Passengers', cover: 'half', capacity, canAttackOut: true, visibleFromArcs: ALL_ARCS, bulk: true };
+}
 
 export const ROWBOAT: VehicleTemplate = {
   id: 'rowboat',
@@ -113,7 +117,7 @@ export const ROWBOAT: VehicleTemplate = {
   beamFt: 5,
   size: 'large',
   environment: 'water',
-  zones: [crewDeck(2, 'Oars & Deck', 'none', false)],
+  zones: [crewDeck(2, 'Oars & Deck', 'none', false), passengers(2)],
   weapons: [],
   components: [
     hull(11, 50),
@@ -137,7 +141,7 @@ export const KEELBOAT: VehicleTemplate = {
   beamFt: 20,
   size: 'gargantuan',
   environment: 'water',
-  zones: [helmZone(), weaponStation('ballista', 'Ballista'), crewDeck(1)],
+  zones: [helmZone(), weaponStation('ballista', 'Ballista'), crewDeck(1), passengers(4)],
   weapons: [ballistaWeapon('ballista')],
   components: [
     hull(15, 100, 10),
@@ -164,7 +168,7 @@ export const LONGSHIP: VehicleTemplate = {
   beamFt: 20,
   size: 'gargantuan',
   environment: 'water',
-  zones: [helmZone(), crewDeck(39, 'Rowers & Deck')],
+  zones: [helmZone(), crewDeck(39, 'Rowers & Deck'), passengers(100)],
   weapons: [],
   components: [
     hull(15, 300, 15),
@@ -195,6 +199,7 @@ export const SAILING_SHIP: VehicleTemplate = {
     weaponStation('ballista', 'Ballista'),
     weaponStation('mangonel', 'Mangonel'),
     crewDeck(27),
+    passengers(20),
   ],
   weapons: [ballistaWeapon('ballista'), mangonelWeapon('mangonel')],
   components: [
@@ -229,6 +234,7 @@ export const WARSHIP: VehicleTemplate = {
     weaponStation('mangonel_1', 'Mangonel 1'),
     weaponStation('mangonel_2', 'Mangonel 2'),
     crewDeck(35),
+    passengers(60),
   ],
   weapons: [
     ballistaWeapon('ballista_1'),
@@ -274,6 +280,7 @@ export const GALLEY: VehicleTemplate = {
     weaponStation('mangonel_1', 'Mangonel 1'),
     weaponStation('mangonel_2', 'Mangonel 2'),
     crewDeck(73, 'Rowers & Deck'),
+    passengers(40),
   ],
   weapons: [
     ballistaWeapon('ballista_1'),

@@ -33,8 +33,8 @@ function buildShip(width: number, height: number, color: string, spec: ShipSpec)
   const endY = H - 1;
 
   const hullPath = pointedStern
-    ? `M12,1 L16,${bowY} L16,${sternY} L12,${endY} L8,${sternY} L8,${bowY} Z`
-    : `M12,${ram ? bowY : 1} L17,${bowY} L17,${sternY} Q17,${endY} 12,${endY} Q7,${endY} 7,${sternY} L7,${bowY} Z`;
+    ? `M12,1 L18,${bowY} L18,${sternY} L12,${endY} L6,${sternY} L6,${bowY} Z`
+    : `M12,${ram ? bowY : 1} L18,${bowY} L18,${sternY} Q18,${endY} 12,${endY} Q6,${endY} 6,${sternY} L6,${bowY} Z`;
 
   const els: ReactElement[] = [<path key="hull" d={hullPath} fill={color} opacity="0.9" />];
 
@@ -44,8 +44,8 @@ function buildShip(width: number, height: number, color: string, spec: ShipSpec)
     const y = Math.round(f * H);
     els.push(
       <g key={`o${i}`}>
-        <line x1="7" y1={y} x2="2.5" y2={y - 2} stroke={color} strokeWidth="0.8" opacity="0.85" />
-        <line x1="17" y1={y} x2="21.5" y2={y - 2} stroke={color} strokeWidth="0.8" opacity="0.85" />
+        <line x1="6" y1={y} x2="2" y2={y - 2} stroke={color} strokeWidth="0.9" opacity="0.85" />
+        <line x1="18" y1={y} x2="22" y2={y - 2} stroke={color} strokeWidth="0.9" opacity="0.85" />
       </g>
     );
   });
@@ -75,18 +75,16 @@ function buildShip(width: number, height: number, color: string, spec: ShipSpec)
   );
 }
 
+// All ships are drawn at a chunky 2.5:1 (viewBox 24×60), matching the capped token
+// aspect (MAX_SHIP_ASPECT in BattlefieldMap) so they fill without distortion. On-map
+// size differences come from real length, not from the icon proportions.
 const SPECS: Record<string, ShipSpec> = {
-  // Keelboat 60×20 → H 72
-  keelboat: { H: 72, masts: [0.46], stations: [{ x: 12, y: 0.2 }], helm: 0.86, oarRows: [0.58, 0.7] },
-  // Longship 70×20 → H 84, sharp bow & stern, oar banks, no siege weapons
-  longship: { H: 84, pointedStern: true, masts: [0.45], helm: 0.9, oarRows: [0.24, 0.38, 0.52, 0.66] },
-  // Sailing ship 100×20 → H 120, three masts, ballista fore + mangonel aft
-  sailing_ship: { H: 120, masts: [0.26, 0.46, 0.66], stations: [{ x: 12, y: 0.13 }, { x: 12, y: 0.8, r: 2.4 }], helm: 0.92 },
-  // Warship 100×20 → H 120, ram, 2 ballistas fore + 2 mangonels aft
-  warship: { H: 120, ram: true, masts: [0.42, 0.66], stations: [{ x: 8, y: 0.24 }, { x: 16, y: 0.24 }, { x: 8, y: 0.78, r: 2.4 }, { x: 16, y: 0.78, r: 2.4 }], helm: 0.93 },
-  // Galley 130×20 → H 156, ram, oar banks, 4 ballistas + 2 mangonels
+  keelboat: { H: 60, masts: [0.46], stations: [{ x: 12, y: 0.2 }], helm: 0.86, oarRows: [0.6, 0.72] },
+  longship: { H: 60, pointedStern: true, masts: [0.45], helm: 0.9, oarRows: [0.26, 0.4, 0.54, 0.68] },
+  sailing_ship: { H: 60, masts: [0.26, 0.46, 0.66], stations: [{ x: 12, y: 0.14 }, { x: 12, y: 0.8, r: 2.4 }], helm: 0.92 },
+  warship: { H: 60, ram: true, masts: [0.42, 0.66], stations: [{ x: 8, y: 0.24 }, { x: 16, y: 0.24 }, { x: 8, y: 0.78, r: 2.4 }, { x: 16, y: 0.78, r: 2.4 }], helm: 0.93 },
   galley: {
-    H: 156,
+    H: 60,
     ram: true,
     masts: [0.44, 0.68],
     oarRows: [0.3, 0.42, 0.54, 0.66, 0.78],

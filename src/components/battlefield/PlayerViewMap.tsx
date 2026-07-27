@@ -240,12 +240,25 @@ export function PlayerViewMap() {
         {/* Vehicle Tokens */}
         {state.vehicles.map((vehicle) => {
           const screenPos = worldToScreen(vehicle.position);
-          // Rectangular for ships (lengthFt/beamFt); square otherwise. Min 24px for visibility.
-          const rect = vehicle.template.lengthFt && vehicle.template.beamFt;
-          const tokenW = rect
-            ? Math.max(24, vehicle.template.beamFt! * pixelsPerFoot)
-            : Math.max(24, getVehicleSizeInFeet(vehicle.template.size, vehicle.template.id) * pixelsPerFoot);
-          const tokenH = rect ? Math.max(24, vehicle.template.lengthFt! * pixelsPerFoot) : tokenW;
+          // Ships: chunky boat aspect (≤2.5:1) scaled by real length, min size without slivers.
+          // Others: square. Mirrors getVehicleTokenDims in BattlefieldMap.
+          let tokenW: number;
+          let tokenH: number;
+          if (vehicle.template.lengthFt && vehicle.template.beamFt) {
+            const drawnBeam = Math.max(vehicle.template.beamFt, vehicle.template.lengthFt / 2.5);
+            tokenW = drawnBeam * pixelsPerFoot;
+            tokenH = vehicle.template.lengthFt * pixelsPerFoot;
+            const smallest = Math.min(tokenW, tokenH);
+            if (smallest < 24) {
+              const s = 24 / smallest;
+              tokenW *= s;
+              tokenH *= s;
+            }
+          } else {
+            const sq = Math.max(24, getVehicleSizeInFeet(vehicle.template.size, vehicle.template.id) * pixelsPerFoot);
+            tokenW = sq;
+            tokenH = sq;
+          }
           const borderColor = vehicle.type === 'party' ? 'var(--color-health)' : 'var(--color-fire)';
           const isInoperative = vehicle.isInoperative || vehicle.currentHp === 0;
           const weaponRangesByArc = getWeaponRangesByArc(vehicle, state.crewAssignments, state.creatures);

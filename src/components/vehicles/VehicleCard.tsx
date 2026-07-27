@@ -37,7 +37,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import BuildIcon from '@mui/icons-material/Build';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
-import { Vehicle, VehicleZone, CrewAssignment, Mishap, VehicleWeapon } from '../../types';
+import { Vehicle, VehicleZone, CrewAssignment, Mishap, VehicleWeapon, Creature, Statblock } from '../../types';
 import { useCombat } from '../../context/CombatContext';
 import { getMishapResult, getMishapSeverity, canRepairMishap, getRepairDescription, checkMishapFromDamage, rollMishapForVehicle } from '../../data/mishapTable';
 import { v4 as uuid } from 'uuid';
@@ -1097,7 +1097,7 @@ interface CrewZoneProps {
 }
 
 function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
-  const { state, assignCrew, dispatch } = useCombat();
+  const { state, assignCrew, addCreature, dispatch } = useCombat();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [moveMenuAnchor, setMoveMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedCreatureId, setSelectedCreatureId] = useState<string | null>(null);
@@ -1258,6 +1258,45 @@ function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
   const visibleAssignments = zone.bulk ? assignments.slice(0, MAX_BULK_AVATARS) : assignments;
   const bulkOverflow = assignments.length - visibleAssignments.length;
 
+  const seatLabel = zone.id === 'passengers' ? 'Passenger' : zone.id === 'helm' ? 'Pilot' : 'Crew';
+
+  // Create a fresh character already seated in this zone, so an empty seat isn't a dead end.
+  const handleCreateAndSeat = () => {
+    if (!vehicle) return;
+    const name = `${seatLabel} ${assignments.length + 1}`;
+    const statblock: Statblock = {
+      id: uuid(),
+      name,
+      source: 'custom',
+      size: 'medium',
+      type: 'humanoid',
+      alignment: 'neutral',
+      ac: 12,
+      maxHp: 10,
+      hitDice: '2d8',
+      speed: { walk: 30 },
+      abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+      senses: 'passive Perception 10',
+      languages: 'Common',
+      cr: '0',
+    };
+    const creature: Creature = {
+      id: uuid(),
+      name,
+      statblock,
+      currentHp: statblock.maxHp,
+      tempHp: 0,
+      conditions: [],
+      initiative: 0,
+      initiativeModifier: 0,
+      faction: vehicle.type,
+      position: { ...vehicle.position },
+    };
+    addCreature(creature);
+    assignCrew({ creatureId: creature.id, vehicleId, zoneId: zone.id });
+    setAnchorEl(null);
+  };
+
   return (
     <Paper
       sx={{
@@ -1354,27 +1393,25 @@ function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
           },
         }}
       >
-        {unassignedCreatures.length === 0 ? (
-          <MenuItem disabled>
+        <MenuItem onClick={handleCreateAndSeat}>
+          <ListItemText
+            primary={`+ New ${seatLabel.toLowerCase()} here`}
+            secondary="Create a character in this seat"
+            primaryTypographyProps={{ variant: 'body2', fontWeight: 600, color: 'primary.main' }}
+            secondaryTypographyProps={{ variant: 'caption' }}
+          />
+        </MenuItem>
+        {unassignedCreatures.length > 0 && <Divider />}
+        {unassignedCreatures.map((creature) => (
+          <MenuItem key={creature.id} onClick={() => handleAssign(creature.id)}>
             <ListItemText
-              primary="No unassigned creatures"
-              secondary="Add creatures in sidebar"
-              primaryTypographyProps={{ variant: 'body2' }}
+              primary={creature.name}
+              secondary={`Seat existing · HP ${creature.currentHp}/${creature.statblock.maxHp}`}
+              primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
               secondaryTypographyProps={{ variant: 'caption' }}
             />
           </MenuItem>
-        ) : (
-          unassignedCreatures.map((creature) => (
-            <MenuItem key={creature.id} onClick={() => handleAssign(creature.id)}>
-              <ListItemText
-                primary={creature.name}
-                secondary={`HP: ${creature.currentHp}/${creature.statblock.maxHp}`}
-                primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
-                secondaryTypographyProps={{ variant: 'caption' }}
-              />
-            </MenuItem>
-          ))
-        )}
+        ))}
       </Menu>
 
       {/* Move/Exit Menu for assigned crew */}

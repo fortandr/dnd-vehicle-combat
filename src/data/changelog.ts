@@ -14,6 +14,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.1.1',
+    date: '2026-07-27',
+    changes: [
+      { type: 'fix', description: 'Ships now render as chunky, readable boat tokens (capped at ~2.5:1) instead of book-accurate slivers, and no longer shrink to a sliver at coarse map zoom — they stay boat-shaped and clickable at any scale' },
+      { type: 'feature', description: 'Added a Passengers zone to every ship (book passenger capacity, e.g. Sailing Ship 20, Longship 100) so you can place your party aboard, separate from the working crew' },
+      { type: 'improvement', description: 'You can now create a character directly in any vehicle seat — the "+" on a crew or passenger station offers "New crew/passenger here", instead of a dead end when no creatures exist yet' },
+    ],
+  },
+  {
     version: '2.1.0',
     date: '2026-07-27',
     changes: [

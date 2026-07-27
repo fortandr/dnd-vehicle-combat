@@ -4107,14 +4107,27 @@ function getVehicleSizeInFeet(size: string, templateId?: string): number {
   return sizes[size] || 10;
 }
 
+// Longest a ship is drawn relative to its width. Book hulls are 5:1–6.5:1, which
+// render as unreadable slivers, so we cap the drawn aspect to keep them boat-shaped
+// and clickable while still scaling length by real feet (a galley dwarfs a rowboat).
+const MAX_SHIP_ASPECT = 2.5;
+
 // Token pixel dimensions. Vehicles with explicit lengthFt/beamFt (ships) get a
 // rectangular footprint; everything else stays a square sized by getVehicleSizeInFeet.
 function getVehicleTokenDims(template: VehicleTemplate, pixelsPerFoot: number): { w: number; h: number } {
   if (template.lengthFt && template.beamFt) {
-    return {
-      w: Math.max(24, template.beamFt * pixelsPerFoot),
-      h: Math.max(24, template.lengthFt * pixelsPerFoot),
-    };
+    // Draw the beam chunkier than reality so long ships aren't pencil-thin.
+    const drawnBeam = Math.max(template.beamFt, template.lengthFt / MAX_SHIP_ASPECT);
+    let w = drawnBeam * pixelsPerFoot;
+    let h = template.lengthFt * pixelsPerFoot;
+    // Enforce a minimum size without breaking the aspect ratio (no slivers at coarse zoom).
+    const smallest = Math.min(w, h);
+    if (smallest < 24) {
+      const scale = 24 / smallest;
+      w *= scale;
+      h *= scale;
+    }
+    return { w, h };
   }
   const s = Math.max(24, getVehicleSizeInFeet(template.size, template.id) * pixelsPerFoot);
   return { w: s, h: s };
