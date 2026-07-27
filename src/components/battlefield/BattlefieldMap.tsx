@@ -19,7 +19,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useCombat } from '../../context/CombatContext';
 import { useSettings } from '../../context/SettingsContext';
-import { Vehicle, Position, ScaleName, Creature, CrewAssignment, ElevationZone } from '../../types';
+import { Vehicle, VehicleTemplate, Position, ScaleName, Creature, CrewAssignment, ElevationZone } from '../../types';
 import { SCALES, formatDistance, formatDistanceWithUnit, getScaleForDistance, calculateMovementPerRound } from '../../data/scaleConfig';
 import { getVehicleElevation } from '../../utils/elevationCalculator';
 import { resolveZone } from '../../data/vehicleTemplates';
@@ -2321,13 +2321,14 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
 interface WeaponRangeArcsProps {
   weaponRanges: Record<'front' | 'rear' | 'left' | 'right', number>;
   pixelsPerFoot: number;
-  tokenSize: number;
+  tokenWidth: number;
+  tokenHeight: number;
   vehicleType: 'party' | 'enemy';
   facing: number;
   unitSystem: 'imperial' | 'metric';
 }
 
-function WeaponRangeArcs({ weaponRanges, pixelsPerFoot, tokenSize, vehicleType, facing, unitSystem }: WeaponRangeArcsProps) {
+function WeaponRangeArcs({ weaponRanges, pixelsPerFoot, tokenWidth, tokenHeight, vehicleType, facing, unitSystem }: WeaponRangeArcsProps) {
   const baseColor = vehicleType === 'party' ? '34, 197, 94' : '255, 69, 0';
   const maxRange = Math.max(weaponRanges.front, weaponRanges.rear, weaponRanges.left, weaponRanges.right);
   const svgSize = maxRange * pixelsPerFoot * 2 + 20;
@@ -2365,8 +2366,8 @@ function WeaponRangeArcs({ weaponRanges, pixelsPerFoot, tokenSize, vehicleType, 
     <svg
       style={{
         position: 'absolute',
-        left: tokenSize / 2 - center,
-        top: tokenSize / 2 - center,
+        left: tokenWidth / 2 - center,
+        top: tokenHeight / 2 - center,
         width: svgSize,
         height: svgSize,
         pointerEvents: 'none',
@@ -2647,12 +2648,10 @@ function VehicleToken({
       disabled: disabled || isInoperative, // Can't move inoperative vehicles
     });
 
-  // Calculate token size based on actual vehicle dimensions in feet
-  // This ensures vehicles are properly scaled relative to the map at any zoom level
-  const vehicleFeet = getVehicleSizeInFeet(vehicle.template.size, vehicle.template.id);
-  const scaledSize = vehicleFeet * pixelsPerFoot;
-  // Minimum 24px for visibility at extreme zoom out, no max so vehicles scale properly
-  const tokenSize = Math.max(24, scaledSize);
+  // Token pixel dimensions — rectangular for ships (lengthFt/beamFt), square otherwise.
+  // Scaled relative to the map so vehicles keep their real proportions at any zoom.
+  const { w: tokenW, h: tokenH } = getVehicleTokenDims(vehicle.template, pixelsPerFoot);
+  const tokenMin = Math.min(tokenW, tokenH);
 
   // Calculate weapon ranges per arc direction (only for manned weapons)
   // Includes elevation-based range extension when firing at targets below
@@ -2670,8 +2669,8 @@ function VehicleToken({
 
   const style = {
     position: 'absolute' as const,
-    left: screenPosition.x - tokenSize / 2,
-    top: screenPosition.y - tokenSize / 2,
+    left: screenPosition.x - tokenW / 2,
+    top: screenPosition.y - tokenH / 2,
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.5 : 1,
     zIndex: getZIndex(),
@@ -2705,7 +2704,8 @@ function VehicleToken({
         <WeaponRangeArcs
           weaponRanges={weaponRangesByArc}
           pixelsPerFoot={pixelsPerFoot}
-          tokenSize={tokenSize}
+          tokenWidth={tokenW}
+          tokenHeight={tokenH}
           vehicleType={vehicle.type}
           facing={vehicle.facing}
           unitSystem={unitSystem}
@@ -2754,8 +2754,8 @@ function VehicleToken({
         <div
           className={`vehicle-token ${isDragging ? 'dragging' : ''} ${isCurrentTurn ? 'current-turn' : ''} ${isInoperative ? 'inoperative' : ''}`}
           style={{
-            width: tokenSize,
-            height: tokenSize,
+            width: tokenW,
+            height: tokenH,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -2771,7 +2771,8 @@ function VehicleToken({
           {/* Vehicle Icon - includes all visual elements */}
           <VehicleIcon
             templateId={vehicle.template.id}
-            size={tokenSize * 0.9}
+            size={tokenW * 0.9}
+            height={tokenH * 0.9}
             color={borderColor}
           />
 
@@ -2814,7 +2815,7 @@ function VehicleToken({
             >
               <span
                 style={{
-                  fontSize: Math.max(tokenSize * 0.6, 20),
+                  fontSize: Math.max(tokenMin * 0.6, 20),
                   fontWeight: 'bold',
                   color: '#dc2626',
                   textShadow: '0 0 4px #000, 0 0 8px #000',
@@ -2833,7 +2834,7 @@ function VehicleToken({
       <div
         style={{
           position: 'absolute',
-          top: tokenSize + 2,
+          top: tokenH + 2,
           left: '50%',
           transform: 'translateX(-50%)',
           display: 'flex',
@@ -2878,7 +2879,7 @@ function VehicleToken({
         ) : (
           <div
             style={{
-              width: tokenSize * 0.8,
+              width: tokenW * 0.8,
               height: 4,
               background: 'rgba(0,0,0,0.6)',
               borderRadius: 2,
@@ -2918,17 +2919,15 @@ function VehicleTokenDisplay({
   zoom,
   pixelsPerFoot,
 }: VehicleTokenDisplayProps) {
-  // Calculate token size based on actual vehicle dimensions in feet
-  const vehicleFeet = getVehicleSizeInFeet(vehicle.template.size, vehicle.template.id);
-  const scaledSize = vehicleFeet * pixelsPerFoot;
-  const tokenSize = Math.max(24, scaledSize);
+  // Token pixel dimensions — rectangular for ships, square otherwise.
+  const { w: tokenW, h: tokenH } = getVehicleTokenDims(vehicle.template, pixelsPerFoot);
   const borderColor = vehicle.type === 'party' ? 'var(--color-health)' : 'var(--color-fire)';
 
   return (
     <div
       style={{
-        width: tokenSize,
-        height: tokenSize,
+        width: tokenW,
+        height: tokenH,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -2939,7 +2938,8 @@ function VehicleTokenDisplay({
     >
       <VehicleIcon
         templateId={vehicle.template.id}
-        size={tokenSize * 0.9}
+        size={tokenW * 0.9}
+        height={tokenH * 0.9}
         color={borderColor}
       />
     </div>
@@ -2953,15 +2953,16 @@ function VehicleTokenDisplay({
 
 interface VehicleIconProps {
   templateId: string;
-  size: number;
+  size: number; // width in px (also height for square vehicles)
+  height?: number; // height in px when the token is rectangular (ships)
   color: string;
 }
 
-function VehicleIcon({ templateId, size, color }: VehicleIconProps) {
+function VehicleIcon({ templateId, size, height, color }: VehicleIconProps) {
   const id = templateId.toLowerCase();
 
-  // Saltmarsh ships have their own shared top-down icons.
-  const shipIcon = renderShipIcon(id, size, color);
+  // Saltmarsh ships have their own shared top-down icons (rectangular).
+  const shipIcon = renderShipIcon(id, size, height ?? size, color);
   if (shipIcon) return shipIcon;
 
   // All icons are TOP-DOWN view, pointing UP (forward)
@@ -4104,6 +4105,19 @@ function getVehicleSizeInFeet(size: string, templateId?: string): number {
     gargantuan: 20, // 20x20 ft space
   };
   return sizes[size] || 10;
+}
+
+// Token pixel dimensions. Vehicles with explicit lengthFt/beamFt (ships) get a
+// rectangular footprint; everything else stays a square sized by getVehicleSizeInFeet.
+function getVehicleTokenDims(template: VehicleTemplate, pixelsPerFoot: number): { w: number; h: number } {
+  if (template.lengthFt && template.beamFt) {
+    return {
+      w: Math.max(24, template.beamFt * pixelsPerFoot),
+      h: Math.max(24, template.lengthFt * pixelsPerFoot),
+    };
+  }
+  const s = Math.max(24, getVehicleSizeInFeet(template.size, template.id) * pixelsPerFoot);
+  return { w: s, h: s };
 }
 
 /**

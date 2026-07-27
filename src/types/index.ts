@@ -153,6 +153,7 @@ export interface VehicleZone {
   canAttackOut: boolean;
   visibleFromArcs: ('front' | 'rear' | 'left' | 'right')[]; // Which directions can see into this zone
   description?: string;
+  bulk?: boolean; // Large undifferentiated crew (deck/rowers) — shown as a compact count, not a slot per creature
 }
 
 export interface WeaponTemplate {
@@ -232,6 +233,8 @@ export interface VehicleTemplate {
   immunities?: string[];
   environment?: VehicleEnvironment; // Default 'land' when unset
   components?: VehicleComponent[]; // Per-part HP model (e.g. Saltmarsh ships)
+  lengthFt?: number; // Real length bow→stern in feet — gives a rectangular map footprint (else square by size)
+  beamFt?: number; // Real width (beam) in feet — paired with lengthFt
 }
 
 export interface Vehicle {

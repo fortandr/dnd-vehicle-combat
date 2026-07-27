@@ -1253,6 +1253,11 @@ function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
     setSelectedCreatureId(null);
   };
 
+  // Bulk zones (deck crew / rowers) show a compact count instead of a slot per creature.
+  const MAX_BULK_AVATARS = 6;
+  const visibleAssignments = zone.bulk ? assignments.slice(0, MAX_BULK_AVATARS) : assignments;
+  const bulkOverflow = assignments.length - visibleAssignments.length;
+
   return (
     <Paper
       sx={{
@@ -1263,9 +1268,16 @@ function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
       }}
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-        <Typography variant="caption" fontWeight={600}>
-          {zone.name}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
+          <Typography variant="caption" fontWeight={600}>
+            {zone.name}
+          </Typography>
+          {zone.bulk && (
+            <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+              {assignments.length}/{zone.capacity}
+            </Typography>
+          )}
+        </Box>
         <Chip
           label={formatCoverShort(zone.cover)}
           size="small"
@@ -1278,7 +1290,7 @@ function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
         />
       </Box>
       <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-        {assignments.map((assignment) => {
+        {visibleAssignments.map((assignment) => {
           const creature = state.creatures.find((c) => c.id === assignment.creatureId);
           if (!creature) return null;
           const isDead = creature.currentHp === 0;
@@ -1303,6 +1315,14 @@ function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
             </Avatar>
           );
         })}
+        {zone.bulk && bulkOverflow > 0 && (
+          <Avatar
+            sx={{ width: 28, height: 28, fontSize: '0.7rem', bgcolor: 'grey.800', color: 'text.secondary' }}
+            title={`${bulkOverflow} more crew assigned`}
+          >
+            +{bulkOverflow}
+          </Avatar>
+        )}
         {assignments.length < zone.capacity && (
           <Avatar
             onClick={(e) => setAnchorEl(e.currentTarget)}

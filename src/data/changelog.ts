@@ -18,7 +18,9 @@ export const changelog: ChangelogEntry[] = [
     date: '2026-07-27',
     changes: [
       { type: 'feature', description: 'Added distinct top-down token icons for each ship type (rowboat, keelboat, longship, sailing ship, warship, galley) on both the DM and player battlefield views' },
+      { type: 'feature', description: 'Ships now use true rectangular footprints scaled to their book dimensions (a 130-ft galley towers over a 10-ft rowboat) instead of a one-size square' },
       { type: 'fix', description: 'Fixed ship crew stations — ships now show a Helm, a station per weapon, and a Deck Crew/Rowers station (e.g. the Sailing Ship has 4 stations for its 30 crew, not 2)' },
+      { type: 'improvement', description: 'Large deck/rowers crew is shown as a compact count (e.g. "5 / 73") instead of a slot per crew member, so big ships stay readable' },
     ],
   },
   {

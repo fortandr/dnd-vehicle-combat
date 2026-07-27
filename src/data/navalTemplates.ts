@@ -92,8 +92,8 @@ function helmZone(): VehicleZone {
 function weaponStation(weaponId: string, label: string): VehicleZone {
   return { id: `st_${weaponId}`, name: label, cover: 'half', capacity: 1, canAttackOut: true, visibleFromArcs: ALL_ARCS };
 }
-function crewDeck(capacity: number, name = 'Deck Crew', cover: CoverType = 'half'): VehicleZone {
-  return { id: 'deck_crew', name, cover, capacity, canAttackOut: true, visibleFromArcs: ALL_ARCS };
+function crewDeck(capacity: number, name = 'Deck Crew', cover: CoverType = 'half', bulk = true): VehicleZone {
+  return { id: 'deck_crew', name, cover, capacity, canAttackOut: true, visibleFromArcs: ALL_ARCS, bulk };
 }
 
 export const ROWBOAT: VehicleTemplate = {
@@ -109,9 +109,11 @@ export const ROWBOAT: VehicleTemplate = {
   cargoCapacity: 500,
   weight: 100,
   abilityScores: { str: 11, dex: 8, con: 11 },
+  lengthFt: 10,
+  beamFt: 5,
   size: 'large',
   environment: 'water',
-  zones: [crewDeck(2, 'Oars & Deck', 'none')],
+  zones: [crewDeck(2, 'Oars & Deck', 'none', false)],
   weapons: [],
   components: [
     hull(11, 50),
@@ -131,6 +133,8 @@ export const KEELBOAT: VehicleTemplate = {
   crewCapacity: 3,
   cargoCapacity: 1000,
   abilityScores: { str: 16, dex: 7, con: 13 },
+  lengthFt: 60,
+  beamFt: 20,
   size: 'gargantuan',
   environment: 'water',
   zones: [helmZone(), weaponStation('ballista', 'Ballista'), crewDeck(1)],
@@ -156,6 +160,8 @@ export const LONGSHIP: VehicleTemplate = {
   crewCapacity: 40,
   cargoCapacity: 20000,
   abilityScores: { str: 20, dex: 6, con: 17 },
+  lengthFt: 70,
+  beamFt: 20,
   size: 'gargantuan',
   environment: 'water',
   zones: [helmZone(), crewDeck(39, 'Rowers & Deck')],
@@ -180,6 +186,8 @@ export const SAILING_SHIP: VehicleTemplate = {
   crewCapacity: 30,
   cargoCapacity: 200000,
   abilityScores: { str: 20, dex: 7, con: 17 },
+  lengthFt: 100,
+  beamFt: 20,
   size: 'gargantuan',
   environment: 'water',
   zones: [
@@ -210,6 +218,8 @@ export const WARSHIP: VehicleTemplate = {
   crewCapacity: 40,
   cargoCapacity: 400000,
   abilityScores: { str: 20, dex: 4, con: 20 },
+  lengthFt: 100,
+  beamFt: 20,
   size: 'gargantuan',
   environment: 'water',
   zones: [
@@ -251,6 +261,8 @@ export const GALLEY: VehicleTemplate = {
   crewCapacity: 80,
   cargoCapacity: 300000,
   abilityScores: { str: 24, dex: 4, con: 20 },
+  lengthFt: 130,
+  beamFt: 20,
   size: 'gargantuan',
   environment: 'water',
   zones: [

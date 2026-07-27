@@ -240,9 +240,12 @@ export function PlayerViewMap() {
         {/* Vehicle Tokens */}
         {state.vehicles.map((vehicle) => {
           const screenPos = worldToScreen(vehicle.position);
-          const vehicleFeet = getVehicleSizeInFeet(vehicle.template.size, vehicle.template.id);
-          const scaledSize = vehicleFeet * pixelsPerFoot;
-          const tokenSize = Math.max(24, scaledSize); // Min 24px for visibility, no max
+          // Rectangular for ships (lengthFt/beamFt); square otherwise. Min 24px for visibility.
+          const rect = vehicle.template.lengthFt && vehicle.template.beamFt;
+          const tokenW = rect
+            ? Math.max(24, vehicle.template.beamFt! * pixelsPerFoot)
+            : Math.max(24, getVehicleSizeInFeet(vehicle.template.size, vehicle.template.id) * pixelsPerFoot);
+          const tokenH = rect ? Math.max(24, vehicle.template.lengthFt! * pixelsPerFoot) : tokenW;
           const borderColor = vehicle.type === 'party' ? 'var(--color-health)' : 'var(--color-fire)';
           const isInoperative = vehicle.isInoperative || vehicle.currentHp === 0;
           const weaponRangesByArc = getWeaponRangesByArc(vehicle, state.crewAssignments, state.creatures);
@@ -269,7 +272,8 @@ export function PlayerViewMap() {
                 <PlayerViewWeaponRangeArcs
                   weaponRanges={weaponRangesByArc}
                   pixelsPerFoot={pixelsPerFoot}
-                  tokenSize={tokenSize}
+                  tokenWidth={tokenW}
+                  tokenHeight={tokenH}
                   vehicleType={vehicle.type}
                   facing={vehicle.facing}
                   unitSystem={unitSystem}
@@ -278,8 +282,8 @@ export function PlayerViewMap() {
               {/* Vehicle Icon */}
               <div
                 style={{
-                  width: tokenSize,
-                  height: tokenSize,
+                  width: tokenW,
+                  height: tokenH,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -289,7 +293,8 @@ export function PlayerViewMap() {
               >
                 <PlayerViewVehicleIcon
                   templateId={vehicle.template.id}
-                  size={tokenSize * 0.9}
+                  size={tokenW * 0.9}
+                  height={tokenH * 0.9}
                   color={borderColor}
                 />
               </div>
@@ -601,7 +606,8 @@ function getWeaponRangesByArc(
 interface PlayerViewWeaponRangeArcsProps {
   weaponRanges: Record<'front' | 'rear' | 'left' | 'right', number>;
   pixelsPerFoot: number;
-  tokenSize: number;
+  tokenWidth: number;
+  tokenHeight: number;
   vehicleType: 'party' | 'enemy';
   facing: number;
   unitSystem: 'imperial' | 'metric';
@@ -610,7 +616,8 @@ interface PlayerViewWeaponRangeArcsProps {
 function PlayerViewWeaponRangeArcs({
   weaponRanges,
   pixelsPerFoot,
-  tokenSize,
+  tokenWidth,
+  tokenHeight,
   vehicleType,
   facing,
   unitSystem,
@@ -648,8 +655,8 @@ function PlayerViewWeaponRangeArcs({
     <svg
       style={{
         position: 'absolute',
-        left: tokenSize / 2 - center,
-        top: tokenSize / 2 - center,
+        left: tokenWidth / 2 - center,
+        top: tokenHeight / 2 - center,
         width: svgSize,
         height: svgSize,
         pointerEvents: 'none',
@@ -699,15 +706,16 @@ function PlayerViewWeaponRangeArcs({
 
 interface PlayerViewVehicleIconProps {
   templateId: string;
-  size: number;
+  size: number; // width in px (also height for square vehicles)
+  height?: number; // height in px when rectangular (ships)
   color: string;
 }
 
-function PlayerViewVehicleIcon({ templateId, size, color }: PlayerViewVehicleIconProps) {
+function PlayerViewVehicleIcon({ templateId, size, height, color }: PlayerViewVehicleIconProps) {
   const id = templateId.toLowerCase();
 
-  // Saltmarsh ships have their own shared top-down icons.
-  const shipIcon = renderShipIcon(id, size, color);
+  // Saltmarsh ships have their own shared top-down icons (rectangular).
+  const shipIcon = renderShipIcon(id, size, height ?? size, color);
   if (shipIcon) return shipIcon;
 
   if (id.includes('buzz') || id.includes('killer')) {
