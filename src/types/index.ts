@@ -253,7 +253,8 @@ export interface Vehicle {
   facing: number; // Degrees, 0 = north
   // Upgrades
   armorUpgradeId?: string; // ID of armor upgrade (default: 'none')
-  gadgetIds?: string[]; // IDs of installed magical gadgets
+  gadgetIds?: string[]; // IDs of installed magical gadgets (Avernus pack)
+  navalUpgradeIds?: string[]; // IDs of installed Superior Ship Upgrades (naval pack)
   hasWeaponStationUpgrade?: boolean; // Whether custom weapon station is installed
   // Status
   isInoperative?: boolean; // True when HP reaches 0 - crew ejected, vehicle disabled

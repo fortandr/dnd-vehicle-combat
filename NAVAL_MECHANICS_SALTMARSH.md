@@ -161,10 +161,15 @@ At the end of the day the **bosun** makes a **Strength check with carpenter's to
 each damaged component regains HP equal to **1d6 + crew quality** (min 1). A non-hull component that
 was at 0 HP becomes functional again.
 
-## Superior Ship Upgrades (≈ the Avernus "gadgets/armor" analog)
-Optional per-component upgrades (15,000 gp, 1d4 weeks in port). Examples: **Churning Hull**
-(surrounds ship with difficult terrain), **Death Vessel** (fear-pulse aura). Categorized by
-component (hull / movement / control / weapon). Flag for the naval pack; not core to MVP.
+## Superior Ship Upgrades (≈ the Avernus "gadgets/armor" analog) — IMPLEMENTED (v2.2.0)
+Optional upgrades (15,000 gp, 1d4 weeks in port), grouped by the component they enhance.
+Shipped as the **Naval customization pack** in `src/data/navalUpgrades.ts`, installed per ship
+(`Vehicle.navalUpgradeIds`) and shown only on naval vehicles via the "Ship Upgrades" accordion.
+- **Hull:** Churning Hull, Death Vessel, Frost-Locked Hull, Living Vessel, Reinforced Hull, Vigilant Watch
+- **Movement:** Clockwork Oars, Ever-Full Sails, Defiant Sails, Dragon Sails, Screaming Sails, Scything Oars
+- **Weapon:** Arcane Artillery, Concussive Rounds, Explosive Rounds, Grasping Rounds
+- **Figurehead:** Guardian, Red Dragon, Storm Giant
+- **Miscellaneous:** Bones of Endless Toil, Smuggler's Banner, Taskmaster's Drums
 
 ## Mapping to the VVTT data model — decision needed
 

@@ -97,6 +97,7 @@ type CombatAction =
   | { type: 'SWAP_VEHICLE_WEAPON'; payload: { vehicleId: string; weaponIndex: number; newWeapon: VehicleWeapon } }
   | { type: 'SET_VEHICLE_ARMOR'; payload: { vehicleId: string; armorUpgradeId: string } }
   | { type: 'TOGGLE_VEHICLE_GADGET'; payload: { vehicleId: string; gadgetId: string } }
+  | { type: 'TOGGLE_NAVAL_UPGRADE'; payload: { vehicleId: string; upgradeId: string } }
   | { type: 'TOGGLE_WEAPON_STATION_UPGRADE'; payload: { vehicleId: string } }
   | { type: 'UPDATE_VEHICLE'; payload: { id: string; updates: Partial<Vehicle> } }
   | { type: 'ADD_CREATURE'; payload: Creature }
@@ -515,6 +516,23 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
             gadgetIds: hasGadget
               ? currentGadgets.filter((id) => id !== gadgetId)
               : [...currentGadgets, gadgetId],
+          };
+        }),
+      };
+
+    case 'TOGGLE_NAVAL_UPGRADE':
+      return {
+        ...state,
+        vehicles: state.vehicles.map((v) => {
+          if (v.id !== action.payload.vehicleId) return v;
+          const current = v.navalUpgradeIds || [];
+          const upgradeId = action.payload.upgradeId;
+          const has = current.includes(upgradeId);
+          return {
+            ...v,
+            navalUpgradeIds: has
+              ? current.filter((id) => id !== upgradeId)
+              : [...current, upgradeId],
           };
         }),
       };
@@ -1742,6 +1760,7 @@ interface CombatContextValue {
   swapVehicleWeapon: (vehicleId: string, weaponIndex: number, newWeapon: VehicleWeapon) => void;
   setVehicleArmor: (vehicleId: string, armorUpgradeId: string) => void;
   toggleVehicleGadget: (vehicleId: string, gadgetId: string) => void;
+  toggleNavalUpgrade: (vehicleId: string, upgradeId: string) => void;
   toggleWeaponStationUpgrade: (vehicleId: string) => void;
   loadPartyPreset: (vehicles: Vehicle[], creatures: Creature[], crewAssignments: CrewAssignment[]) => void;
   toggleAutoRollComplications: () => void;
@@ -2115,6 +2134,12 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
       dispatch({ type: 'SET_VEHICLE_ARMOR', payload: { vehicleId, armorUpgradeId } }),
     []
   );
+  const toggleNavalUpgrade = useCallback(
+    (vehicleId: string, upgradeId: string) =>
+      dispatch({ type: 'TOGGLE_NAVAL_UPGRADE', payload: { vehicleId, upgradeId } }),
+    []
+  );
+
   const toggleVehicleGadget = useCallback(
     (vehicleId: string, gadgetId: string) =>
       dispatch({ type: 'TOGGLE_VEHICLE_GADGET', payload: { vehicleId, gadgetId } }),
@@ -2273,6 +2298,7 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
     swapVehicleWeapon,
     setVehicleArmor,
     toggleVehicleGadget,
+    toggleNavalUpgrade,
     toggleWeaponStationUpgrade,
     loadPartyPreset,
     toggleAutoRollComplications,

@@ -42,6 +42,7 @@ import { useCombat } from '../../context/CombatContext';
 import { getMishapResult, getMishapSeverity, canRepairMishap, getRepairDescription, checkMishapFromDamage, rollMishapForVehicle } from '../../data/mishapTable';
 import { v4 as uuid } from 'uuid';
 import { SWAPPABLE_WEAPONS, ARMOR_UPGRADES, MAGICAL_GADGETS, getWeaponStationUpgrade, WEAPON_STATION_EXCLUDED_VEHICLES, resolveZone, isAvernusVehicle } from '../../data/vehicleTemplates';
+import { NAVAL_UPGRADES, NAVAL_UPGRADE_CATEGORIES, isNavalVehicle } from '../../data/navalUpgrades';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
 
 interface VehicleCardProps {
@@ -114,7 +115,7 @@ function getEffectiveDamageThreshold(vehicle: Vehicle): number {
 }
 
 export function VehicleCard({ vehicle }: VehicleCardProps) {
-  const { state, applyMishap, dispatch, removeVehicle, swapVehicleWeapon, setVehicleArmor, toggleVehicleGadget, toggleWeaponStationUpgrade } = useCombat();
+  const { state, applyMishap, dispatch, removeVehicle, swapVehicleWeapon, setVehicleArmor, toggleVehicleGadget, toggleNavalUpgrade, toggleWeaponStationUpgrade } = useCombat();
   const [damageAmount, setDamageAmount] = useState('');
   const [lastMishapResult, setLastMishapResult] = useState<{ roll: number; mishap: Mishap } | null>(null);
   const [showMishapResult, setShowMishapResult] = useState(false);
@@ -818,6 +819,82 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                 })}
               </Stack>
             </Box>
+          </AccordionDetails>
+        </Accordion>
+        )}
+
+        {/* Ship Upgrades — naval pack (Superior Ship Upgrades) */}
+        {isNavalVehicle(vehicle.template) && (
+        <Accordion
+          disableGutters
+          sx={{ mb: 2, bgcolor: 'transparent', '&:before': { display: 'none' }, boxShadow: 'none' }}
+        >
+          <AccordionSummary
+            expandIcon={<ExpandMoreIcon />}
+            sx={{ bgcolor: '#242424', borderRadius: 1, minHeight: 40, '& .MuiAccordionSummary-content': { my: 0 } }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <BuildIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+              <Typography variant="caption" fontWeight={600}>
+                Ship Upgrades
+              </Typography>
+              {vehicle.navalUpgradeIds && vehicle.navalUpgradeIds.length > 0 && (
+                <Chip label={`${vehicle.navalUpgradeIds.length}`} size="small" sx={{ height: 18, fontSize: '0.625rem' }} />
+              )}
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails sx={{ p: 1, pt: 1.5 }}>
+            <Stack spacing={1.5}>
+              {NAVAL_UPGRADE_CATEGORIES.map((cat) => {
+                const upgrades = NAVAL_UPGRADES.filter((u) => u.category === cat.key);
+                return (
+                  <Box key={cat.key}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                      {cat.label}
+                    </Typography>
+                    <Stack spacing={0.5}>
+                      {upgrades.map((u) => {
+                        const isInstalled = vehicle.navalUpgradeIds?.includes(u.id);
+                        return (
+                          <Paper
+                            key={u.id}
+                            sx={{
+                              p: 1,
+                              bgcolor: isInstalled ? withOpacity('#38bdf8', 0.1) : '#242424',
+                              border: isInstalled ? 1 : 0,
+                              borderColor: '#38bdf8',
+                              cursor: 'pointer',
+                              '&:hover': { bgcolor: isInstalled ? withOpacity('#38bdf8', 0.15) : '#2a2a2a' },
+                            }}
+                            onClick={() => toggleNavalUpgrade(vehicle.id, u.id)}
+                          >
+                            <FormControlLabel
+                              control={<Checkbox checked={!!isInstalled} size="small" sx={{ p: 0.5, mr: 1 }} />}
+                              label={
+                                <Box>
+                                  <Typography variant="body2" fontWeight={600}>
+                                    {u.name}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {u.activation}
+                                  </Typography>
+                                </Box>
+                              }
+                              sx={{ m: 0, width: '100%' }}
+                            />
+                            {isInstalled && (
+                              <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#38bdf8' }}>
+                                {u.effect}
+                              </Typography>
+                            )}
+                          </Paper>
+                        );
+                      })}
+                    </Stack>
+                  </Box>
+                );
+              })}
+            </Stack>
           </AccordionDetails>
         </Accordion>
         )}

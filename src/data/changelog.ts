@@ -14,6 +14,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.2.0',
+    date: '2026-07-27',
+    changes: [
+      { type: 'feature', description: 'Added the Naval customization pack — "Ship Upgrades" (Superior Ship Upgrades from Ghosts of Saltmarsh): 22 hull, movement, weapon, figurehead, and miscellaneous upgrades installable per ship (e.g. Reinforced Hull, Ever-Full Sails, Arcane Artillery, Red Dragon Figurehead). Shown only on naval vehicles, the water-side analog to Avernus gadgets.' },
+    ],
+  },
+  {
     version: '2.1.2',
     date: '2026-07-27',
     changes: [
