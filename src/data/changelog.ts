@@ -14,6 +14,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.7.2',
+    date: '2026-07-28',
+    changes: [
+      { type: 'fix', description: 'Fixed ship weapons all being assigned to the Helm instead of their own stations — a fallback was overwriting each weapon\'s explicit station with the first zone. Ballistas/mangonels now correctly belong to their gunners, fixing weapon display, firing, and the Current Turn expander. Re-add existing ships to pick up the fix.' },
+    ],
+  },
+  {
     version: '2.7.1',
     date: '2026-07-28',
     changes: [

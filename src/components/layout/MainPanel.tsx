@@ -142,8 +142,10 @@ export function MainPanel() {
           arcs = explicitZone.visibleFromArcs;
         }
 
-        // Match weapon to zone by ID pattern
-        if (!zoneId && w.id.includes('port')) {
+        // Match weapon to zone by ID pattern — only when no explicit station was set,
+        // so the else fallback below can't overwrite an explicit ship-weapon station.
+        if (!zoneId) {
+          if (w.id.includes('port')) {
           const zone = template.zones.find((z) => z.id.includes('port'));
           if (zone) {
             zoneId = zone.id;
@@ -187,6 +189,7 @@ export function MainPanel() {
             zoneId = zone.id;
             arcs = zone.visibleFromArcs;
           }
+        }
         }
 
         return {
