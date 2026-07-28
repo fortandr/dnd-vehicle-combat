@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Vehicle, Creature, VehicleZone } from '../../types';
 import { resolveZone } from '../../data/vehicleTemplates';
 import { useCombat } from '../../context/CombatContext';
+import { RollableText } from '../common/RollableText';
 import {
   calculateCoverWithElevation,
   getArcDisplayName,
@@ -79,6 +80,16 @@ const PASSENGER_BONUS_ACTIONS = [
 
 export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
   const { state, dispatch } = useCombat();
+
+  // Which crew positions are expanded (click a position to open its details).
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) =>
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   // Get all crew on this vehicle
   const vehicleCrew = state.crewAssignments
@@ -332,6 +343,8 @@ export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
           const { actions, bonusActions } = getAvailableActions(zone);
           const crewAction = crewActions[creature.id];
           const isDriver = zone && isDriverZone(zone.id);
+          const isExpanded = expandedIds.has(creature.id);
+          const stationWeapon = zone ? vehicle.weapons.find((w) => w.zoneId === zone.id) : undefined;
 
           return (
             <div
@@ -342,9 +355,14 @@ export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
                 opacity: crewAction?.resolved ? 0.6 : 1,
               }}
             >
-              {/* Crew Member Header */}
-              <div className="flex justify-between items-center mb-sm">
+              {/* Crew Member Header — click to expand this position */}
+              <div
+                className="flex justify-between items-center mb-sm"
+                style={{ cursor: 'pointer' }}
+                onClick={() => toggleExpanded(creature.id)}
+              >
                 <div>
+                  <span className="text-muted" style={{ marginRight: 4 }}>{isExpanded ? '▾' : '▸'}</span>
                   <span className="font-bold">{creature.name}</span>
                   {isDriver && <span className="badge badge-fire ml-sm" style={{ fontSize: '0.6rem' }}>DRIVER</span>}
                 </div>
@@ -355,6 +373,33 @@ export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
               <div className="text-xs text-muted mb-sm">
                 HP: {creature.currentHp}/{creature.statblock.maxHp} | AC: {creature.statblock.ac}
               </div>
+
+              {/* Collapsed summary of the declared action */}
+              {!isExpanded && (crewAction?.action || crewAction?.bonusAction || crewAction?.resolved) && (
+                <div className="text-xs" style={{ color: crewAction?.resolved ? 'var(--color-health)' : 'var(--color-text-muted)' }}>
+                  {crewAction?.resolved ? '✓ ' : ''}{crewAction?.action || 'No action'}{crewAction?.bonusAction ? ` + ${crewAction.bonusAction}` : ''}
+                </div>
+              )}
+
+              {isExpanded && (
+                <>
+                  {/* Weapon values for this station */}
+                  {stationWeapon && (
+                    <div className="mb-sm" style={{ padding: 'var(--spacing-sm)', background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-sm)' }}>
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-sm">{stationWeapon.name}</span>
+                        <span className="text-sm"><RollableText text={stationWeapon.damage} source={`${vehicle.name} · ${stationWeapon.name}`} /></span>
+                      </div>
+                      <div className="text-xs text-muted mt-sm">
+                        {stationWeapon.attackBonus ? <><RollableText text={`1d20${stationWeapon.attackBonus >= 0 ? '+' : ''}${stationWeapon.attackBonus}`} source={`${vehicle.name} · ${stationWeapon.name} to hit`} /> to hit</> : null}
+                        {stationWeapon.range ? `${stationWeapon.attackBonus ? ' · ' : ''}Range ${stationWeapon.range}` : ''}
+                        {stationWeapon.crewRequired ? ` · ${stationWeapon.crewRequired} crew` : ''}
+                      </div>
+                      {stationWeapon.specialEffect && (
+                        <div className="text-xs text-muted mt-sm"><RollableText text={stationWeapon.specialEffect} /></div>
+                      )}
+                    </div>
+                  )}
 
               {crewAction?.resolved ? (
                 /* Resolved State */
@@ -528,6 +573,8 @@ export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
                       Resolve {creature.name}'s Actions
                     </button>
                   )}
+                </>
+              )}
                 </>
               )}
             </div>

@@ -14,6 +14,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.7.0',
+    date: '2026-07-28',
+    changes: [
+      { type: 'improvement', description: 'The Current Turn crew panel is now collapsible per position — click any manned station to expand it, see its weapon values (damage, to-hit, range) with clickable dice, and declare actions. Every crew member is listed (not just the first), with a one-line summary when collapsed.' },
+    ],
+  },
+  {
     version: '2.6.0',
     date: '2026-07-28',
     changes: [
