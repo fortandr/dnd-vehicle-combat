@@ -14,6 +14,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.5.0',
+    date: '2026-07-28',
+    changes: [
+      { type: 'feature', description: 'Click any dice notation (e.g. 5d10, 2d10+8, 1d20+6) to roll it — the result pops up and is logged to the combat log. Works on weapon damage, to-hit, and effect text (traits, mishaps, gadgets, armor, ship upgrades) for both war machines and ships.' },
+      { type: 'improvement', description: 'Vehicle weapons now show their range and crew requirement, not just damage (e.g. the Mangonel now lists "Range 200/800 ft").' },
+    ],
+  },
+  {
     version: '2.4.0',
     date: '2026-07-28',
     changes: [

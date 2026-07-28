@@ -39,6 +39,7 @@ import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
 import { Vehicle, VehicleZone, CrewAssignment, Mishap, VehicleWeapon, Creature, Statblock } from '../../types';
 import { getComponentHp, destroyedEffectLabel, hasComponents } from '../../utils/vehicleComponents';
+import { RollableText } from '../common/RollableText';
 import { useCombat } from '../../context/CombatContext';
 import { getMishapResult, getMishapSeverity, canRepairMishap, getRepairDescription, checkMishapFromDamage, rollMishapForVehicle } from '../../data/mishapTable';
 import { v4 as uuid } from 'uuid';
@@ -565,13 +566,30 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
             <Stack spacing={0.5}>
               {vehicle.weapons.map((weapon) => (
                 <Paper key={weapon.id} sx={{ p: 1, bgcolor: '#242424' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
                     <Typography variant="body2" fontWeight={600}>{weapon.name}</Typography>
-                    <Typography variant="body2" color="text.secondary">{weapon.damage}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      <RollableText text={weapon.damage} source={`${vehicle.name} · ${weapon.name}`} />
+                    </Typography>
                   </Box>
+                  {(weapon.attackBonus || weapon.range || weapon.crewRequired) && (
+                    <Stack direction="row" spacing={1.5} sx={{ mt: 0.25, flexWrap: 'wrap' }} useFlexGap>
+                      {weapon.attackBonus ? (
+                        <Typography variant="caption" color="text.secondary">
+                          <RollableText text={`1d20${weapon.attackBonus >= 0 ? '+' : ''}${weapon.attackBonus}`} source={`${vehicle.name} · ${weapon.name} to hit`} /> to hit
+                        </Typography>
+                      ) : null}
+                      {weapon.range && (
+                        <Typography variant="caption" color="text.secondary">Range {weapon.range}</Typography>
+                      )}
+                      {weapon.crewRequired ? (
+                        <Typography variant="caption" color="text.secondary">{weapon.crewRequired} crew</Typography>
+                      ) : null}
+                    </Stack>
+                  )}
                   {weapon.specialEffect && (
                     <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                      {weapon.specialEffect}
+                      <RollableText text={weapon.specialEffect} source={`${vehicle.name} · ${weapon.name}`} />
                     </Typography>
                   )}
                 </Paper>
@@ -591,7 +609,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                 <Paper key={trait.name} sx={{ p: 1, bgcolor: '#242424' }}>
                   <Typography variant="body2">
                     <Box component="span" fontWeight={600}>{trait.name}.</Box>{' '}
-                    <Box component="span" sx={{ color: 'text.secondary' }}>{trait.description}</Box>
+                    <Box component="span" sx={{ color: 'text.secondary' }}><RollableText text={trait.description} /></Box>
                   </Typography>
                 </Paper>
               ))}
@@ -716,7 +734,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
               {vehicle.armorUpgradeId && vehicle.armorUpgradeId !== 'none' && (
                 <Paper sx={{ p: 1, mt: 1, bgcolor: withOpacity('#8b5cf6', 0.1), border: 1, borderColor: '#8b5cf6' }}>
                   <Typography variant="caption" sx={{ color: '#8b5cf6' }}>
-                    {ARMOR_UPGRADES.find((a) => a.id === vehicle.armorUpgradeId)?.effect}
+                    <RollableText text={ARMOR_UPGRADES.find((a) => a.id === vehicle.armorUpgradeId)?.effect} />
                   </Typography>
                 </Paper>
               )}
@@ -814,7 +832,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                       />
                       {isInstalled && (
                         <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#10b981' }}>
-                          {gadget.effect}
+                          <RollableText text={gadget.effect} />
                         </Typography>
                       )}
                     </Paper>
@@ -887,7 +905,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                             />
                             {isInstalled && (
                               <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#38bdf8' }}>
-                                {u.effect}
+                                <RollableText text={u.effect} />
                               </Typography>
                             )}
                           </Paper>
@@ -934,7 +952,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                         </Button>
                       )}
                     </Box>
-                    <Typography variant="caption" color="text.secondary">{mishap.effect}</Typography>
+                    <Typography variant="caption" color="text.secondary"><RollableText text={mishap.effect} /></Typography>
                     {repairable && (
                       <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'primary.main' }}>
                         {getRepairDescription(mishap)}
@@ -1012,7 +1030,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
               </Button>
             </Box>
             <Typography variant="body2" fontWeight={600}>{lastMishapResult.mishap.name}</Typography>
-            <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>{lastMishapResult.mishap.effect}</Typography>
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}><RollableText text={lastMishapResult.mishap.effect} /></Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
               Duration: {lastMishapResult.mishap.duration === 'instant' ? 'Instant' :
                 lastMishapResult.mishap.duration === 'until_repaired' ? 'Until Repaired' :
