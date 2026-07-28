@@ -46,8 +46,9 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
 
       <DialogContent dividers>
         <Typography variant="body2" color="text.secondary" paragraph>
-          This app helps you run vehicular chase combat encounters for D&D 5e,
-          based on the rules from Baldur's Gate: Descent into Avernus.
+          VVTT (Vehicular Virtual Table Top) helps you run tactical vehicle combat and chases
+          for D&D 5e — from the infernal war machines of Baldur's Gate: Descent into Avernus to
+          the ships of Ghosts of Saltmarsh, plus any custom vehicles you build yourself.
         </Typography>
 
         <Box sx={{ p: 1.5, mb: 2, bgcolor: 'action.hover', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
@@ -67,22 +68,26 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" paragraph>
-              Use the <strong>"+ Vehicle"</strong> dropdown button to add Party or Enemy vehicles to the encounter.
-            </Typography>
-            <Typography variant="body2" paragraph>
-              • <strong>Party vehicles</strong> (green) are controlled by the players<br />
-              • <strong>Enemy vehicles</strong> (red) are controlled by the DM
-            </Typography>
-            <Typography variant="body2" paragraph>
-              <strong>Managing Vehicles:</strong> Switch to the <strong>"Vehicles"</strong> tab in the main panel
-              to see full vehicle cards with:
+              Use the <strong>"+ Vehicle"</strong> dropdown to add Party or Enemy vehicles. The picker
+              offers three kinds of vehicle:
             </Typography>
             <Typography variant="body2" component="div" sx={{ pl: 2 }}>
-              • HP editing and damage dealing (with auto-mishap triggering)<br />
-              • Speed adjustment and effective speed display<br />
-              • Crew HP management with damage/heal controls<br />
-              • Weapon stations, armor upgrades, and magical gadgets<br />
-              • Active mishaps with repair buttons
+              • <strong>Avernus war machines</strong> — the infernal vehicles (Devil's Ride, Demon Grinder, …)<br />
+              • <strong>Ships</strong> — the six Ghosts of Saltmarsh vessels (rowboat, keelboat, longship, sailing ship, warship, galley)<br />
+              • <strong>Your custom vehicles</strong> — build one with <strong>"+ Create Custom Vehicle"</strong>, or
+                duplicate a built-in as a starting point. Custom vehicles are saved to your personal library.
+            </Typography>
+            <Typography variant="body2" paragraph sx={{ mt: 1 }}>
+              • <strong>Party vehicles</strong> (green) are the players'; <strong>Enemy vehicles</strong> (red) are the DM's.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Managing Vehicles:</strong> Switch to the <strong>"Vehicles"</strong> tab for full vehicle cards.
+              The card adapts to the vehicle type — war machines show armor upgrades, magical gadgets, and mishaps;
+              ships show their components and Ship Upgrades. Both offer HP/damage controls, crew management, and weapons.
+            </Typography>
+            <Typography variant="body2">
+              <strong>Tip:</strong> Any dice shown (weapon damage, to-hit, effects) is clickable — click it to roll,
+              and the result is logged to the combat log.
             </Typography>
           </AccordionDetails>
         </Accordion>
@@ -109,12 +114,15 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               You can change a creature's faction by clicking the edit button and toggling Party/Enemy.
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Assign crew to stations:</strong> Click on a creature to see available vehicles,
-              then assign them to a station (Helm, Weapons, etc.).
+              <strong>Seat crew &amp; passengers:</strong> In a vehicle's <strong>Crew Positions</strong>, click the
+              <strong> +</strong> on any station to seat a creature — pick an existing one, or choose
+              <strong> "New … here"</strong> to create a character directly in that seat.
             </Typography>
             <Typography variant="body2">
-              • The <strong>Helm</strong> station is for the driver (required for each vehicle)<br />
-              • Weapon stations allow crew to fire that weapon on their turn
+              • The <strong>Helm</strong> is the driver (required to steer)<br />
+              • <strong>Weapon stations</strong> let a crew member fire that weapon<br />
+              • Ships also have a <strong>Passengers</strong> zone for the party, plus a bulk
+                <strong> Deck Crew / Rowers</strong> station shown as a count
             </Typography>
           </AccordionDetails>
         </Accordion>
@@ -201,8 +209,14 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               • Use <strong>"Next Turn"</strong> to advance through the initiative order<br />
               • Use <strong>"Next Round"</strong> when all turns are complete
             </Typography>
+            <Typography variant="body2" paragraph>
+              Switch to the <strong>Vehicles</strong> tab to deal damage and track crew HP.
+            </Typography>
             <Typography variant="body2">
-              Switch to the <strong>Vehicles</strong> tab to deal damage, manage mishaps, and track crew HP.
+              <strong>Ships take component damage</strong> (not mishaps): each part — hull, helm, sails/oars, and
+              weapon stations — has its own HP in the <strong>Components</strong> panel, and destroying a part has
+              real effects. Knock out the sails/oars to cut its speed, the helm to stop it turning, a weapon to
+              silence it, or the hull to wreck the ship. Use <strong>Repair</strong> to restore a part.
             </Typography>
           </AccordionDetails>
         </Accordion>
@@ -227,7 +241,8 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               • <strong>Attack arc:</strong> Which direction you're attacking from<br />
               • <strong>Distance:</strong> How far away the target is in feet<br />
               • <strong>Range status:</strong> Whether your weapons can reach the target<br />
-              • <strong>Elevation modifier:</strong> Attack bonus/penalty based on height difference
+              • <strong>Elevation modifier:</strong> Attack bonus/penalty based on height difference<br />
+              • <strong>Ship components:</strong> for ships, each targetable part (hull, helm, sails, weapons) with its AC &amp; HP
             </Typography>
             <Typography variant="body2" sx={{ mt: 1 }}>
               Range is automatically extended when firing from higher elevation (10% per 10 ft).
@@ -289,7 +304,8 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
         <Divider sx={{ my: 2 }} />
 
         <Typography variant="caption" color="text.secondary">
-          Based on the vehicle combat rules from Baldur's Gate: Descent into Avernus (D&D 5e).
+          Based on the vehicle combat rules from Baldur's Gate: Descent into Avernus and the ship
+          rules from Ghosts of Saltmarsh (D&D 5e).
           <br />
           For feedback or issues, contact the developer.
         </Typography>

@@ -2,7 +2,14 @@
 
 ## Project Overview
 
-**5e Vehicle Combat Tracker** - A web app for running vehicular chase combat encounters in D&D 5e, based on rules from Baldur's Gate: Descent into Avernus.
+**VVTT (Vehicular Virtual Table Top)** - A web app for running the tactical combat/chase phase of vehicular encounters in D&D 5e. Covers **Avernus infernal war machines** (Baldur's Gate: Descent into Avernus) and **Ghosts of Saltmarsh ships**, plus **user-built custom vehicles**.
+
+Scope: VVTT is a **combat/chase tool only** — not a voyage/travel tracker. (Chase complications belong; Saltmarsh naval *hazards* are travel-phase and intentionally out of scope.)
+
+Key architecture for the multi-ruleset support:
+- **Template registry** (`src/data/templateRegistry.ts`) merges built-in Avernus vehicles + Saltmarsh ships (`src/data/navalTemplates.ts`) + the user's personal library.
+- **Packs** (`VehicleTemplate.pack`, `isAvernusVehicle` / `isNavalVehicle`) gate pack-specific UI: war machines show armor/gadgets/mishaps; ships show components + Ship Upgrades (`src/data/navalUpgrades.ts`).
+- **Component combat** (`VehicleTemplate.components`, `Vehicle.componentHp`, `src/utils/vehicleComponents.ts`): ships track per-part HP (hull mirrors `currentHp`); destroyed parts affect speed/turning/firing.
 
 **Live URL:** https://vvtt.lukantan.com (custom domain — "Vehicular Virtual Table Top")
 **Firebase URL:** https://e-vehicle-combat.web.app (still active)

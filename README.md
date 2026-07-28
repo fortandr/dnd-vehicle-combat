@@ -1,73 +1,44 @@
-# React + TypeScript + Vite
+# VVTT — Vehicular Virtual Table Top
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A tactical **vehicle combat and chase** tracker for D&D 5e. VVTT runs the combat/chase phase of
+vehicular encounters — from the infernal war machines of *Baldur's Gate: Descent into Avernus* to
+the ships of *Ghosts of Saltmarsh* — plus any custom vehicles you build yourself.
 
-Currently, two official plugins are available:
+**Live:** https://vvtt.lukantan.com
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
 
-## React Compiler
+- **Two built-in vehicle rulesets, cleanly separated by pack:**
+  - **Avernus war machines** — Devil's Ride, Buzz Killer, Tormentor, Demon Grinder, Scavenger — with
+    armor upgrades, magical gadgets, weapon stations, and the mishap system.
+  - **Ghosts of Saltmarsh ships** — rowboat, keelboat, longship, sailing ship, warship, galley — with
+    per-component HP, siege weapons, and the Superior Ship Upgrades pack.
+- **Custom vehicle library** — build your own vehicles in the editor (or duplicate a built-in), saved
+  per-user. Content shown on a vehicle adapts to its type automatically.
+- **Component combat (ships)** — each part (hull, helm, sails/oars, weapon stations) tracks its own HP
+  with targeted damage and repair. Destroying a part has effects: no sails/oars → speed cut, no helm →
+  can't turn, weapon destroyed → can't fire, hull destroyed → wrecked.
+- **Tactical battlefield** — drag/rotate tokens scaled to real dimensions, cover & arcs, elevation zones,
+  weapon range arcs, auto-adjusting combat scales, and a synced player view.
+- **Target Status** — per-target cover, arc, distance, range, elevation, and (for ships) each targetable
+  component's AC & HP.
+- **Crew & passengers** — seat creatures at stations (or create one directly in a seat); ships add a
+  Passengers zone and bulk deck-crew counts.
+- **Click-to-roll dice** — click any dice notation (weapon damage, to-hit, effects) to roll it.
+- **Cloud sync & sharing** — Firebase auth + Firestore, party presets, combat-log export, player view.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech stack
 
-## Expanding the ESLint configuration
+React 18 · TypeScript · Vite · Material UI · Firebase (Auth / Firestore / Hosting / Storage).
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Development
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install       # install dependencies
+npm run dev       # run locally (Vite dev server)
+npx tsc --noEmit  # type-check
+npm run build     # production build (tsc -b && vite build)
+CI=true npm run deploy   # build + deploy hosting/firestore/storage to Firebase
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+See `CLAUDE.md` for architecture notes and `NAVAL_MECHANICS_SALTMARSH.md` for the transcribed ship rules.
