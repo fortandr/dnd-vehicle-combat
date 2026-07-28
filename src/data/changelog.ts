@@ -14,6 +14,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.3.1',
+    date: '2026-07-28',
+    changes: [
+      { type: 'fix', description: 'Ships no longer show Avernus mishap UI (mishap threshold, the "Roll Mishap" button, and mishap-on-damage rolls). Mishaps are an infernal war-machine mechanic; Saltmarsh ships take harm through their components instead, so it never applied to boats.' },
+    ],
+  },
+  {
     version: '2.3.0',
     date: '2026-07-27',
     changes: [

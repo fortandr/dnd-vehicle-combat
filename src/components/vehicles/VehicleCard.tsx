@@ -38,7 +38,7 @@ import BuildIcon from '@mui/icons-material/Build';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
 import { Vehicle, VehicleZone, CrewAssignment, Mishap, VehicleWeapon, Creature, Statblock } from '../../types';
-import { getComponentHp, destroyedEffectLabel } from '../../utils/vehicleComponents';
+import { getComponentHp, destroyedEffectLabel, hasComponents } from '../../utils/vehicleComponents';
 import { useCombat } from '../../context/CombatContext';
 import { getMishapResult, getMishapSeverity, canRepairMishap, getRepairDescription, checkMishapFromDamage, rollMishapForVehicle } from '../../data/mishapTable';
 import { v4 as uuid } from 'uuid';
@@ -190,7 +190,9 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
     dispatch({ type: 'UPDATE_VEHICLE', payload: { id: vehicle.id, updates: { currentHp: newHp } } });
     dispatch({ type: 'LOG_ACTION', payload: { type: 'damage', action: `${vehicle.name} takes ${damage} damage`, details: `HP: ${vehicle.currentHp} → ${newHp}` } });
 
-    if (checkMishapFromDamage(damage, vehicle.template.mishapThreshold)) {
+    // Mishaps are an Avernus war-machine mechanic; component vehicles (ships) model
+    // harm through their components instead and never roll mishaps.
+    if (!hasComponents(vehicle) && checkMishapFromDamage(damage, vehicle.template.mishapThreshold)) {
       // Roll for mishap, rerolling if the result is already active or would have no effect
       const vehicleMishapState = {
         currentSpeed: vehicle.currentSpeed,
@@ -332,7 +334,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
             </span>
           ) : (
             vehicle.template.damageThreshold
-          )} | Mishap Threshold: {vehicle.template.mishapThreshold}
+          )}{!hasComponents(vehicle) && <> | Mishap Threshold: {vehicle.template.mishapThreshold}</>}
         </Typography>
 
         {/* HP Bar with editing */}
@@ -956,7 +958,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
         {/* Deal Damage Section */}
         <Paper sx={{ p: 1.5, bgcolor: '#242424', mb: 2 }}>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-            Deal Damage (ignores &lt;{effectiveDamageThreshold}, mishap at {vehicle.template.mishapThreshold}+)
+            Deal Damage (ignores &lt;{effectiveDamageThreshold}{!hasComponents(vehicle) && `, mishap at ${vehicle.template.mishapThreshold}+`})
           </Typography>
           <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
             <TextField
@@ -979,9 +981,11 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
             </Paper>
           )}
           <Stack direction="row" spacing={1}>
-            <Button variant="outlined" size="small" onClick={handleManualMishapRoll} fullWidth>
-              Roll Mishap (d20)
-            </Button>
+            {!hasComponents(vehicle) && (
+              <Button variant="outlined" size="small" onClick={handleManualMishapRoll} fullWidth>
+                Roll Mishap (d20)
+              </Button>
+            )}
             <Button variant="outlined" size="small" onClick={handleRepair} fullWidth>
               Repair HP
             </Button>
