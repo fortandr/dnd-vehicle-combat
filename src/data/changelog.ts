@@ -14,6 +14,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.4.0',
+    date: '2026-07-28',
+    changes: [
+      { type: 'feature', description: 'Target Status now lists a ship’s components (hull, helm, sails/oars, weapon stations) with each part’s AC, HP, damage threshold, and destroyed state — so you can see exactly what to aim at on a component-based vehicle.' },
+    ],
+  },
+  {
     version: '2.3.1',
     date: '2026-07-28',
     changes: [

@@ -9,11 +9,13 @@ import {
   Paper,
   Chip,
   Stack,
+  LinearProgress,
 } from '@mui/material';
 import { useCombat } from '../../context/CombatContext';
 import { useSettings } from '../../context/SettingsContext';
 import { Vehicle, Creature, VehicleZone, Position, VehicleWeapon } from '../../types';
 import { resolveZone } from '../../data/vehicleTemplates';
+import { hasComponents, getComponentHp } from '../../utils/vehicleComponents';
 import {
   calculateCoverWithElevation,
   calculateCoverFromPositionWithElevation,
@@ -167,7 +169,7 @@ export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFa
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Typography variant="body2" fontWeight={600}>{vehicle.name}</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    HP: {vehicle.currentHp}/{vehicle.template.maxHp}
+                    {hasComponents(vehicle) ? 'Hull' : 'HP'}: {vehicle.currentHp}/{vehicle.template.maxHp}
                   </Typography>
                 </Box>
                 {distance > 0 && (
@@ -178,7 +180,17 @@ export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFa
               </Box>
             </Paper>
 
-            {/* Targets on this vehicle */}
+            {/* Components (targetable parts) for component-based vehicles (ships) */}
+            {hasComponents(vehicle) && (
+              <Box sx={{ mb: 1 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, pl: 0.5 }}>
+                  Components
+                </Typography>
+                <ComponentTargetList vehicle={vehicle} />
+              </Box>
+            )}
+
+            {/* Crew targets on this vehicle */}
             {targets.length === 0 ? (
               <Typography variant="caption" color="text.secondary" sx={{ pl: 1 }}>
                 No crew on this vehicle
@@ -377,5 +389,45 @@ function TargetStatusCard({ creature, zone, cover, distance, baseRange, extended
         </Typography>
       )}
     </Paper>
+  );
+}
+
+// Targetable components (hull, helm, sails/oars, weapon stations) with their AC & HP,
+// so an attacker can see which part to aim at on a component-based vehicle (ship).
+function ComponentTargetList({ vehicle }: { vehicle: Vehicle }) {
+  const components = vehicle.template.components ?? [];
+  if (components.length === 0) return null;
+
+  return (
+    <Stack spacing={0.5}>
+      {components.map((comp) => {
+        const cur = getComponentHp(vehicle, comp);
+        const destroyed = cur <= 0;
+        const pct = comp.maxHp > 0 ? (cur / comp.maxHp) * 100 : 0;
+        const barColor = pct > 50 ? '#10b981' : pct > 25 ? '#f59e0b' : '#ef4444';
+        return (
+          <Paper key={comp.id} sx={{ p: 0.75, bgcolor: '#242424', border: 1, borderColor: 'divider', opacity: destroyed ? 0.6 : 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, flexWrap: 'wrap' }}>
+                <Typography variant="caption" fontWeight={600} noWrap>{comp.name}</Typography>
+                <Chip label={`AC ${comp.ac}`} size="small" variant="outlined" sx={{ height: 16, fontSize: '0.55rem' }} />
+                {comp.damageThreshold ? (
+                  <Chip label={`DT ${comp.damageThreshold}`} size="small" variant="outlined" sx={{ height: 16, fontSize: '0.55rem' }} />
+                ) : null}
+                {destroyed && <Chip label="Destroyed" size="small" color="error" sx={{ height: 16, fontSize: '0.55rem' }} />}
+              </Box>
+              <Typography variant="caption" fontFamily="monospace" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                {cur}/{comp.maxHp}
+              </Typography>
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={Math.max(0, Math.min(100, pct))}
+              sx={{ height: 3, borderRadius: 1, mt: 0.5, bgcolor: '#111', '& .MuiLinearProgress-bar': { bgcolor: barColor } }}
+            />
+          </Paper>
+        );
+      })}
+    </Stack>
   );
 }
