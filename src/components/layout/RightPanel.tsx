@@ -3,6 +3,7 @@
  * Target info and current turn details
  */
 
+import { useState } from 'react';
 import {
   Box,
   Card,
@@ -13,6 +14,7 @@ import {
   Paper,
 } from '@mui/material';
 import { useCombat } from '../../context/CombatContext';
+import { RollableText } from '../common/RollableText';
 import { resolveZone } from '../../data/vehicleTemplates';
 import { TargetCoverPanel } from '../combat/TargetCoverPanel';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
@@ -138,6 +140,16 @@ function getEffectiveSpeed(vehicle: { currentSpeed: number; activeMishaps: Array
 
 function CurrentTurnInfo() {
   const { state, currentTurnCreature, currentTurnVehicle, currentTurnDriver } = useCombat();
+
+  // Which crew positions are expanded (click a manned station to open its weapon details).
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   // Calculate elevation modifiers for the current vehicle against enemy targets
   // Returns grouped modifiers: { highGround: +2, lowGround: -2 } or null if no elevation differences
@@ -267,20 +279,24 @@ function CurrentTurnInfo() {
             {vehicleCrew.map(({ creature, zone, weapon, isDriver }) => {
               const isAlive = creature!.currentHp > 0;
               const showWeapon = weapon && isAlive;
+              const isExpanded = expanded.has(creature!.id);
               return (
               <Paper
                 key={creature!.id}
+                onClick={showWeapon ? () => toggleExpanded(creature!.id) : undefined}
                 sx={{
                   p: 1,
                   bgcolor: '#242424',
                   borderLeft: showWeapon ? 2 : 0,
                   borderColor: showWeapon ? 'warning.main' : undefined,
                   opacity: isAlive ? 1 : 0.5,
+                  cursor: showWeapon ? 'pointer' : 'default',
                 }}
               >
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <Box>
                     <Typography variant="body2">
+                      {showWeapon && <Box component="span" sx={{ color: 'text.secondary', mr: 0.5 }}>{isExpanded ? '▾' : '▸'}</Box>}
                       {creature!.name}
                       {!isAlive && (
                         <Typography component="span" variant="body2" color="error.main"> (DEAD)</Typography>
@@ -302,8 +318,14 @@ function CurrentTurnInfo() {
                     </Typography>
                   </Box>
                 </Box>
-                {/* Weapon info for manned weapon stations - only show if crew is alive */}
-                {showWeapon && (() => {
+                {/* Collapsed hint for a manned weapon station */}
+                {showWeapon && !isExpanded && (
+                  <Typography variant="caption" color="warning.main" fontWeight={600} sx={{ display: 'block', mt: 0.5 }}>
+                    ⚔ {weapon.name} — tap to view &amp; roll
+                  </Typography>
+                )}
+                {/* Weapon values (expanded) - only show if crew is alive */}
+                {showWeapon && isExpanded && (() => {
                   // Only show elevation modifiers for ranged attack roll weapons (not melee, not save-based)
                   const isRangedWeapon = parseWeaponRange(weapon.range) > 0;
                   // A weapon is save-based if it has saveDC, saveType, or "Save-based" in properties
@@ -328,8 +350,8 @@ function CurrentTurnInfo() {
                     <Box sx={{ display: 'flex', gap: 1.5, mt: 0.25, flexWrap: 'wrap' }}>
                       {weapon.attackBonus !== undefined ? (
                         <>
-                          <Typography variant="caption" fontFamily="monospace" color="text.secondary">
-                            +{weapon.attackBonus} to hit
+                          <Typography variant="caption" component="span" fontFamily="monospace" color="text.secondary">
+                            <RollableText text={`1d20${weapon.attackBonus >= 0 ? '+' : ''}${weapon.attackBonus}`} source={`${currentTurnVehicle.name} · ${weapon.name} to hit`} /> to hit
                           </Typography>
                           {elevMods && (
                             <>
@@ -359,8 +381,8 @@ function CurrentTurnInfo() {
                           DC {weapon.saveDC} {weapon.saveType?.toUpperCase()} save
                         </Typography>
                       ) : null}
-                      <Typography variant="caption" fontFamily="monospace" sx={{ color: 'error.light' }}>
-                        {weapon.damage}
+                      <Typography variant="caption" component="span" fontFamily="monospace" sx={{ color: 'error.light' }}>
+                        <RollableText text={weapon.damage} source={`${currentTurnVehicle.name} · ${weapon.name}`} />
                       </Typography>
                       {weapon.range && (
                         <Typography variant="caption" fontFamily="monospace" color="text.secondary">
@@ -370,7 +392,7 @@ function CurrentTurnInfo() {
                     </Box>
                     {weapon.specialEffect && (
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, fontStyle: 'italic' }}>
-                        {weapon.specialEffect}
+                        <RollableText text={weapon.specialEffect} />
                       </Typography>
                     )}
                   </Box>
