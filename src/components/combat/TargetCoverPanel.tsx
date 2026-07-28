@@ -3,6 +3,7 @@
  * Shows cover, range, and elevation status for all potential targets
  */
 
+import { useState } from 'react';
 import {
   Box,
   Typography,
@@ -10,6 +11,8 @@ import {
   Chip,
   Stack,
   LinearProgress,
+  TextField,
+  Button,
 } from '@mui/material';
 import { useCombat } from '../../context/CombatContext';
 import { useSettings } from '../../context/SettingsContext';
@@ -70,8 +73,17 @@ interface TargetCoverPanelProps {
 }
 
 export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFaction }: TargetCoverPanelProps) {
-  const { state } = useCombat();
+  const { state, dispatch } = useCombat();
   const { unitSystem } = useSettings();
+  const [vehicleDmg, setVehicleDmg] = useState<Record<string, string>>({});
+
+  // Whole-vehicle damage (used for war machines, which have no component list).
+  const applyVehicleDamage = (vehicleId: string) => {
+    const n = parseInt(vehicleDmg[vehicleId] ?? '', 10);
+    if (!Number.isFinite(n) || n <= 0) return;
+    dispatch({ type: 'DEAL_DAMAGE_TO_VEHICLE', payload: { vehicleId, amount: n } });
+    setVehicleDmg((s) => ({ ...s, [vehicleId]: '' }));
+  };
 
   // Determine which faction we're attacking (opposite of attacker)
   const targetFaction = attackerVehicle
@@ -178,6 +190,22 @@ export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFa
                   </Typography>
                 )}
               </Box>
+              {!hasComponents(vehicle) && (
+                <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', mt: 0.75 }}>
+                  <TextField
+                    type="number"
+                    size="small"
+                    placeholder="Dmg"
+                    value={vehicleDmg[vehicle.id] ?? ''}
+                    onChange={(e) => setVehicleDmg((s) => ({ ...s, [vehicle.id]: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') applyVehicleDamage(vehicle.id); }}
+                    sx={{ width: 66, '& input': { py: 0.25, fontSize: '0.75rem' } }}
+                  />
+                  <Button size="small" color="error" variant="outlined" onClick={() => applyVehicleDamage(vehicle.id)} disabled={!vehicleDmg[vehicle.id] || parseInt(vehicleDmg[vehicle.id], 10) <= 0} sx={{ minWidth: 0, px: 1, fontSize: '0.65rem' }}>
+                    Damage
+                  </Button>
+                </Box>
+              )}
             </Paper>
 
             {/* Components (targetable parts) for component-based vehicles (ships) */}
@@ -231,6 +259,15 @@ interface TargetStatusCardProps {
 }
 
 function TargetStatusCard({ creature, zone, cover, distance, baseRange, extendedRange, inRange, unitSystem }: TargetStatusCardProps) {
+  const { dispatch } = useCombat();
+  const [dmg, setDmg] = useState('');
+  const applyDamage = () => {
+    const n = parseInt(dmg, 10);
+    if (!Number.isFinite(n) || n <= 0) return;
+    dispatch({ type: 'UPDATE_CREATURE', payload: { id: creature.id, updates: { currentHp: Math.max(0, creature.currentHp - n) } } });
+    setDmg('');
+  };
+
   const getCoverChipColor = (coverType: string): 'error' | 'warning' | 'success' | 'default' => {
     switch (coverType) {
       case 'none': return 'error';
@@ -388,6 +425,22 @@ function TargetStatusCard({ creature, zone, cover, distance, baseRange, extended
           Not visible from this angle - cannot be targeted
         </Typography>
       )}
+
+      {/* Quick damage */}
+      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', mt: 0.75 }}>
+        <TextField
+          type="number"
+          size="small"
+          placeholder="Dmg"
+          value={dmg}
+          onChange={(e) => setDmg(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') applyDamage(); }}
+          sx={{ width: 66, '& input': { py: 0.25, fontSize: '0.75rem' } }}
+        />
+        <Button size="small" color="error" variant="outlined" onClick={applyDamage} disabled={!dmg || parseInt(dmg, 10) <= 0} sx={{ minWidth: 0, px: 1, fontSize: '0.65rem' }}>
+          Damage
+        </Button>
+      </Box>
     </Paper>
   );
 }
@@ -395,6 +448,8 @@ function TargetStatusCard({ creature, zone, cover, distance, baseRange, extended
 // Targetable components (hull, helm, sails/oars, weapon stations) with their AC & HP,
 // so an attacker can see which part to aim at on a component-based vehicle (ship).
 function ComponentTargetList({ vehicle }: { vehicle: Vehicle }) {
+  const { damageVehicleComponent } = useCombat();
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
   const components = vehicle.template.components ?? [];
   if (components.length === 0) return null;
 
@@ -405,6 +460,13 @@ function ComponentTargetList({ vehicle }: { vehicle: Vehicle }) {
         const destroyed = cur <= 0;
         const pct = comp.maxHp > 0 ? (cur / comp.maxHp) * 100 : 0;
         const barColor = pct > 50 ? '#10b981' : pct > 25 ? '#f59e0b' : '#ef4444';
+        const amt = amounts[comp.id] ?? '';
+        const applyDamage = () => {
+          const n = parseInt(amt, 10);
+          if (!Number.isFinite(n) || n <= 0) return;
+          damageVehicleComponent(vehicle.id, comp.id, n);
+          setAmounts((s) => ({ ...s, [comp.id]: '' }));
+        };
         return (
           <Paper key={comp.id} sx={{ p: 0.75, bgcolor: '#242424', border: 1, borderColor: 'divider', opacity: destroyed ? 0.6 : 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
@@ -423,8 +485,22 @@ function ComponentTargetList({ vehicle }: { vehicle: Vehicle }) {
             <LinearProgress
               variant="determinate"
               value={Math.max(0, Math.min(100, pct))}
-              sx={{ height: 3, borderRadius: 1, mt: 0.5, bgcolor: '#111', '& .MuiLinearProgress-bar': { bgcolor: barColor } }}
+              sx={{ height: 3, borderRadius: 1, mt: 0.5, mb: 0.5, bgcolor: '#111', '& .MuiLinearProgress-bar': { bgcolor: barColor } }}
             />
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+              <TextField
+                type="number"
+                size="small"
+                placeholder="Dmg"
+                value={amt}
+                onChange={(e) => setAmounts((s) => ({ ...s, [comp.id]: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === 'Enter') applyDamage(); }}
+                sx={{ width: 66, '& input': { py: 0.25, fontSize: '0.75rem' } }}
+              />
+              <Button size="small" color="error" variant="outlined" onClick={applyDamage} disabled={!amt || parseInt(amt, 10) <= 0} sx={{ minWidth: 0, px: 1, fontSize: '0.65rem' }}>
+                Hit
+              </Button>
+            </Box>
           </Paper>
         );
       })}

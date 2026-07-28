@@ -14,6 +14,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.6.0',
+    date: '2026-07-28',
+    changes: [
+      { type: 'feature', description: 'Apply damage directly from the Target Status panel — no more tabbing to the Vehicles tab. Ship components each get their own damage box (respecting damage threshold), crew targets and war machines get a whole-target damage box, and HP/destroyed state updates live.' },
+    ],
+  },
+  {
     version: '2.5.0',
     date: '2026-07-28',
     changes: [
