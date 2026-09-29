@@ -12,6 +12,9 @@ Key architecture for the multi-ruleset support:
 - **Component combat** (`VehicleTemplate.components`, `Vehicle.componentHp`, `src/utils/vehicleComponents.ts`): ships track per-part HP (hull mirrors `currentHp`); destroyed parts affect speed/turning/firing.
 
 **Live URL:** https://vvtt.lukantan.com (custom domain — "Vehicular Virtual Table Top")
+
+> **Page structure (since the SEO landing page, Sep 2026):** `index.html` at `/` is a static, crawlable marketing page (no React). The React app is `app.html`, served at `/app` via a Firebase rewrite. `player-view.html` is served at `/player-view`. All three are Vite build inputs in `vite.config.ts`. `public/` holds `robots.txt`, `sitemap.xml`, `favicon.svg`, and `screenshots/`. `app` and `player-view` are `noindex`. See `LAUNCH_PLAN.md` for the SEO/adoption checklist.
+
 **Firebase URL:** https://e-vehicle-combat.web.app (still active)
 **GitHub:** https://github.com/fortandr/dnd-vehicle-combat
 

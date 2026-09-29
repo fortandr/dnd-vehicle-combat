@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /player-view
+
+Sitemap: https://vvtt.lukantan.com/sitemap.xml

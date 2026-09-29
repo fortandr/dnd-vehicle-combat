@@ -4,7 +4,7 @@ A tactical **vehicle combat and chase** tracker for D&D 5e. VVTT runs the combat
 vehicular encounters — from the infernal war machines of *Baldur's Gate: Descent into Avernus* to
 the ships of *Ghosts of Saltmarsh* — plus any custom vehicles you build yourself.
 
-**Live:** https://vvtt.lukantan.com
+**Live:** https://vvtt.lukantan.com (landing page) · **App:** https://vvtt.lukantan.com/app
 
 ## Features
 

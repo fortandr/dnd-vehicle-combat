@@ -174,7 +174,7 @@ export function VehicleTemplateEditor({ open, initial, onClose, onSave }: Vehicl
             title="Components (per-part HP)"
             addLabel="Add component"
             onAdd={addComponent}
-            hint="For ships and other multi-part vehicles: hull, helm, sails/oars, weapon stations — each with its own AC & HP. Leave empty for single-HP vehicles. (Per-component targeting in combat is coming in the naval update; components are saved with the template now.)"
+            hint="For ships and other multi-part vehicles: hull, helm, sails/oars, weapon stations — each with its own AC & HP. Leave empty for single-HP vehicles."
           >
             {components.map((c, i) => (
               <Stack key={c.id} direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>

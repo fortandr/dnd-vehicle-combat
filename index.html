@@ -2,12 +2,461 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VVTT — Vehicular Virtual Table Top</title>
+    <title>VVTT — D&amp;D 5e Vehicle Combat &amp; Ship Combat Tracker</title>
+    <meta
+      name="description"
+      content="VVTT is a free virtual tabletop for D&D 5e vehicle combat and chases. Run Descent into Avernus infernal war machines and Ghosts of Saltmarsh ship battles with a tactical map, component damage, crew stations, click-to-roll dice, and a synced player view."
+    />
+    <link rel="canonical" href="https://vvtt.lukantan.com/" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#0f0f0f" />
+
+    <!-- Open Graph / Twitter -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="VVTT" />
+    <meta property="og:url" content="https://vvtt.lukantan.com/" />
+    <meta property="og:title" content="VVTT — D&D 5e Vehicle Combat & Ship Combat Tracker" />
+    <meta
+      property="og:description"
+      content="Free VTT for D&D vehicle combat: Avernus war machines and Saltmarsh ships with component damage, crew stations, tactical map, and a player view."
+    />
+    <meta property="og:image" content="https://vvtt.lukantan.com/screenshots/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="VVTT — D&D 5e Vehicle Combat & Ship Combat Tracker" />
+    <meta
+      name="twitter:description"
+      content="Free VTT for D&D vehicle combat: Avernus war machines and Saltmarsh ships with component damage, crew stations, tactical map, and a player view."
+    />
+    <meta name="twitter:image" content="https://vvtt.lukantan.com/screenshots/og-image.jpg" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "SoftwareApplication",
+            "name": "VVTT — Vehicular Virtual Table Top",
+            "alternateName": "VVTT",
+            "url": "https://vvtt.lukantan.com/",
+            "applicationCategory": "GameApplication",
+            "applicationSubCategory": "Virtual tabletop",
+            "operatingSystem": "Web browser",
+            "browserRequirements": "Requires JavaScript",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+            "description": "A free virtual tabletop for running D&D 5e vehicle combat and chases, including Descent into Avernus infernal war machines and Ghosts of Saltmarsh ships.",
+            "featureList": [
+              "Avernus infernal war machines with weapon stations, upgrades, and mishaps",
+              "Ghosts of Saltmarsh ships with per-component hit points",
+              "Custom vehicle editor and library",
+              "Tactical battlefield with cover, arcs, range, and elevation",
+              "Crew and passenger stations",
+              "Click-to-roll dice",
+              "Cloud sync and synced player view"
+            ],
+            "screenshot": "https://vvtt.lukantan.com/screenshots/battlefield.jpg",
+            "image": "https://vvtt.lukantan.com/screenshots/og-image.jpg",
+            "sameAs": ["https://github.com/fortandr/dnd-vehicle-combat"]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Is VVTT free?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. VVTT is free to use. Sign in with a Google account so your encounters, custom vehicles, and party presets sync to the cloud."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Which vehicles are included?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "The Descent into Avernus infernal war machines (Devil's Ride, Buzz Killer, Tormentor, Demon Grinder, Scavenger) and the Ghosts of Saltmarsh ships (rowboat, keelboat, longship, sailing ship, warship, galley). You can also build your own vehicles in the editor."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Does it replace my main VTT?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. VVTT runs the combat and chase phase of vehicular encounters, which most VTTs handle poorly. Use it alongside Roll20, Foundry, Owlbear Rodeo, or a physical table."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Can my players see the map?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. Open the player view on a second screen or share the link. It shows the battlefield and vehicle tokens in real time without the DM controls."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+
+    <style>
+      :root {
+        --bg: #0f0f0f;
+        --bg-2: #161616;
+        --bg-3: #1e1e1e;
+        --line: #2a2a2a;
+        --text: #f2f2f2;
+        --muted: #a3a3a3;
+        --fire: #ff6b35;
+        --fire-2: #ff4500;
+        --lava: #ff8c00;
+        --sea: #3b82f6;
+        --sea-2: #60a5fa;
+        --max: 1100px;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: var(--fire); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      img { max-width: 100%; height: auto; display: block; }
+      .wrap { max-width: var(--max); margin: 0 auto; padding: 0 20px; }
+      h1, h2, h3 { line-height: 1.15; margin: 0 0 .5em; letter-spacing: -0.01em; }
+      h1 { font-size: clamp(2rem, 5vw, 3.4rem); font-weight: 800; }
+      h2 { font-size: clamp(1.5rem, 3vw, 2.1rem); font-weight: 700; }
+      h3 { font-size: 1.1rem; font-weight: 600; }
+      p { margin: 0 0 1em; }
+      .muted { color: var(--muted); }
+      .eyebrow {
+        color: var(--fire);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .12em;
+        font-size: .78rem;
+        margin-bottom: .75rem;
+      }
+
+      /* nav */
+      nav {
+        position: sticky; top: 0; z-index: 10;
+        background: rgba(15,15,15,.85);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--line);
+      }
+      nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+      .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 800; letter-spacing: .04em; }
+      .brand:hover { text-decoration: none; }
+      .brand img { width: 28px; height: 28px; }
+      nav ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 22px; align-items: center; }
+      nav ul a { color: var(--muted); font-size: .92rem; font-weight: 500; }
+      nav ul a:hover { color: var(--text); text-decoration: none; }
+      .btn {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 12px 22px; border-radius: 8px; font-weight: 600;
+        background: var(--fire); color: #111; border: 1px solid transparent;
+        transition: transform .12s ease, background .12s ease;
+      }
+      .btn:hover { background: var(--lava); text-decoration: none; transform: translateY(-1px); }
+      .btn.small { padding: 8px 16px; font-size: .9rem; }
+      .btn.ghost { background: transparent; color: var(--text); border-color: var(--line); }
+      .btn.ghost:hover { background: var(--bg-3); }
+      @media (max-width: 640px) { nav ul li.hide-sm { display: none; } }
+
+      /* hero */
+      .hero { padding: 84px 0 48px; text-align: center; position: relative; overflow: hidden; }
+      .hero::before {
+        content: ""; position: absolute; inset: 0; z-index: -1;
+        background:
+          radial-gradient(60% 50% at 30% 0%, rgba(255,69,0,.18), transparent 70%),
+          radial-gradient(50% 45% at 80% 10%, rgba(59,130,246,.14), transparent 70%);
+      }
+      .hero h1 span { color: var(--fire); }
+      .hero .lede { font-size: clamp(1.05rem, 2vw, 1.3rem); max-width: 720px; margin: 0 auto 28px; color: var(--muted); }
+      .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
+      .hero .note { font-size: .85rem; color: #777; }
+      .shot {
+        margin: 44px auto 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+        box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,107,53,.08);
+        background: var(--bg-2);
+      }
+
+      /* sections */
+      section { padding: 72px 0; }
+      section + section { border-top: 1px solid var(--line); }
+      .grid { display: grid; gap: 20px; }
+      .grid.two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+      .grid.three { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+      .card {
+        background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 24px;
+      }
+      .card h3 { margin-top: 0; }
+      .card p:last-child { margin-bottom: 0; }
+      .card.fire { border-top: 3px solid var(--fire); }
+      .card.sea { border-top: 3px solid var(--sea); }
+      .card ul { margin: .5em 0 0; padding-left: 1.2em; color: var(--muted); }
+      .card li { margin-bottom: .35em; }
+      .pack-title { display: flex; align-items: baseline; gap: 10px; }
+      .pack-title small { color: var(--muted); font-weight: 500; }
+      .feature { display: flex; gap: 14px; }
+      .feature .ico {
+        flex: none; width: 40px; height: 40px; border-radius: 10px;
+        background: rgba(255,107,53,.12); color: var(--fire);
+        display: grid; place-items: center; font-size: 1.2rem;
+      }
+      .feature p { color: var(--muted); font-size: .95rem; margin: 0; }
+
+      /* screenshot pairs */
+      .showcase { display: grid; gap: 40px; }
+      .showcase .row { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: center; }
+      .showcase .row:nth-child(even) .text { order: 2; }
+      .showcase .text p { color: var(--muted); }
+      @media (max-width: 800px) {
+        .showcase .row { grid-template-columns: 1fr; }
+        .showcase .row:nth-child(even) .text { order: 0; }
+      }
+
+      /* steps */
+      .steps { counter-reset: step; }
+      .step { position: relative; padding-left: 56px; }
+      .step::before {
+        counter-increment: step; content: counter(step);
+        position: absolute; left: 0; top: 0; width: 40px; height: 40px; border-radius: 50%;
+        background: var(--fire); color: #111; font-weight: 800; display: grid; place-items: center;
+      }
+      .step p { color: var(--muted); margin: 0; }
+
+      /* faq */
+      details { border: 1px solid var(--line); border-radius: 10px; background: var(--bg-2); margin-bottom: 10px; }
+      summary { cursor: pointer; padding: 16px 20px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; }
+      summary::-webkit-details-marker { display: none; }
+      summary::after { content: "+"; color: var(--fire); font-weight: 700; }
+      details[open] summary::after { content: "–"; }
+      details div { padding: 0 20px 18px; color: var(--muted); }
+
+      /* final cta */
+      .final { text-align: center; padding: 84px 0; }
+      footer { border-top: 1px solid var(--line); padding: 32px 0; color: #777; font-size: .85rem; }
+      footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+      footer a { color: var(--muted); }
+    </style>
   </head>
+
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <nav>
+      <div class="wrap">
+        <a class="brand" href="/"><img src="/favicon.svg" alt="" width="28" height="28" />VVTT</a>
+        <ul>
+          <li class="hide-sm"><a href="#features">Features</a></li>
+          <li class="hide-sm"><a href="#vehicles">Vehicles</a></li>
+          <li class="hide-sm"><a href="#faq">FAQ</a></li>
+          <li class="hide-sm"><a href="https://github.com/fortandr/dnd-vehicle-combat" rel="noopener">GitHub</a></li>
+          <li><a class="btn small" href="/app">Open the app</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="wrap">
+        <div class="eyebrow">Free · D&amp;D 5e · Works alongside any VTT</div>
+        <h1>Run <span>vehicle combat</span> and ship battles<br />the way your VTT can't.</h1>
+        <p class="lede">
+          VVTT is a virtual tabletop built for the chase and combat phase of vehicular encounters:
+          infernal war machines tearing across Avernus, warships trading ballista fire off Saltmarsh,
+          or anything you build yourself.
+        </p>
+        <div class="cta">
+          <a class="btn" href="/app">Open the app — it's free</a>
+          <a class="btn ghost" href="#features">See what it does</a>
+        </div>
+        <p class="note">Sign in with Google. No install, nothing to configure.</p>
+        <div class="shot">
+          <img
+            src="/screenshots/battlefield.jpg"
+            alt="VVTT tactical battlefield showing Avernus war machines with weapon range arcs and a crew panel"
+            width="1160"
+            height="722"
+            fetchpriority="high"
+          />
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="vehicles">
+        <div class="wrap">
+          <div class="eyebrow">Two rulesets, built in</div>
+          <h2>Descent into Avernus and Ghosts of Saltmarsh, out of the box</h2>
+          <p class="muted" style="max-width: 720px">
+            Every stat, weapon, and rule from both books is already loaded. Pick a vehicle, seat your
+            crew, and start rolling initiative.
+          </p>
+          <div class="grid two" style="margin-top: 28px">
+            <div class="card fire">
+              <div class="pack-title"><h3>Infernal war machines</h3><small>Descent into Avernus</small></div>
+              <ul>
+                <li>Devil's Ride, Buzz Killer, Tormentor, Demon Grinder, Scavenger</li>
+                <li>Helm, weapon stations, and crew seats with the right actions at each</li>
+                <li>Armor upgrades and magical gadgets</li>
+                <li>Mishap table with automatic tracking of ongoing mishaps</li>
+              </ul>
+            </div>
+            <div class="card sea">
+              <div class="pack-title"><h3>Ships</h3><small>Ghosts of Saltmarsh</small></div>
+              <ul>
+                <li>Rowboat, keelboat, longship, sailing ship, warship, galley</li>
+                <li>Hull, helm, sails or oars, and each siege weapon track their own HP</li>
+                <li>Destroyed components have consequences: lose sails and your speed drops, lose the helm and you can't turn</li>
+                <li>Superior Ship Upgrades pack included</li>
+              </ul>
+            </div>
+          </div>
+          <p class="muted" style="margin-top: 20px">
+            Not enough? The <strong style="color: var(--text)">custom vehicle editor</strong> lets you build any land, sea, or air vehicle
+            from scratch, or duplicate a built-in one and tweak it. Custom vehicles save to your library.
+          </p>
+        </div>
+      </section>
+
+      <section id="features">
+        <div class="wrap">
+          <div class="eyebrow">Features</div>
+          <h2>Everything vehicle combat needs that initiative trackers skip</h2>
+          <div class="grid three" style="margin-top: 28px">
+            <div class="feature">
+              <div class="ico">⌖</div>
+              <div><h3>Tactical battlefield</h3><p>Drag and rotate tokens scaled to real vehicle dimensions. Cover, firing arcs, elevation zones, and weapon range arcs are drawn for you.</p></div>
+            </div>
+            <div class="feature">
+              <div class="ico">◎</div>
+              <div><h3>Target status</h3><p>Select a target and see cover, arc, distance, whether it's in range, and for ships, every targetable component's AC and HP.</p></div>
+            </div>
+            <div class="feature">
+              <div class="ico">⚒</div>
+              <div><h3>Component damage</h3><p>Apply damage to a specific component or the hull. Repairs, destruction effects, and wrecks are handled by the rules.</p></div>
+            </div>
+            <div class="feature">
+              <div class="ico">☺</div>
+              <div><h3>Crew &amp; passengers</h3><p>Seat creatures at stations or create them in place. Ships add a passengers zone and bulk deck-crew counts.</p></div>
+            </div>
+            <div class="feature">
+              <div class="ico">⚄</div>
+              <div><h3>Click-to-roll dice</h3><p>Every dice expression on screen is clickable: to-hit, weapon damage, effects. Results land in the combat log.</p></div>
+            </div>
+            <div class="feature">
+              <div class="ico">⇄</div>
+              <div><h3>Player view</h3><p>A second window that mirrors the battlefield for your players, synced live, with no DM controls showing.</p></div>
+            </div>
+            <div class="feature">
+              <div class="ico">☁</div>
+              <div><h3>Cloud sync</h3><p>Encounters, custom vehicles, and party presets save to your account and follow you to any device.</p></div>
+            </div>
+            <div class="feature">
+              <div class="ico">≡</div>
+              <div><h3>Current turn panel</h3><p>Who's acting, what they can do from their seat, and what their weapon does, one click from rolling.</p></div>
+            </div>
+            <div class="feature">
+              <div class="ico">⤓</div>
+              <div><h3>Combat log export</h3><p>Export the full log after the session for your recap or your campaign notes.</p></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="screens">
+        <div class="wrap showcase">
+          <div class="row">
+            <div class="text">
+              <div class="eyebrow">Ships &amp; custom vehicles</div>
+              <h2>Every component is its own target</h2>
+              <p>
+                Hull, helm, sails, oars, and each siege weapon carry their own AC and hit points.
+                Knock out the sails and the enemy drifts. Wreck the helm and they can't come about.
+                VVTT applies the book's destruction effects automatically.
+              </p>
+              <p>
+                The same editor builds your own vehicles from scratch, or duplicates a built-in one
+                so you can tweak it. Everything saves to your library.
+              </p>
+            </div>
+            <div class="shot" style="margin: 0"><img src="/screenshots/ship-components.jpg" alt="VVTT vehicle editor showing a Ghosts of Saltmarsh warship with per-component AC and HP for hull, helm, oars, sails, ballistas, and mangonels" width="820" height="765" loading="lazy" /></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="how">
+        <div class="wrap">
+          <div class="eyebrow">How it works</div>
+          <h2>Three steps to your first chase</h2>
+          <div class="grid three steps" style="margin-top: 28px">
+            <div class="step"><h3>Add vehicles</h3><p>Pick from the Avernus or Saltmarsh packs, or load one from your library. Set a side and drop it on the map.</p></div>
+            <div class="step"><h3>Seat the crew</h3><p>Put your party and NPCs at the helm, weapon stations, and passenger spots. Each seat shows the actions it allows.</p></div>
+            <div class="step"><h3>Run the round</h3><p>Move tokens, check target status, click to roll, apply damage. Open the player view on a second screen and go.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="faq">
+        <div class="wrap">
+          <div class="eyebrow">FAQ</div>
+          <h2>Questions DMs ask</h2>
+          <details open>
+            <summary>Is VVTT free?</summary>
+            <div>Yes. Sign in with a Google account so your encounters, custom vehicles, and party presets sync to the cloud.</div>
+          </details>
+          <details>
+            <summary>Which vehicles are included?</summary>
+            <div>The Descent into Avernus infernal war machines (Devil's Ride, Buzz Killer, Tormentor, Demon Grinder, Scavenger) and the Ghosts of Saltmarsh ships (rowboat, keelboat, longship, sailing ship, warship, galley). You can also build your own in the editor.</div>
+          </details>
+          <details>
+            <summary>Does it replace my main VTT?</summary>
+            <div>No. VVTT runs the combat and chase phase of vehicular encounters, which most VTTs handle poorly. Use it alongside Roll20, Foundry, Owlbear Rodeo, or a physical table.</div>
+          </details>
+          <details>
+            <summary>Can my players see the map?</summary>
+            <div>Yes. Open the player view on a second screen or share the link. It shows the battlefield and tokens in real time without the DM controls.</div>
+          </details>
+          <details>
+            <summary>Does it work on a phone or tablet?</summary>
+            <div>Yes. There's a mobile layout for running from a tablet at the table. The full battlefield is best on a laptop or larger screen.</div>
+          </details>
+          <details>
+            <summary>Can I see the code?</summary>
+            <div>Yes. The source is on <a href="https://github.com/fortandr/dnd-vehicle-combat" rel="noopener">GitHub</a>. Issues and pull requests are welcome.</div>
+          </details>
+        </div>
+      </section>
+
+      <section class="final">
+        <div class="wrap">
+          <h2>Your next Avernus chase is one click away</h2>
+          <p class="muted">Free, in the browser, nothing to install.</p>
+          <div class="cta"><a class="btn" href="/app">Open VVTT</a></div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <div>VVTT — Vehicular Virtual Table Top. Not affiliated with Wizards of the Coast.</div>
+        <div><a href="https://github.com/fortandr/dnd-vehicle-combat" rel="noopener">GitHub</a> · <a href="/app">Open the app</a></div>
+      </div>
+    </footer>
   </body>
 </html>
