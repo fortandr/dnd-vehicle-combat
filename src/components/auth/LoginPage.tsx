@@ -6,9 +6,11 @@
 import { Box, Button, Typography, Paper, CircularProgress, Alert } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
 import { useAuth } from '../../context/AuthContext';
+import { isInAppBrowser } from '../../utils/browserEnv';
 
 export function LoginPage() {
   const { signInWithGoogle, loading, error } = useAuth();
+  const inAppBrowser = isInAppBrowser(typeof navigator !== 'undefined' ? navigator.userAgent : '');
 
   return (
     <Box
@@ -68,6 +70,15 @@ export function LoginPage() {
         <Typography variant="body2" sx={{ color: '#aaa', mb: 4 }}>
           Sign in to save your encounters to the cloud and access them from any device.
         </Typography>
+
+        {/* In-app browser warning (Reddit, Instagram, Discord, ...) */}
+        {inAppBrowser && (
+          <Alert severity="warning" sx={{ mb: 3, textAlign: 'left' }}>
+            Google sign-in doesn't work inside this app's built-in browser. Tap the menu and choose
+            <strong> Open in Safari</strong> or <strong>Open in Chrome</strong>, or copy
+            <strong> vvtt.lukantan.com/app</strong> into your browser.
+          </Alert>
+        )}
 
         {/* Error Message */}
         {error && (

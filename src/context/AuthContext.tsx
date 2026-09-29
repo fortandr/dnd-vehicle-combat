@@ -7,11 +7,14 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import {
   User,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut as firebaseSignOut,
   GoogleAuthProvider,
   onAuthStateChanged,
 } from 'firebase/auth';
 import { auth, isAuthEnabled, logAnalyticsEvent } from '../firebase';
+import { isInAppBrowser, shouldFallbackToRedirect } from '../utils/browserEnv';
 
 // ==========================================
 // Types
@@ -52,6 +55,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return;
     }
 
+    // If we came back from a signInWithRedirect round-trip, surface any error.
+    // (Success is delivered through onAuthStateChanged below.)
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) logAnalyticsEvent('login', { method: 'google', flow: 'redirect' });
+      })
+      .catch((error) => {
+        console.error('Redirect sign-in error:', error);
+        setError(error instanceof Error ? error.message : 'Failed to sign in');
+      });
+
     const unsubscribe = onAuthStateChanged(
       auth,
       (user) => {
@@ -79,13 +93,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLoading(true);
     setError(null);
 
+    const provider = new GoogleAuthProvider();
+    const inAppBrowser = isInAppBrowser(navigator.userAgent);
+
     try {
-      const provider = new GoogleAuthProvider();
+      if (inAppBrowser) {
+        // Popups are unreliable inside embedded browsers; go straight to redirect.
+        await signInWithRedirect(auth, provider);
+        return; // page navigates away
+      }
       await signInWithPopup(auth, provider);
-      logAnalyticsEvent('login', { method: 'google' });
+      logAnalyticsEvent('login', { method: 'google', flow: 'popup' });
     } catch (error) {
-      console.error('Sign in error:', error);
-      setError(error instanceof Error ? error.message : 'Failed to sign in');
+      if (shouldFallbackToRedirect(error)) {
+        console.warn('Popup sign-in unavailable, falling back to redirect:', error);
+        try {
+          await signInWithRedirect(auth, provider);
+          return; // page navigates away
+        } catch (redirectError) {
+          console.error('Redirect sign-in error:', redirectError);
+          setError(redirectError instanceof Error ? redirectError.message : 'Failed to sign in');
+        }
+      } else {
+        console.error('Sign in error:', error);
+        setError(error instanceof Error ? error.message : 'Failed to sign in');
+      }
     } finally {
       setLoading(false);
     }

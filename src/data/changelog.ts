@@ -14,6 +14,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.8.0',
+    date: '2026-09-29',
+    changes: [
+      { type: 'feature', description: 'New public landing page at vvtt.lukantan.com. The app itself now lives at vvtt.lukantan.com/app — update your bookmark.' },
+      { type: 'fix', description: 'Sign-in is more reliable: if the Google popup is blocked, VVTT falls back to a full-page redirect. Inside in-app browsers (Reddit, Instagram, Discord) it now tells you to open the link in Safari or Chrome instead of failing silently.' },
+      { type: 'improvement', description: 'The Google sign-in prompt now shows vvtt.lukantan.com instead of a firebaseapp.com address.' },
+      { type: 'improvement', description: 'If something crashes, you now get a readable error screen with a reload button instead of a blank page.' },
+    ],
+  },
+  {
     version: '2.7.2',
     date: '2026-07-28',
     changes: [
