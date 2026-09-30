@@ -14,6 +14,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.8.3',
+    date: '2026-09-30',
+    changes: [
+      { type: 'improvement', description: 'Quick Start Guide refreshed (☰ → How to Use): corrected combat scale bands (Point-Blank / Tactical / Approach / Strategic) and button names, and added sections on the app address and sign-in, map resize options, zoom and pan, Undo, combat log export, per-encounter auto-roll, Player View, and Settings.' },
+    ],
+  },
+  {
     version: '2.8.2',
     date: '2026-09-30',
     changes: [
