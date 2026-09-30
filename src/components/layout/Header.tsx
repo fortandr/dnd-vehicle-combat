@@ -3,7 +3,7 @@
  * Top navigation bar with encounter info and controls
  */
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -44,7 +44,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { useCombat } from '../../context/CombatContext';
 import { SCALES } from '../../data/scaleConfig';
-import { rollComplication, getComplicationRollRange } from '../../data/chaseComplications';
+import { resolveComplicationRoll, rollD20 } from '../../utils/complicationRoll';
 import { storageService, SavedEncounter, CombatArchive } from '../../services/storageService';
 import { CombatState, ChaseComplication } from '../../types';
 import { scaleColors, withOpacity } from '../../theme/customColors';
@@ -63,6 +63,10 @@ import { HelpGuide } from '../help/HelpGuide';
 import { SettingsDialog } from '../settings/SettingsDialog';
 import { ChangelogDialog } from '../settings/ChangelogDialog';
 import { logAnalyticsEvent } from '../../firebase';
+
+// A roll of 1-2 on the Avernus table is the Creature Chase complication.
+const isCreatureChaseComplication = (complication: ChaseComplication | null, roll: number): boolean =>
+  roll <= 2 && complication?.name === 'Creature Chase';
 
 export function Header() {
   const { state, dispatch, startCombat, returnToSetup, resetCombat, nextRound, nextTurn, loadEncounter, newEncounter, lastSaved, forceSave, markAsSaved, setEncounterName, toggleAutoRollComplications, logComplication, startComplicationResolution } = useCombat();
@@ -86,7 +90,6 @@ export function Header() {
     rollRange: string;
     complication: ChaseComplication | null;
   } | null>(null);
-  const [prevRound, setPrevRound] = useState(state.round);
 
   const currentScale = SCALES[state.scale];
 
@@ -138,50 +141,36 @@ export function Header() {
     };
   }, [state.creatures, state.crewAssignments, state.vehicles]);
 
-  // Helper to check if a complication is "Creature Chase" (roll 1-2)
-  const isCreatureChaseComplication = (complication: ChaseComplication | null, roll: number): boolean => {
-    return roll <= 2 && complication?.name === 'Creature Chase';
+  // Roll a chase complication, log it, and open the matching dialog.
+  // Called from the Complications menu and, when auto-roll is on, from Next Round.
+  const performComplicationRoll = () => {
+    const result = resolveComplicationRoll(rollD20(), state.scale);
+    const { roll, rollRange, complication } = result;
+
+    logComplication(roll, complication?.name || null, result.logDetails);
+    setCurrentComplicationResult({ roll, rollRange, complication });
+
+    switch (result.modal) {
+      case 'creatureChase':
+        setShowCreatureChaseModal(true);
+        break;
+      case 'resolution':
+        startComplicationResolution(complication!, roll, rollRange);
+        setShowResolutionModal(true);
+        break;
+      default:
+        setShowComplicationModal(true);
+    }
   };
 
-  // Auto-roll complication when round changes (if enabled).
-  // This reacts to the round counter because the round advances inside the
-  // combat reducer, which has no hook to fire UI side effects. Moving the roll
-  // into the "next round" action would be the cleaner fix.
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    // Only trigger on round change (not on initial load), in combat phase, and when auto-roll is enabled
-    if (state.round > prevRound && state.phase === 'combat' && state.autoRollComplications) {
-      // Roll for complication
-      const roll = Math.floor(Math.random() * 20) + 1;
-      const complication = rollComplication(roll, state.scale);
-      const rollRange = getComplicationRollRange(roll);
-
-      // Log to combat log
-      logComplication(
-        roll,
-        complication?.name || null,
-        complication ? complication.effect : 'The hellish terrain poses no additional threats this round.'
-      );
-
-      // Store the result for modals
-      setCurrentComplicationResult({ roll, rollRange, complication });
-
-      // Check what type of complication this is
-      if (isCreatureChaseComplication(complication, roll)) {
-        // Creature Chase - show creature selection modal
-        setShowCreatureChaseModal(true);
-      } else if (complication && complication.mechanicalEffect?.skillCheck) {
-        // Skill check complication - start resolution process
-        startComplicationResolution(complication, roll, rollRange);
-        setShowResolutionModal(true);
-      } else {
-        // No complication or simple info-only complication
-        setShowComplicationModal(true);
-      }
+  // Advance the round; the complication roll is a consequence of that action,
+  // so it happens here rather than in an effect watching the round counter.
+  const handleNextRound = () => {
+    nextRound();
+    if (state.phase === 'combat' && state.autoRollComplications) {
+      performComplicationRoll();
     }
-    setPrevRound(state.round);
-  }, [state.round, state.phase, state.autoRollComplications, state.scale, prevRound, logComplication, startComplicationResolution]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  };
 
   const handleSave = async () => {
     try {
@@ -301,32 +290,7 @@ export function Header() {
   };
 
   const handleRollComplication = () => {
-    const roll = Math.floor(Math.random() * 20) + 1;
-    const complication = rollComplication(roll, state.scale);
-    const rollRange = getComplicationRollRange(roll);
-
-    // Log to combat log
-    logComplication(
-      roll,
-      complication?.name || null,
-      complication ? complication.effect : 'The hellish terrain poses no additional threats this round.'
-    );
-
-    // Store the result for modals
-    setCurrentComplicationResult({ roll, rollRange, complication });
-
-    // Check what type of complication this is
-    if (isCreatureChaseComplication(complication, roll)) {
-      // Creature Chase - show creature selection modal
-      setShowCreatureChaseModal(true);
-    } else if (complication && complication.mechanicalEffect?.skillCheck) {
-      // Skill check complication - start resolution process
-      startComplicationResolution(complication, roll, rollRange);
-      setShowResolutionModal(true);
-    } else {
-      // No complication or simple info-only complication
-      setShowComplicationModal(true);
-    }
+    performComplicationRoll();
     setComplicationMenuAnchor(null);
   };
 
@@ -468,7 +432,7 @@ export function Header() {
                   <Button
                     variant="contained"
                     size="small"
-                    onClick={nextRound}
+                    onClick={handleNextRound}
                     disabled={state.currentTurnIndex < state.initiativeOrder.length - 1}
                     title={state.currentTurnIndex < state.initiativeOrder.length - 1
                       ? `Complete all turns first (${state.currentTurnIndex + 1}/${state.initiativeOrder.length})`
