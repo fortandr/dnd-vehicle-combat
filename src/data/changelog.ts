@@ -14,6 +14,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.8.2',
+    date: '2026-09-30',
+    changes: [
+      { type: 'improvement', description: 'Auto-rolled chase complications now fire as part of clicking Next Round, instead of a watcher reacting to the round counter. Same result at the table, but the roll can no longer be missed or double-fired by a re-render.' },
+      { type: 'improvement', description: 'Under the hood: a project-wide cleanup removed dead code and unused props across 20 files, and the codebase now lints clean. No visible changes.' },
+    ],
+  },
+  {
     version: '2.8.1',
     date: '2026-09-30',
     changes: [
