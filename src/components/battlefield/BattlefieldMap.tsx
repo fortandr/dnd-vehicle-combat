@@ -20,8 +20,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useCombat } from '../../context/CombatContext';
 import { useSettings } from '../../context/SettingsContext';
 import { Vehicle, VehicleTemplate, Position, ScaleName, Creature, CrewAssignment, ElevationZone } from '../../types';
-import { SCALES, formatDistance, formatDistanceWithUnit, getScaleForDistance, calculateMovementPerRound } from '../../data/scaleConfig';
-import { getVehicleElevation } from '../../utils/elevationCalculator';
+import { SCALES, formatDistanceWithUnit, getScaleForDistance, calculateMovementPerRound } from '../../data/scaleConfig';
 import { resolveZone } from '../../data/vehicleTemplates';
 import { useBroadcastSource } from '../../hooks/useBroadcastChannel';
 import { renderShipIcon } from './shipIcons';
@@ -36,6 +35,8 @@ import {
   scaleAboutPivot,
 } from '../../utils/mapViewport';
 
+const SCALE_ORDER: ScaleName[] = ['point_blank', 'tactical', 'approach', 'strategic'];
+
 interface BattlefieldMapProps {
   height?: number;
 }
@@ -46,7 +47,6 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   const [showBackgroundControls, setShowBackgroundControls] = useState(false);
   const [showLayersPanel, setShowLayersPanel] = useState(false);
   const [bgPanelTab, setBgPanelTab] = useState<'background' | 'elevation'>('background');
-  const [showElevationControls, setShowElevationControls] = useState(false);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [resizingZone, setResizingZone] = useState<{
     zoneId: string;
@@ -65,8 +65,6 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   } | null>(null);
   const preResizeRef = useRef<{ type: 'feetPerPixel' | 'scale'; oldValue: number } | null>(null);
   const resizeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isDrawingZone, setIsDrawingZone] = useState(false);
-  const [zoneDrawStart, setZoneDrawStart] = useState<Position | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const playerViewRef = useRef<Window | null>(null);
   const { broadcast } = useBroadcastSource();
@@ -97,8 +95,8 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     const updateWidth = () => {
       if (containerRef.current) {
         const newWidth = containerRef.current.offsetWidth;
-        if (newWidth !== containerWidth && newWidth > 0) {
-          setContainerWidth(newWidth);
+        if (newWidth > 0) {
+          setContainerWidth((prev) => (newWidth !== prev ? newWidth : prev));
         }
       }
     };
@@ -193,6 +191,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
 
   // Auto-fit ONLY when new encounter is loaded (vehicle IDs change)
   // This prevents view from breaking when vehicles are moved
+  const vehicleIdsKey = state.vehicles.map(v => v.id).join(',');
   useEffect(() => {
     const currentIds = state.vehicles.map(v => v.id).sort().join(',');
     const previousIds = vehicleIdsRef.current;
@@ -229,7 +228,10 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
       // Auto-fit to show all vehicles
       handleFitAll();
     }
-  }, [state.vehicles.map(v => v.id).join(',')]); // Only depend on vehicle IDs, not positions
+    // Intentionally keyed on the set of vehicle IDs only: this is a one-shot
+    // auto-fit when vehicles are added/removed, not on every position change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleIdsKey]);
 
   // Track turn changes (just update ref, no auto-fit)
   useEffect(() => {
@@ -250,6 +252,9 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
       }, 150);
       return () => clearTimeout(timeoutId);
     }
+    // Intentionally runs only on phase transitions; handleFitAll is recreated
+    // every render and must not retrigger this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.phase]);
 
   // Track the target pixels per foot (this stays constant across scale changes)
@@ -458,13 +463,12 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   // Auto-update scale based on MINIMUM distance between any party and enemy
   // Only auto-scale DOWN (to closer range) - never auto-scale UP during combat
   // The DM should manually change to farther scales if needed
-  const scaleOrder: ScaleName[] = ['point_blank', 'tactical', 'approach', 'strategic'];
 
   useEffect(() => {
     if (minEngagementDist > 0 && minEngagementDist !== Infinity) {
       const suggestedScale = getScaleForDistance(minEngagementDist);
-      const currentScaleIndex = scaleOrder.indexOf(state.scale);
-      const suggestedScaleIndex = scaleOrder.indexOf(suggestedScale);
+      const currentScaleIndex = SCALE_ORDER.indexOf(state.scale);
+      const suggestedScaleIndex = SCALE_ORDER.indexOf(suggestedScale);
 
       // Only auto-scale if the suggested scale is CLOSER (lower index) than current
       // This prevents jarring scale-ups when combat spreads out
@@ -902,8 +906,8 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     const { handle, originalZone } = resizingZone;
     const minSize = 10; // Minimum 10 feet
 
-    let newPosition = { ...originalZone.position };
-    let newSize = { ...originalZone.size };
+    const newPosition = { ...originalZone.position };
+    const newSize = { ...originalZone.size };
 
     // Calculate new size and position based on which handle is being dragged
     switch (handle) {
@@ -2018,7 +2022,6 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                 screenPosition={screenPos}
                 screenWidth={screenWidth}
                 screenHeight={screenHeight}
-                pixelsPerFoot={pixelsPerFoot}
                 isSelected={selectedZoneId === zone.id}
                 onSelect={(id) => setSelectedZoneId(id)}
                 onStartResize={handleStartResize}
@@ -2049,7 +2052,6 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
           {/* Movement Range Indicator - shows remaining movement for current turn vehicle */}
           {state.phase === 'combat' && currentTurnVehicle && (
             <MovementRangeIndicator
-              vehicle={currentTurnVehicle}
               screenPosition={worldToScreen(currentTurnVehicle.position)}
               remainingMovement={getRemainingMovement(currentTurnVehicle)}
               maxMovement={getMaxMovement(currentTurnVehicle)}
@@ -2081,18 +2083,12 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                 key={vehicle.id}
                 vehicle={vehicle}
                 screenPosition={screenPos}
-                isActive={activeId === vehicle.id}
-                zoom={zoom}
                 pixelsPerFoot={pixelsPerFoot}
-                remainingMovement={getRemainingMovement(vehicle)}
-                maxMovement={getMaxMovement(vehicle)}
                 onRotate={updateVehicleFacing}
                 disabled={isDisabled}
                 isCurrentTurn={isThisVehicleTurn}
                 crewAssignments={state.crewAssignments}
                 creatures={state.creatures}
-                elevationZones={state.elevationZones}
-                allVehicles={state.vehicles}
                 unitSystem={unitSystem}
                 showRangeArcs={showRangeArcs}
                 showHpBars={showHpBars}
@@ -2135,7 +2131,6 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
               <VehicleTokenDisplay
                 vehicle={activeVehicle}
                 isDragging
-                zoom={zoom}
                 pixelsPerFoot={pixelsPerFoot}
               />
             ) : null}
@@ -2417,7 +2412,6 @@ interface DraggableElevationZoneProps {
   screenPosition: { x: number; y: number };
   screenWidth: number;
   screenHeight: number;
-  pixelsPerFoot: number;
   isSelected: boolean;
   onSelect: (zoneId: string) => void;
   onStartResize: (zoneId: string, handle: ResizeHandle, startX: number, startY: number) => void;
@@ -2431,7 +2425,6 @@ function DraggableElevationZone({
   screenPosition,
   screenWidth,
   screenHeight,
-  pixelsPerFoot,
   isSelected,
   onSelect,
   onStartResize,
@@ -2592,18 +2585,12 @@ function DraggableElevationZone({
 interface VehicleTokenProps {
   vehicle: Vehicle;
   screenPosition: Position;
-  isActive: boolean;
-  zoom: number;
   pixelsPerFoot: number;
-  remainingMovement: number;
-  maxMovement: number;
   onRotate: (vehicleId: string, newFacing: number) => void;
   disabled?: boolean; // Disable dragging (e.g., not this vehicle's turn)
   isCurrentTurn?: boolean; // Highlight as current turn
   crewAssignments: CrewAssignment[];
   creatures: Creature[];
-  elevationZones: ElevationZone[];
-  allVehicles: Vehicle[];
   unitSystem: 'imperial' | 'metric';
   showRangeArcs: boolean;
   showHpBars: boolean;
@@ -2613,18 +2600,12 @@ interface VehicleTokenProps {
 function VehicleToken({
   vehicle,
   screenPosition,
-  isActive,
-  zoom,
   pixelsPerFoot,
-  remainingMovement,
-  maxMovement,
   onRotate,
   disabled = false,
   isCurrentTurn = false,
   crewAssignments,
   creatures,
-  elevationZones,
-  allVehicles,
   unitSystem,
   showRangeArcs,
   showHpBars,
@@ -2645,7 +2626,7 @@ function VehicleToken({
 
   // Calculate weapon ranges per arc direction (only for manned weapons)
   // Includes elevation-based range extension when firing at targets below
-  const weaponRangesByArc = getWeaponRangesByArc(vehicle, crewAssignments, creatures, elevationZones, allVehicles);
+  const weaponRangesByArc = getWeaponRangesByArc(vehicle, crewAssignments, creatures);
   const maxWeaponRange = Math.max(weaponRangesByArc.front, weaponRangesByArc.rear, weaponRangesByArc.left, weaponRangesByArc.right);
 
   // z-index priority: dragging > current turn > hovered > default
@@ -2900,7 +2881,6 @@ function VehicleToken({
 interface VehicleTokenDisplayProps {
   vehicle: Vehicle;
   isDragging: boolean;
-  zoom: number;
   pixelsPerFoot: number;
   remainingMovement?: number;
   maxMovement?: number;
@@ -2908,7 +2888,6 @@ interface VehicleTokenDisplayProps {
 
 function VehicleTokenDisplay({
   vehicle,
-  zoom,
   pixelsPerFoot,
 }: VehicleTokenDisplayProps) {
   // Token pixel dimensions — rectangular for ships, square otherwise.
@@ -3461,33 +3440,6 @@ function VehicleIcon({ templateId, size, height, color }: VehicleIconProps) {
   );
 }
 
-function getVehicleIconPath(templateId: string): string {
-  // Legacy function - kept for compatibility
-  const id = templateId.toLowerCase();
-
-  if (id.includes('devil') || id.includes('ride')) {
-    return 'M5 14 L10 8 L30 8 L35 14 L30 18 L10 18 Z M8 12 L12 10 L12 16 L8 14 Z';
-  }
-
-  if (id.includes('grinder') || id.includes('demon')) {
-    // Heavy tank/grinder shape
-    return 'M2 10 L8 4 L32 4 L38 10 L38 18 L32 22 L8 22 L2 18 Z M6 8 L10 6 L10 12 L6 10 Z M34 8 L34 18 L38 16 L38 10 Z';
-  }
-
-  if (id.includes('tormentor')) {
-    // Assault vehicle shape
-    return 'M4 12 L10 6 L30 6 L36 12 L36 16 L30 20 L10 20 L4 16 Z M8 10 L12 8 L12 14 L8 12 Z';
-  }
-
-  if (id.includes('scavenger')) {
-    // Truck/transport shape
-    return 'M3 10 L8 6 L28 6 L33 10 L37 10 L37 18 L33 18 L28 20 L8 20 L3 16 Z';
-  }
-
-  // Default vehicle shape
-  return 'M5 12 L10 6 L30 6 L35 12 L35 16 L30 20 L10 20 L5 16 Z M8 10 L12 8 L12 14 L8 12 Z';
-}
-
 // ==========================================
 // Grid Background
 // ==========================================
@@ -3656,7 +3608,6 @@ function DistanceLines({ vehicles, distances, worldToScreen, unitSystem }: Dista
 // ==========================================
 
 interface MovementRangeIndicatorProps {
-  vehicle: Vehicle;
   screenPosition: Position;
   remainingMovement: number;
   maxMovement: number;
@@ -3665,7 +3616,6 @@ interface MovementRangeIndicatorProps {
 }
 
 function MovementRangeIndicator({
-  vehicle,
   screenPosition,
   remainingMovement,
   maxMovement,
@@ -3861,11 +3811,10 @@ interface CreatureTokenProps {
   showMovement?: boolean;
   isCurrentTurn?: boolean;
   disabled?: boolean;
-  onPositionUpdate?: (creatureId: string, newPosition: Position) => void;
   showHpBars?: boolean;
 }
 
-function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovement = 0, maxMovement = 0, showMovement = false, isCurrentTurn = false, disabled = false, onPositionUpdate, showHpBars = true }: CreatureTokenProps) {
+function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovement = 0, maxMovement = 0, showMovement = false, isCurrentTurn = false, disabled = false, showHpBars = true }: CreatureTokenProps) {
   const [isHovered, setIsHovered] = useState(false);
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `creature-${creature.id}`,
@@ -4147,22 +4096,6 @@ function parseWeaponRange(range?: string): number {
 }
 
 /**
- * Get the maximum weapon range for a vehicle from its mounted weapons
- */
-function getMaxWeaponRange(vehicle: Vehicle): number {
-  if (!vehicle.weapons || vehicle.weapons.length === 0) return 0;
-
-  let maxRange = 0;
-  for (const weapon of vehicle.weapons) {
-    const range = parseWeaponRange(weapon.range);
-    if (range > maxRange) {
-      maxRange = range;
-    }
-  }
-  return maxRange;
-}
-
-/**
  * Get max weapon range per arc direction
  * Returns { front, rear, left, right } with the max range for each direction
  * Only includes ranges for weapons that have a living crew member manning them
@@ -4171,9 +4104,7 @@ function getMaxWeaponRange(vehicle: Vehicle): number {
 function getWeaponRangesByArc(
   vehicle: Vehicle,
   crewAssignments: CrewAssignment[],
-  creatures: Creature[],
-  _elevationZones: ElevationZone[],
-  _allVehicles: Vehicle[]
+  creatures: Creature[]
 ): Record<'front' | 'rear' | 'left' | 'right', number> {
   const ranges = { front: 0, rear: 0, left: 0, right: 0 };
 
