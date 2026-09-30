@@ -4,8 +4,7 @@
  */
 
 import { useState } from 'react';
-import { Box, Typography, CircularProgress, Drawer, IconButton, useMediaQuery, useTheme, BottomNavigation, BottomNavigationAction } from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
+import { Box, Typography, CircularProgress, useMediaQuery, useTheme, BottomNavigation, BottomNavigationAction } from '@mui/material';
 import MapIcon from '@mui/icons-material/Map';
 import GroupIcon from '@mui/icons-material/Group';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
@@ -26,8 +25,6 @@ function AppContent() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md')); // < 900px
 
   // Mobile drawer states
-  const [leftDrawerOpen, setLeftDrawerOpen] = useState(false);
-  const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(0); // 0=map, 1=creatures, 2=vehicles
 
   // Show loading spinner while checking auth state

@@ -15,7 +15,6 @@ import {
   ListItemIcon,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
-import PersonIcon from '@mui/icons-material/Person';
 import CloudIcon from '@mui/icons-material/Cloud';
 import { useAuth } from '../../context/AuthContext';
 

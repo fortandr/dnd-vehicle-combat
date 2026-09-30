@@ -41,7 +41,7 @@ import { Vehicle, VehicleZone, CrewAssignment, Mishap, VehicleWeapon, Creature, 
 import { getComponentHp, destroyedEffectLabel, hasComponents } from '../../utils/vehicleComponents';
 import { RollableText } from '../common/RollableText';
 import { useCombat } from '../../context/CombatContext';
-import { getMishapResult, getMishapSeverity, canRepairMishap, getRepairDescription, checkMishapFromDamage, rollMishapForVehicle } from '../../data/mishapTable';
+import { getMishapSeverity, canRepairMishap, getRepairDescription, checkMishapFromDamage, rollMishapForVehicle } from '../../data/mishapTable';
 import { v4 as uuid } from 'uuid';
 import { SWAPPABLE_WEAPONS, ARMOR_UPGRADES, MAGICAL_GADGETS, getWeaponStationUpgrade, WEAPON_STATION_EXCLUDED_VEHICLES, resolveZone, isAvernusVehicle } from '../../data/vehicleTemplates';
 import { NAVAL_UPGRADES, NAVAL_UPGRADE_CATEGORIES, isNavalVehicle } from '../../data/navalUpgrades';
@@ -1309,9 +1309,6 @@ function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
     if (!selectedCreatureId) return;
     // Just remove the crew assignment - the creature stays in the creatures list but with no assignment
     // This is different from UNASSIGN_CREW which places them on the battlefield
-    const newAssignments = state.crewAssignments.filter(
-      (a) => a.creatureId !== selectedCreatureId
-    );
     // Dispatch directly to update crew assignments without the exit vehicle logic
     dispatch({
       type: 'LOG_ACTION',

@@ -6,30 +6,8 @@
  */
 
 import React, { createContext, useContext, useReducer, useCallback, ReactNode, useEffect, useState, useRef } from 'react';
-import {
-  CombatState,
-  Vehicle,
-  VehicleWeapon,
-  Creature,
-  CrewAssignment,
-  Mishap,
-  LogEntry,
-  LogEntryType,
-  ScaleName,
-  Position,
-  Environment,
-  CombatPhase,
-  BattlefieldState,
-  BackgroundImageConfig,
-  ChaseComplication,
-  ActiveBattlefieldComplication,
-  VehicleComplicationResolution,
-  SpeedModifier,
-  ComplicationResolutionStatus,
-  ElevationZone,
-  MoveHistoryEntry,
-} from '../types';
-import { getScaleForDistance, SCALES } from '../data/scaleConfig';
+import { CombatState, Vehicle, VehicleWeapon, Creature, CrewAssignment, Mishap, LogEntry, LogEntryType, ScaleName, Position, Environment, BattlefieldState, BackgroundImageConfig, ChaseComplication, ActiveBattlefieldComplication, VehicleComplicationResolution, SpeedModifier, ComplicationResolutionStatus, ElevationZone, MoveHistoryEntry } from '../types';
+import { SCALES } from '../data/scaleConfig';
 import { getWeaponStationUpgrade, resolveZone } from '../data/vehicleTemplates';
 import { logAnalyticsEvent } from '../firebase';
 import { v4 as uuid } from 'uuid';
@@ -630,7 +608,7 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
     }
 
     // ========== Crew Assignments ==========
-    case 'ASSIGN_CREW':
+    case 'ASSIGN_CREW': {
       // Remove existing assignment for this creature
       const filteredAssignments = state.crewAssignments.filter(
         (a) => a.creatureId !== action.payload.creatureId
@@ -639,6 +617,7 @@ function combatReducer(state: CombatState, action: CombatAction): CombatState {
         ...state,
         crewAssignments: [...filteredAssignments, action.payload],
       };
+    }
 
     case 'UNASSIGN_CREW': {
       // Find the current assignment to get the vehicle
@@ -1597,7 +1576,7 @@ function insertCreaturesIntoInitiative(
   currentOrder: string[],
   creaturesToAdd: Creature[],
   allCreatures: Creature[],
-  allVehicles: Vehicle[]
+  _allVehicles: Vehicle[]
 ): string[] {
   if (creaturesToAdd.length === 0) return currentOrder;
 
@@ -1753,19 +1732,6 @@ function findVehicleDriver(
 
   const firstAssignment = sortedAssignments[0];
   return creatures.find((c) => c.id === firstAssignment.creatureId);
-}
-
-/**
- * Get the initiative value for a vehicle based on its driver.
- * Returns the driver's initiative, or -1 if no driver.
- */
-function getVehicleInitiative(
-  vehicle: Vehicle,
-  crewAssignments: CrewAssignment[],
-  creatures: Creature[]
-): number {
-  const driver = findVehicleDriver(vehicle, crewAssignments, creatures);
-  return driver ? driver.initiative : -1;
 }
 
 // ==========================================
@@ -1952,9 +1918,13 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
   // Track last saved time for UI feedback
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
-  // Keep a ref to always have the latest state (avoids stale closure issues)
+  // Keep a ref to always have the latest state (avoids stale closure issues).
+  // Updated in an effect rather than during render, per the React rules of refs;
+  // every reader below runs from a callback or timer, after commit.
   const stateRef = useRef(state);
-  stateRef.current = state;
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   // Direct save function using current state parameter
   const saveState = useCallback((stateToSave: CombatState) => {
@@ -2002,6 +1972,10 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
   const prevHasBgRef = useRef(!!state.battlefield.backgroundImage);
   const prevHasBeenSavedRef = useRef(state.hasBeenSaved);
 
+  // Auto-save on meaningful state changes. saveState() writes localStorage
+  // (an external system) and then records the timestamp for the UI; that
+  // setState is the intended feedback, not a derived-state mistake.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const phaseChanged = prevPhaseRef.current !== state.phase;
     const roundChanged = prevRoundRef.current !== state.round;
@@ -2026,6 +2000,7 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
       prevHasBeenSavedRef.current = state.hasBeenSaved;
     }
   }, [state.phase, state.round, state.currentTurnIndex, state.battlefield.backgroundImage, state.hasBeenSaved, state, saveState]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Force save function for external use - always uses latest state via ref
   const forceSave = useCallback(() => {

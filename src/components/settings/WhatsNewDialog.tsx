@@ -150,25 +150,3 @@ export function WhatsNewDialog() {
     </Dialog>
   );
 }
-
-/**
- * Get the current app version
- */
-export function getCurrentVersion(): string {
-  return changelog[0]?.version || '0.0.0';
-}
-
-/**
- * Check if user has seen the current version
- */
-export function hasSeenCurrentVersion(): boolean {
-  const lastSeenVersion = localStorage.getItem(LAST_SEEN_VERSION_KEY);
-  return lastSeenVersion === changelog[0]?.version;
-}
-
-/**
- * Mark current version as seen (for manual dismissal)
- */
-export function markVersionAsSeen(): void {
-  localStorage.setItem(LAST_SEEN_VERSION_KEY, changelog[0]?.version || '0.0.0');
-}

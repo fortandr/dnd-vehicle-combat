@@ -31,7 +31,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import PersonIcon from '@mui/icons-material/Person';
 import { useCombat } from '../../context/CombatContext';
-import { ActiveBattlefieldComplication, Vehicle, ComplicationResolutionStatus } from '../../types';
+import { ActiveBattlefieldComplication, ComplicationResolutionStatus } from '../../types';
 import { withOpacity, factionColors } from '../../theme/customColors';
 
 interface ComplicationResolutionModalProps {

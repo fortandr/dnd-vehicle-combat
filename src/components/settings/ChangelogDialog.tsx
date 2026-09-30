@@ -18,7 +18,7 @@ import {
 import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import { changelog, ChangelogEntry } from '../../data/changelog';
+import { changelog } from '../../data/changelog';
 
 interface ChangelogDialogProps {
   open: boolean;

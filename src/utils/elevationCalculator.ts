@@ -119,7 +119,7 @@ export function getModifiedWeaponRange(baseRange: number, elevationDiff: number)
 export function formatRangeExtension(
   baseRange: number,
   modifiedRange: number,
-  elevationDiff: number
+  _elevationDiff: number
 ): string | null {
   if (baseRange === 0 || modifiedRange <= baseRange) {
     return null;

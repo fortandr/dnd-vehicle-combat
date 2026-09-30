@@ -38,11 +38,25 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import PetsIcon from '@mui/icons-material/Pets';
 import { useCombat } from '../../context/CombatContext';
 import { Creature, Statblock, ChaseComplication } from '../../types';
-import { withOpacity } from '../../theme/customColors';
 
 // ==========================================
 // Open5e Types & API
 // ==========================================
+
+/** Pick a spawn point 50-100 ft from a random enemy vehicle, or near the map centre. */
+function randomCreaturePosition(vehicles: { type: string; position: { x: number; y: number } }[]): { x: number; y: number } {
+  const enemyVehicles = vehicles.filter(v => v.type === 'enemy');
+  if (enemyVehicles.length > 0) {
+    const vehicle = enemyVehicles[Math.floor(Math.random() * enemyVehicles.length)];
+    const angle = Math.random() * 2 * Math.PI;
+    const distance = 50 + Math.random() * 50;
+    return {
+      x: vehicle.position.x + Math.cos(angle) * distance,
+      y: vehicle.position.y + Math.sin(angle) * distance,
+    };
+  }
+  return { x: 300 + Math.random() * 100, y: 300 + Math.random() * 100 };
+}
 
 interface Open5eAction {
   name: string;
@@ -268,22 +282,9 @@ export function CreatureChaseModal({
   const [manualDexSave, setManualDexSave] = useState(2);
   const [manualInitiative, setManualInitiative] = useState(2);
 
-  // Calculate position for new creature (near enemy vehicles or center)
-  const getCreaturePosition = (): { x: number; y: number } => {
-    const enemyVehicles = state.vehicles.filter(v => v.type === 'enemy');
-    if (enemyVehicles.length > 0) {
-      // Place near a random enemy vehicle
-      const vehicle = enemyVehicles[Math.floor(Math.random() * enemyVehicles.length)];
-      const angle = Math.random() * 2 * Math.PI;
-      const distance = 50 + Math.random() * 50; // 50-100 feet away
-      return {
-        x: vehicle.position.x + Math.cos(angle) * distance,
-        y: vehicle.position.y + Math.sin(angle) * distance,
-      };
-    }
-    // Default position
-    return { x: 300 + Math.random() * 100, y: 300 + Math.random() * 100 };
-  };
+  // Position for a new creature: near a random enemy vehicle, else near centre.
+  // Only called from click handlers, never during render.
+  const getCreaturePosition = () => randomCreaturePosition(state.vehicles);
 
   // Debounced search
   const handleSearchChange = useCallback((query: string) => {

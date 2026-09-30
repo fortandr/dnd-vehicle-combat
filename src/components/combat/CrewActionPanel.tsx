@@ -13,14 +13,7 @@ import {
   calculateCoverWithElevation,
   getArcDisplayName,
   ElevationCoverResult,
-  getZoneCoverDescription,
 } from '../../utils/coverCalculator';
-import {
-  getVehicleElevation,
-  parseWeaponRange,
-  getModifiedWeaponRange,
-  formatRangeExtension,
-} from '../../utils/elevationCalculator';
 
 interface CrewActionPanelProps {
   vehicle: Vehicle;
@@ -121,7 +114,7 @@ export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
   });
 
   // Get all potential targets (creatures on other vehicles or unassigned)
-  const getPotentialTargets = (attackerCreatureId: string) => {
+  const getPotentialTargets = (_attackerCreatureId: string) => {
     const targets: Array<{
       creatureId: string;
       creatureName: string;
@@ -129,14 +122,6 @@ export function CrewActionPanel({ vehicle, driver }: CrewActionPanelProps) {
       zoneName: string | null;
       cover: ElevationCoverResult | null;
     }> = [];
-
-    // Get attacker's zone
-    const attackerAssignment = state.crewAssignments.find(
-      (a) => a.creatureId === attackerCreatureId
-    );
-    const attackerZone = attackerAssignment
-      ? resolveZone(vehicle, attackerAssignment.zoneId)
-      : undefined;
 
     // Add creatures on other vehicles
     state.vehicles.forEach((targetVehicle) => {

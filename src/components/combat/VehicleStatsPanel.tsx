@@ -21,7 +21,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { useCombat } from '../../context/CombatContext';
 import { Vehicle, Mishap, Creature, VehicleZone } from '../../types';
 import { resolveZone } from '../../data/vehicleTemplates';
-import { getMishapResult, getMishapSeverity, checkMishapFromDamage, canRepairMishap, getRepairDescription, rollMishapForVehicle } from '../../data/mishapTable';
+import { getMishapSeverity, checkMishapFromDamage, canRepairMishap, getRepairDescription, rollMishapForVehicle } from '../../data/mishapTable';
 import { v4 as uuid } from 'uuid';
 import { factionColors, withOpacity } from '../../theme/customColors';
 import IconButton from '@mui/material/IconButton';

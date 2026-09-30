@@ -96,7 +96,7 @@ export function TargetCoverPanel({ attackerVehicle, attackerCreature, attackerFa
 
   // Get attacker's position and weapon info
   const attackerPosition = attackerVehicle?.position || attackerCreature?.position;
-  const { maxRange: baseMaxRange, weapons: mannedWeapons } = getMaxWeaponRange(
+  const { maxRange: baseMaxRange } = getMaxWeaponRange(
     attackerVehicle,
     state.crewAssignments,
     state.creatures
@@ -266,16 +266,6 @@ function TargetStatusCard({ creature, zone, cover, distance, baseRange, extended
     if (!Number.isFinite(n) || n <= 0) return;
     dispatch({ type: 'UPDATE_CREATURE', payload: { id: creature.id, updates: { currentHp: Math.max(0, creature.currentHp - n) } } });
     setDmg('');
-  };
-
-  const getCoverChipColor = (coverType: string): 'error' | 'warning' | 'success' | 'default' => {
-    switch (coverType) {
-      case 'none': return 'error';
-      case 'half': return 'warning';
-      case 'three_quarters': return 'success';
-      case 'full': return 'default';
-      default: return 'default';
-    }
   };
 
   const getCoverLabel = (coverType: string): string => {

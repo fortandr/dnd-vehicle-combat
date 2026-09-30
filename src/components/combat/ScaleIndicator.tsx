@@ -4,16 +4,7 @@
  */
 
 import { useEffect } from 'react';
-import {
-  Box,
-  Paper,
-  Typography,
-  Chip,
-  Button,
-  ButtonGroup,
-  Stack,
-  Tooltip,
-} from '@mui/material';
+import { Box, Paper, Typography, Chip, Button, Tooltip } from '@mui/material';
 import { useCombat } from '../../context/CombatContext';
 import { useSettings } from '../../context/SettingsContext';
 import {
@@ -68,6 +59,10 @@ export function ScaleIndicator() {
         setScale(suggestedScale);
       }
     }
+    // Intentionally re-runs only when the active vehicle or its distance changes.
+    // Including state.scale would re-apply the suggestion after a manual scale
+    // change, overriding the DM's choice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTurnVehicle?.id, distance]);
 
   const getScalePosition = (dist: number): number => {

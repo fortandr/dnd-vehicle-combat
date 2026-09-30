@@ -19,5 +19,18 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // A leading underscore marks a deliberately unused value (e.g. `const { id: _id, ...rest }`).
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_' },
+      ],
+    },
+  },
+  {
+    // Context modules export a Provider component alongside its hook (useAuth, useCombat, ...).
+    // That is the standard React pattern; the fast-refresh rule can't tell them apart.
+    files: ['src/context/**/*.tsx'],
+    rules: { 'react-refresh/only-export-components': 'off' },
   },
 ])

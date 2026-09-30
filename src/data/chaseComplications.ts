@@ -380,7 +380,7 @@ export function getComplicationsForScale(scale: ScaleName): ChaseComplication[] 
  * Roll for a complication using official Avernus table
  * d20: 1-2 = Creature Chase, 3 = Fire Tornado, ... 10 = Ground Collapse, 11-20 = No complication
  */
-export function rollComplication(roll: number, scale: ScaleName): ChaseComplication | null {
+export function rollComplication(roll: number, _scale: ScaleName): ChaseComplication | null {
   // 11-20: No complication
   if (roll >= 11) return null;
 

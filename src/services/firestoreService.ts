@@ -3,19 +3,7 @@
  * Implements StorageService interface using Firebase Firestore
  */
 
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  deleteDoc,
-  query,
-  orderBy,
-  limit,
-  serverTimestamp,
-  Timestamp,
-} from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, auth, storage } from '../firebase';
 import type { StorageService } from './storageService';

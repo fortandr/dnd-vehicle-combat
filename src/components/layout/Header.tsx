@@ -36,7 +36,6 @@ import SaveIcon from '@mui/icons-material/Save';
 import SaveAsIcon from '@mui/icons-material/SaveAs';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import AddIcon from '@mui/icons-material/Add';
-import StopIcon from '@mui/icons-material/Stop';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CasinoIcon from '@mui/icons-material/Casino';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
@@ -66,7 +65,7 @@ import { ChangelogDialog } from '../settings/ChangelogDialog';
 import { logAnalyticsEvent } from '../../firebase';
 
 export function Header() {
-  const { state, dispatch, startCombat, returnToSetup, resetCombat, nextRound, nextTurn, loadEncounter, newEncounter, lastSaved, forceSave, markAsSaved, setEncounterName, toggleAutoRollComplications, logComplication, startComplicationResolution, clearComplication } = useCombat();
+  const { state, dispatch, startCombat, returnToSetup, resetCombat, nextRound, nextTurn, loadEncounter, newEncounter, lastSaved, forceSave, markAsSaved, setEncounterName, toggleAutoRollComplications, logComplication, startComplicationResolution } = useCombat();
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
@@ -144,7 +143,11 @@ export function Header() {
     return roll <= 2 && complication?.name === 'Creature Chase';
   };
 
-  // Auto-roll complication when round changes (if enabled)
+  // Auto-roll complication when round changes (if enabled).
+  // This reacts to the round counter because the round advances inside the
+  // combat reducer, which has no hook to fire UI side effects. Moving the roll
+  // into the "next round" action would be the cleaner fix.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     // Only trigger on round change (not on initial load), in combat phase, and when auto-roll is enabled
     if (state.round > prevRound && state.phase === 'combat' && state.autoRollComplications) {
@@ -178,6 +181,7 @@ export function Header() {
     }
     setPrevRound(state.round);
   }, [state.round, state.phase, state.autoRollComplications, state.scale, prevRound, logComplication, startComplicationResolution]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSave = async () => {
     try {

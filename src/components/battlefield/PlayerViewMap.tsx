@@ -4,9 +4,9 @@
  */
 
 import { useRef, useEffect, useState } from 'react';
-import { useBroadcastReceiver, BattlefieldSyncState } from '../../hooks/useBroadcastChannel';
+import { useBroadcastReceiver } from '../../hooks/useBroadcastChannel';
 import { SCALES, formatDistanceWithUnit } from '../../data/scaleConfig';
-import { Vehicle, Creature, Position, VehicleWeapon, CrewAssignment, ElevationZone } from '../../types';
+import { Vehicle, Creature, Position, CrewAssignment, ElevationZone } from '../../types';
 import { featureFlags } from '../../config/featureFlags';
 import { resolveZone } from '../../data/vehicleTemplates';
 import { renderShipIcon } from './shipIcons';
