@@ -104,6 +104,12 @@ npm run dev
 npx tsc --noEmit
 ```
 
+### Run unit tests
+```bash
+npm test
+```
+Pure logic lives in `src/utils/*.ts` with sibling `*.test.ts` files (vitest). Put testable decisions there rather than inside components.
+
 ## Data Structure in Firestore
 
 ```

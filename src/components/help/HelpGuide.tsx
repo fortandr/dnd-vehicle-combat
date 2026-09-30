@@ -51,6 +51,13 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
           the ships of Ghosts of Saltmarsh, plus any custom vehicles you build yourself.
         </Typography>
 
+        <Typography variant="body2" color="text.secondary" paragraph>
+          The app lives at <strong>vvtt.lukantan.com/app</strong> (bookmark that; the root address is the
+          public landing page). Sign in with Google so your encounters, custom vehicles, and party presets
+          sync to the cloud. If you opened this link inside another app's browser (Reddit, Discord, Instagram),
+          sign-in won't work there — open it in Safari or Chrome instead.
+        </Typography>
+
         <Box sx={{ p: 1.5, mb: 2, bgcolor: 'action.hover', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
           <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <ViewModuleIcon fontSize="small" color="primary" />
@@ -101,12 +108,13 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" paragraph>
-              In the <strong>Creatures</strong> panel (left sidebar), click <strong>"+ Add Creature"</strong> to add
-              PCs and NPCs to the encounter.
+              The left sidebar has two lists. Under <strong>Player Characters</strong>, click
+              <strong> "+ Add PC"</strong>; under <strong>NPCs / Enemies</strong>, click <strong>"+ Add"</strong>.
             </Typography>
             <Typography variant="body2" paragraph>
-              • For PCs, enter their name, HP, AC, DEX save bonus, and initiative<br />
-              • You can search for monsters from the Open5e database
+              • For PCs, use <strong>Quick Add by Class</strong> for sensible defaults, or enter name, HP, AC,
+                speed, DEX save bonus, and initiative yourself<br />
+              • For NPCs, search the Open5e monster database or enter stats manually
             </Typography>
             <Typography variant="body2" paragraph>
               <strong>Factions:</strong> Each creature belongs to either the <strong>Party</strong> (blue) or
@@ -140,18 +148,26 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               Drag vehicles to move them and use the rotation handle to change their facing.
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Background Image:</strong> Upload a custom map image using the map controls panel.
-              You can adjust the scale (feet per pixel) and opacity. If you resize the map after placing
-              vehicles, you'll be prompted to scale positions proportionally.
+              <strong>Background Image:</strong> Click <strong>BG</strong> above the map to upload a battlemap,
+              then set its scale (feet per pixel) and opacity. If you rescale the image after placing tokens,
+              a <strong>Map Resize</strong> dialog asks whether to move tokens with the image or leave their
+              coordinates alone. Tick <strong>Remember my choice</strong> to stop it asking; change it later
+              under Settings → "When the battlemap is rescaled".
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Combat Scales:</strong> The scale indicator shows the current combat range:
+              <strong>Zoom &amp; pan:</strong> Use <strong>−</strong> / <strong>+</strong>, <strong>Fit</strong> (frame every
+              token), and <strong>Reset</strong>. Drag empty map to pan. You can always pan or zoom out to any
+              token, even one that ends up outside the image edge, so nothing gets stranded.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Combat Scales:</strong> The scale bar shows the current range band and auto-adjusts
+              as vehicles close in. Movement per round scales with it:
             </Typography>
             <Typography variant="body2" component="div" sx={{ pl: 2 }}>
-              • <strong>Point Blank</strong> (0-30 ft): Melee range<br />
-              • <strong>Tactical</strong> (30-300 ft): Standard combat<br />
-              • <strong>Pursuit</strong> (300-3000 ft): Chase scale<br />
-              • <strong>Exploration</strong> (3000+ ft): Long distance
+              • <strong>Point-Blank</strong> (under 100 ft): boarding and melee range<br />
+              • <strong>Tactical</strong> (100–1,000 ft): standard weapon combat<br />
+              • <strong>Approach</strong> (1,000 ft – 1 mile): closing distance<br />
+              • <strong>Strategic</strong> (1 mile+): long-range pursuit
             </Typography>
           </AccordionDetails>
         </Accordion>
@@ -166,11 +182,11 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
           <AccordionDetails>
             <Typography variant="body2" paragraph>
               Create elevation zones to represent hills, cliffs, and other terrain features.
-              Open the map controls and switch to the <strong>"Elevation"</strong> tab.
+              Click <strong>Layers</strong> above the map to open the layer controls.
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Creating Zones:</strong> Click "Add Zone" and draw on the map, or use "Draw Zone"
-              mode to click and drag. You can resize zones using the corner handles.
+              <strong>Creating Zones:</strong> Click <strong>"+ Add Zone"</strong>, then drag the zone into
+              place and resize it with the corner handles. Click a zone to select it and set its elevation.
             </Typography>
             <Typography variant="body2" paragraph>
               <strong>Elevation Effects:</strong> When attacking between different elevations:
@@ -210,7 +226,14 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               • Use <strong>"Next Round"</strong> when all turns are complete
             </Typography>
             <Typography variant="body2" paragraph>
-              Switch to the <strong>Vehicles</strong> tab to deal damage and track crew HP.
+              Switch to the <strong>Vehicles</strong> tab to deal damage and track crew HP, or apply damage
+              straight from the <strong>Target Status</strong> panel. <strong>Undo</strong> above the map
+              reverts the last token move.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Combat log:</strong> every roll, move, and complication is logged below the map. The
+              export icon offers <strong>Copy as Markdown</strong>, <strong>Copy as JSON</strong>, or
+              <strong>Download Markdown</strong> — handy for a session recap.
             </Typography>
             <Typography variant="body2">
               <strong>Ships take component damage</strong> (not mishaps): each part — hull, helm, sails/oars, and
@@ -263,8 +286,9 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               to roll for a complication.
             </Typography>
             <Typography variant="body2" paragraph>
-              You can enable <strong>"Auto-roll at End of Round"</strong> to automatically roll
-              complications when a new round begins.
+              <strong>"Auto-roll at End of Round"</strong> in the same menu makes the roll happen automatically
+              each time you click <strong>Next Round</strong>. It's off by default, saved with the encounter,
+              and shows a green check in the menu while it's on.
             </Typography>
             <Typography variant="body2">
               Complications may include terrain hazards, creature attacks, or environmental effects
@@ -294,9 +318,14 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               into new encounters. Only <strong>Party faction</strong> creatures and party vehicles are
               saved in presets (enemy creatures are not included).
             </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Player View:</strong> Click <strong>Player View</strong> above the map (or open
+              <code> vvtt.lukantan.com/player-view</code>) in a second window or on a TV to show players a
+              synced battlefield without DM controls. Settings lets you hide vehicle HP from that view.
+            </Typography>
             <Typography variant="body2">
-              <strong>Player View:</strong> Open <code>/player-view</code> in a separate window
-              to show players a synced view of the battlefield without DM controls.
+              <strong>Settings</strong> (☰ menu) also holds distance units (feet or metres) and the
+              map-resize behaviour described in step 3.
             </Typography>
           </AccordionDetails>
         </Accordion>
@@ -307,7 +336,8 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
           Based on the vehicle combat rules from Baldur's Gate: Descent into Avernus and the ship
           rules from Ghosts of Saltmarsh (D&D 5e).
           <br />
-          For feedback or issues, contact the developer.
+          Found a bug or want a feature? Use ☰ → <strong>Report Issue / Feedback</strong>, or open an issue
+          on GitHub.
         </Typography>
       </DialogContent>
 

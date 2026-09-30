@@ -37,6 +37,7 @@ React 18 · TypeScript · Vite · Material UI · Firebase (Auth / Firestore / Ho
 npm install       # install dependencies
 npm run dev       # run locally (Vite dev server)
 npx tsc --noEmit  # type-check
+npm test          # unit tests (vitest)
 npm run build     # production build (tsc -b && vite build)
 CI=true npm run deploy   # build + deploy hosting/firestore/storage to Firebase
 ```
