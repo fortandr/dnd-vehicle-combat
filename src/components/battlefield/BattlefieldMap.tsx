@@ -27,6 +27,14 @@ import { useBroadcastSource } from '../../hooks/useBroadcastChannel';
 import { renderShipIcon } from './shipIcons';
 import { getPropulsionSpeedCap, isWeaponDestroyed, canVehicleTurn } from '../../utils/vehicleComponents';
 import { featureFlags } from '../../config/featureFlags';
+import {
+  getBackgroundBounds,
+  getPointsBounds,
+  unionBounds,
+  constrainPanOffset as constrainPanToBounds,
+  getMinZoom as minZoomForBounds,
+  scaleAboutPivot,
+} from '../../utils/mapViewport';
 
 interface BattlefieldMapProps {
   height?: number;
@@ -77,7 +85,12 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
-  const { unitSystem } = useSettings();
+  const { unitSystem, mapResizeBehavior, setMapResizeBehavior } = useSettings();
+  const mapResizeBehaviorRef = useRef(mapResizeBehavior);
+  useEffect(() => {
+    mapResizeBehaviorRef.current = mapResizeBehavior;
+  }, [mapResizeBehavior]);
+  const [rememberResizeChoice, setRememberResizeChoice] = useState(false);
 
   // Measure container width and re-measure when phase changes (panel appears/disappears)
   useEffect(() => {
@@ -753,25 +766,30 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     };
   };
 
-  // Calculate minimum zoom that keeps the background filling the viewport
+  // Camera bounds: the background image PLUS every token on the map, padded.
+  // Tokens can end up outside the image (e.g. after the image is rescaled);
+  // including them here guarantees they can always be panned to and dragged.
+  const CAMERA_PADDING_FEET = 100;
+  const cameraBounds = useMemo(() => {
+    const points: Position[] = [
+      ...state.vehicles.map(v => v.position),
+      ...state.creatures.filter(c => c.position).map(c => c.position!),
+      ...state.elevationZones.flatMap(z => [
+        z.position,
+        { x: z.position.x + z.size.width, y: z.position.y + z.size.height },
+      ]),
+    ];
+    return unionBounds(
+      getBackgroundBounds(state.battlefield.backgroundImage),
+      getPointsBounds(points, CAMERA_PADDING_FEET),
+    );
+  }, [state.vehicles, state.creatures, state.elevationZones, state.battlefield.backgroundImage]);
+
+  // Calculate minimum zoom that keeps the camera bounds filling the viewport
   const getMinZoom = useCallback(() => {
-    const bg = state.battlefield.backgroundImage;
-    if (!bg || !bg.naturalWidth || !bg.naturalHeight) {
-      return 0.1; // Default minimum if no background
-    }
-
-    const feetPerPixel = bg.feetPerPixel || 1;
-    const bgScale = bg.scale || 1;
-    const bgWidthFeet = bg.naturalWidth * feetPerPixel * bgScale;
-    const bgHeightFeet = bg.naturalHeight * feetPerPixel * bgScale;
-
-    // Calculate zoom needed to fit background in viewport
-    const zoomToFitWidth = width / (bgWidthFeet * currentScale.mapScale);
-    const zoomToFitHeight = height / (bgHeightFeet * currentScale.mapScale);
-
-    // Minimum zoom is whichever dimension would fit first
-    return Math.max(zoomToFitWidth, zoomToFitHeight, 0.1);
-  }, [state.battlefield.backgroundImage, currentScale.mapScale, width, height]);
+    if (!state.battlefield.backgroundImage) return 0.1; // No background, no zoom floor
+    return minZoomForBounds(cameraBounds, { width, height }, currentScale.mapScale);
+  }, [state.battlefield.backgroundImage, cameraBounds, currentScale.mapScale, width, height]);
 
   // Zoom controls - center on vehicles
   const handleZoomIn = () => {
@@ -829,60 +847,11 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     }
   };
 
-  // Constrain pan offset to keep view within background image bounds
+  // Constrain pan offset to keep view within the camera bounds (image + tokens)
   const constrainPanOffset = useCallback((offset: { x: number; y: number }, currentZoom: number): { x: number; y: number } => {
-    const bg = state.battlefield.backgroundImage;
-    if (!bg || !bg.naturalWidth || !bg.naturalHeight) {
-      return offset; // No background, no constraints
-    }
-
-    const currentPixelsPerFoot = currentScale.mapScale * currentZoom;
-    const feetPerPixel = bg.feetPerPixel || 1;
-    const bgScale = bg.scale || 1;
-
-    // Calculate background bounds in world coordinates (feet)
-    const bgWidthFeet = bg.naturalWidth * feetPerPixel * bgScale;
-    const bgHeightFeet = bg.naturalHeight * feetPerPixel * bgScale;
-    const bgMinX = bg.position.x - bgWidthFeet / 2;
-    const bgMaxX = bg.position.x + bgWidthFeet / 2;
-    const bgMinY = bg.position.y - bgHeightFeet / 2;
-    const bgMaxY = bg.position.y + bgHeightFeet / 2;
-
-    // Calculate the visible area in world coordinates
-    const visibleWidthFeet = width / currentPixelsPerFoot;
-    const visibleHeightFeet = height / currentPixelsPerFoot;
-
-    // Calculate allowed pan offset range
-    // Pan offset = -(worldCenter * pixelsPerFoot) to center on worldCenter
-    // So we need to limit the world center that can be shown
-
-    // If the visible area is larger than the BG, center on the BG
-    if (visibleWidthFeet >= bgWidthFeet) {
-      // Center horizontally on background
-      offset = { ...offset, x: -bg.position.x * currentPixelsPerFoot };
-    } else {
-      // Limit horizontal panning
-      const minCenterX = bgMinX + visibleWidthFeet / 2;
-      const maxCenterX = bgMaxX - visibleWidthFeet / 2;
-      const currentCenterX = -offset.x / currentPixelsPerFoot;
-      const clampedCenterX = Math.max(minCenterX, Math.min(maxCenterX, currentCenterX));
-      offset = { ...offset, x: -clampedCenterX * currentPixelsPerFoot };
-    }
-
-    if (visibleHeightFeet >= bgHeightFeet) {
-      // Center vertically on background
-      offset = { ...offset, y: -bg.position.y * currentPixelsPerFoot };
-    } else {
-      // Limit vertical panning
-      const minCenterY = bgMinY + visibleHeightFeet / 2;
-      const maxCenterY = bgMaxY - visibleHeightFeet / 2;
-      const currentCenterY = -offset.y / currentPixelsPerFoot;
-      const clampedCenterY = Math.max(minCenterY, Math.min(maxCenterY, currentCenterY));
-      offset = { ...offset, y: -clampedCenterY * currentPixelsPerFoot };
-    }
-
-    return offset;
-  }, [state.battlefield.backgroundImage, currentScale.mapScale, width, height]);
+    if (!state.battlefield.backgroundImage) return offset; // No background, no constraints
+    return constrainPanToBounds(offset, currentScale.mapScale * currentZoom, { width, height }, cameraBounds);
+  }, [state.battlefield.backgroundImage, cameraBounds, currentScale.mapScale, width, height]);
 
   const handleMapMouseMove = (e: React.MouseEvent) => {
     if (isPanning) {
@@ -1172,13 +1141,13 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     const bg = state.battlefield.backgroundImage;
     if (!bg) return;
 
+    // The image scales about its own centre, so tokens must too - scaling about
+    // the world origin would drift everything off the map when the image is offset.
+    const pivot = bg.position;
+
     // Scale vehicle positions
     state.vehicles.forEach((vehicle) => {
-      const newPos = {
-        x: vehicle.position.x * scaleFactor,
-        y: vehicle.position.y * scaleFactor,
-      };
-      updateVehiclePosition(vehicle.id, newPos);
+      updateVehiclePosition(vehicle.id, scaleAboutPivot(vehicle.position, pivot, scaleFactor));
     });
 
     // Scale creature positions
@@ -1189,10 +1158,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
           payload: {
             id: creature.id,
             updates: {
-              position: {
-                x: creature.position.x * scaleFactor,
-                y: creature.position.y * scaleFactor,
-              },
+              position: scaleAboutPivot(creature.position, pivot, scaleFactor),
             },
           },
         });
@@ -1206,10 +1172,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
         payload: {
           id: zone.id,
           updates: {
-            position: {
-              x: zone.position.x * scaleFactor,
-              y: zone.position.y * scaleFactor,
-            },
+            position: scaleAboutPivot(zone.position, pivot, scaleFactor),
             size: {
               width: zone.size.width * scaleFactor,
               height: zone.size.height * scaleFactor,
@@ -1234,8 +1197,25 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
       applyProportionalScaling(scaleFactor);
     }
 
+    if (rememberResizeChoice) {
+      setMapResizeBehavior(scalePositions ? 'scale' : 'keep');
+    }
+
     setShowResizeWarning(false);
     setPendingResize(null);
+  };
+
+  // After the user stops adjusting the map scale: either apply the remembered
+  // preference silently or ask.
+  const resolveResize = (type: 'scale' | 'feetPerPixel', oldValue: number, newValue: number) => {
+    const behavior = mapResizeBehaviorRef.current;
+    if (behavior === 'scale') {
+      applyProportionalScaling(newValue / oldValue);
+      return;
+    }
+    if (behavior === 'keep') return;
+    setPendingResize({ type, oldValue, newValue });
+    setShowResizeWarning(true);
   };
 
   const handleBgScaleChange = (scale: number) => {
@@ -1252,8 +1232,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
         if (resizeDebounceRef.current) clearTimeout(resizeDebounceRef.current);
         resizeDebounceRef.current = setTimeout(() => {
           if (preResizeRef.current) {
-            setPendingResize({ type: 'scale', oldValue: preResizeRef.current.oldValue, newValue: scale });
-            setShowResizeWarning(true);
+            resolveResize('scale', preResizeRef.current.oldValue, scale);
             preResizeRef.current = null;
           }
         }, 600);
@@ -1280,8 +1259,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
         if (resizeDebounceRef.current) clearTimeout(resizeDebounceRef.current);
         resizeDebounceRef.current = setTimeout(() => {
           if (preResizeRef.current) {
-            setPendingResize({ type: 'feetPerPixel', oldValue: preResizeRef.current.oldValue, newValue: feetPerPixel });
-            setShowResizeWarning(true);
+            resolveResize('feetPerPixel', preResizeRef.current.oldValue, feetPerPixel);
             preResizeRef.current = null;
           }
         }, 600);
@@ -2263,6 +2241,14 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                 <strong style={{ color: '#fff' }}>Keep positions:</strong> Leave everything at their current coordinates (may appear in wrong locations relative to background)
               </li>
             </ul>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 13, color: '#ccc', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={rememberResizeChoice}
+                onChange={(e) => setRememberResizeChoice(e.target.checked)}
+              />
+              Remember my choice (change it later in Settings)
+            </label>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => {

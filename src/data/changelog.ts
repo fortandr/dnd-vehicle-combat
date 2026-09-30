@@ -14,6 +14,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.8.1',
+    date: '2026-09-30',
+    changes: [
+      { type: 'fix', description: 'Tokens can no longer get stranded off-map. The camera can now pan and zoom out to any vehicle, creature, or elevation zone even if it sits outside the battlemap image, so you can always drag it back.' },
+      { type: 'fix', description: '"Scale positions" after a map resize now scales around the image centre instead of the world origin, so tokens stay where they were on the map.' },
+      { type: 'improvement', description: 'The Map Resize dialog has a "Remember my choice" option, and Settings lets you pick Ask / Scale / Keep so it stops reappearing.' },
+    ],
+  },
+  {
     version: '2.8.0',
     date: '2026-09-29',
     changes: [

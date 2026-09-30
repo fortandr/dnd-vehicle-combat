@@ -19,7 +19,7 @@ import {
   Box,
   Divider,
 } from '@mui/material';
-import { useSettings, UnitSystem } from '../../context/SettingsContext';
+import { useSettings, UnitSystem, MapResizeBehavior } from '../../context/SettingsContext';
 import { useCombat } from '../../context/CombatContext';
 
 interface SettingsDialogProps {
@@ -28,13 +28,17 @@ interface SettingsDialogProps {
 }
 
 export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
-  const { unitSystem, setUnitSystem } = useSettings();
+  const { unitSystem, setUnitSystem, mapResizeBehavior, setMapResizeBehavior } = useSettings();
   const { state, dispatch } = useCombat();
 
   const showVehicleHealth = state.playerViewSettings?.showVehicleHealth ?? true;
 
   const handleUnitChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setUnitSystem(event.target.value as UnitSystem);
+  };
+
+  const handleMapResizeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setMapResizeBehavior(event.target.value as MapResizeBehavior);
   };
 
   return (
@@ -65,6 +69,43 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                     <Typography variant="body2">Metric (meters, kilometers)</Typography>
                     <Typography variant="caption" color="text.secondary">
                       1 ft = 0.3 m (approximate)
+                    </Typography>
+                  </Box>
+                }
+              />
+            </RadioGroup>
+          </FormControl>
+
+          <Divider sx={{ my: 2 }} />
+
+          <FormControl component="fieldset">
+            <FormLabel component="legend">When the battlemap is rescaled</FormLabel>
+            <RadioGroup value={mapResizeBehavior} onChange={handleMapResizeChange}>
+              <FormControlLabel
+                value="ask"
+                control={<Radio />}
+                label={<Typography variant="body2">Ask me each time</Typography>}
+              />
+              <FormControlLabel
+                value="scale"
+                control={<Radio />}
+                label={
+                  <Box>
+                    <Typography variant="body2">Scale token positions</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Tokens stay in the same spot relative to the image
+                    </Typography>
+                  </Box>
+                }
+              />
+              <FormControlLabel
+                value="keep"
+                control={<Radio />}
+                label={
+                  <Box>
+                    <Typography variant="body2">Keep token coordinates</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Tokens don't move; you can always pan to them
                     </Typography>
                   </Box>
                 }

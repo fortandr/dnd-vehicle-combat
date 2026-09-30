@@ -7,12 +7,22 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 
 export type UnitSystem = 'imperial' | 'metric';
 
+/**
+ * What to do with tokens when the battlemap image is rescaled.
+ * 'ask'   - show the Map Resize dialog every time (default)
+ * 'scale' - move tokens proportionally so they stay put relative to the image
+ * 'keep'  - leave token coordinates alone
+ */
+export type MapResizeBehavior = 'ask' | 'scale' | 'keep';
+
 interface SettingsState {
   unitSystem: UnitSystem;
+  mapResizeBehavior: MapResizeBehavior;
 }
 
 interface SettingsContextType extends SettingsState {
   setUnitSystem: (system: UnitSystem) => void;
+  setMapResizeBehavior: (behavior: MapResizeBehavior) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | null>(null);
@@ -21,6 +31,7 @@ const SETTINGS_STORAGE_KEY = 'vehicleCombat_settings';
 
 const defaultSettings: SettingsState = {
   unitSystem: 'imperial',
+  mapResizeBehavior: 'ask',
 };
 
 function loadSettings(): SettingsState {
@@ -55,11 +66,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setSettings((prev) => ({ ...prev, unitSystem }));
   };
 
+  const setMapResizeBehavior = (mapResizeBehavior: MapResizeBehavior) => {
+    setSettings((prev) => ({ ...prev, mapResizeBehavior }));
+  };
+
   return (
     <SettingsContext.Provider
       value={{
         ...settings,
         setUnitSystem,
+        setMapResizeBehavior,
       }}
     >
       {children}
