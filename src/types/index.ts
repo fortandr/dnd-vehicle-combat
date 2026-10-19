@@ -216,6 +216,13 @@ export interface VehicleComponent {
   description?: string;
 }
 
+// One ship action from a Saltmarsh stat block (e.g. Move, Fire Ballistas).
+export interface ShipActionDef {
+  id: string;
+  name: string;
+  weaponIds?: string[]; // Station weapons this Fire action covers
+}
+
 export interface VehicleTemplate {
   id: string;
   name: string;
@@ -241,6 +248,10 @@ export interface VehicleTemplate {
   components?: VehicleComponent[]; // Per-part HP model (e.g. Saltmarsh ships)
   lengthFt?: number; // Real length bow→stern in feet — gives a rectangular map footprint (else square by size)
   beamFt?: number; // Real width (beam) in feet — paired with lengthFt
+  shipActions?: {
+    actions: ShipActionDef[];
+    crewThresholds: number[]; // [min crew for 1 action, for 2, for 3]
+  };
 }
 
 export interface Vehicle {
@@ -264,6 +275,8 @@ export interface Vehicle {
   // Component combat: current HP per component id (hull uses currentHp instead).
   // Missing entries default to the component's max HP.
   componentHp?: Record<string, number>;
+  crewQuality?: number; // Ships: crew quality score (−10…+10). Missing → +4.
+  initiative?: number; // Ships: own initiative (d20 + Dex + crew quality). Missing → 0.
   // Status
   isInoperative?: boolean; // True when HP reaches 0 - crew ejected, vehicle disabled
   // Temporary effects from complications
@@ -488,6 +501,10 @@ export interface CombatState {
 
   // Undo stack for movement actions this round. Reset alongside movementUsed.
   moveHistory: MoveHistoryEntry[];
+
+  // Ship actions marked used this round (Fire actions and manual toggles). Move is derived
+  // from movementUsed. Reset alongside movementUsed.
+  shipActionsUsed: Record<string, string[]>;
 }
 
 export interface MoveHistoryEntry {
