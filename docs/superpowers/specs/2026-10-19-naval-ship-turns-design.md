@@ -119,7 +119,7 @@ Crew aboard = `countCrewAboard` (non-passenger assignments), the same count used
 
 ## Initiative flow
 
-1. **Sidebar Roll Init buttons:** `handleRollAllNpcInit` / `handleRollAllPcInit` additionally roll every naval vehicle of the matching faction (`vehicle.type === 'enemy'` for NPC, `'party'` for PC). Each sets `vehicle.initiative = d20 + shipInitiativeModifier` via `UPDATE_VEHICLE` and logs "Galley rolls initiative 14 (d20 11, Dex −3, crew +6)". The clamp-at-1 used for creatures does not apply, because the book has no floor.
+1. **Sidebar Roll Init buttons:** `handleRollAllNpcInit` / `handleRollAllPcInit` additionally roll every naval vehicle of the matching faction (`vehicle.type === 'enemy'` for NPC, `'party'` for PC). Each sets `vehicle.initiative = max(1, d20 + shipInitiativeModifier)` via `UPDATE_VEHICLE` (the same floor of 1 the app applies to creature rolls; the book gives no floor, so this follows War Machine parity) and logs "Galley rolls initiative 14 (d20 11, Dex −3, crew +6)".
 2. **`START_COMBAT`:** a ship's initiative entry is `vehicle.initiative ?? 0`. Non-ships keep driver initiative, or −100 without a driver. The sort rule is unchanged.
 3. **Before combat:** the ship's row in the sidebar **Vehicles** list shows "Init N" and lets the GM edit it, matching how creature rows show and edit Init.
 
