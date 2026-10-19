@@ -125,4 +125,12 @@ describe('ship turns', () => {
     const next = combatReducer(started, { type: 'NEXT_ROUND' });
     expect(next.initiativeOrder).toEqual(['fast', 'slow']);
   });
+
+  it('RESET_COMBAT clears ship initiative but leaves war machines alone', () => {
+    const wm = warMachine('w');
+    const s = { ...initialCombatState, phase: 'combat' as const, round: 2, vehicles: [ship('a', 'Alpha', 14), wm] };
+    const out = combatReducer(s, { type: 'RESET_COMBAT' });
+    expect(out.vehicles[0].initiative).toBeUndefined();
+    expect(out.vehicles[1]).toEqual({ ...wm, currentHp: wm.template.maxHp, activeMishaps: [] });
+  });
 });

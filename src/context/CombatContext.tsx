@@ -13,6 +13,7 @@ import { logAnalyticsEvent } from '../firebase';
 import { v4 as uuid } from 'uuid';
 import { loadCurrentEncounter } from '../hooks/useLocalStorage';
 import { backfillNavalMovement } from '../utils/navalBackfill';
+import { isNavalVehicle } from '../data/navalUpgrades';
 import { shipActionSummary, vehicleInitiative } from '../utils/shipTurn';
 import { getEffectiveSpeed as computeEffectiveSpeed, speedContextFromState } from '../utils/vehicleSpeed';
 
@@ -961,6 +962,8 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
           ...v,
           currentHp: v.template.maxHp,
           activeMishaps: [],
+          // Ship initiative is a per-combat roll, cleared like creature initiative
+          ...(isNavalVehicle(v.template) ? { initiative: undefined } : {}),
         })),
         creatures: state.creatures.map((c) => ({
           ...c,
