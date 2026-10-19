@@ -27,7 +27,7 @@ import { resolveZone } from '../../data/vehicleTemplates';
 import { useBroadcastSource } from '../../hooks/useBroadcastChannel';
 import { renderShipIcon } from './shipIcons';
 import { isWeaponDestroyed, canVehicleTurn } from '../../utils/vehicleComponents';
-import { getEffectiveSpeed, speedContextFromState } from '../../utils/vehicleSpeed';
+import { getEffectiveSpeed, getSpeedBreakdown, speedReasonText, speedContextFromState } from '../../utils/vehicleSpeed';
 import { featureFlags } from '../../config/featureFlags';
 import {
   getBackgroundBounds,
@@ -2070,6 +2070,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
               maxMovement={getMaxMovement(currentTurnVehicle)}
               pixelsPerFoot={pixelsPerFoot}
               unitSystem={unitSystem}
+              reason={speedReasonText(currentTurnVehicle, getSpeedBreakdown(currentTurnVehicle, speedContextFromState(state)))}
             />
           )}
 
@@ -3627,6 +3628,7 @@ interface MovementRangeIndicatorProps {
   maxMovement: number;
   pixelsPerFoot: number;
   unitSystem: 'imperial' | 'metric';
+  reason?: string;
 }
 
 function MovementRangeIndicator({
@@ -3635,6 +3637,7 @@ function MovementRangeIndicator({
   maxMovement,
   pixelsPerFoot,
   unitSystem,
+  reason,
 }: MovementRangeIndicatorProps) {
   // Convert remaining movement (in feet) to screen pixels
   const radiusPixels = remainingMovement * pixelsPerFoot;
@@ -3707,7 +3710,7 @@ function MovementRangeIndicator({
         fontFamily="var(--font-mono)"
         filter="url(#movementGlow)"
       >
-        {formatDistanceWithUnit(remainingMovement, unitSystem)} remaining
+        {formatDistanceWithUnit(remainingMovement, unitSystem)} remaining{reason ? ` · ${reason}` : ''}
       </text>
     </svg>
   );
