@@ -195,6 +195,9 @@ export type VehicleEnvironment = 'land' | 'water' | 'air';
 // Kind of destructible component in the faithful component model.
 export type VehicleComponentKind = 'hull' | 'control' | 'movement' | 'weapon' | 'other';
 
+// Direction the wind blows FROM (8-point compass). 0° = N, clockwise.
+export type CompassPoint = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
+
 // A destructible part of a vehicle with its own AC/HP — the faithful component
 // model used by e.g. Ghosts of Saltmarsh ships (hull, helm, sails, oars, weapon
 // stations). Optional: single-HP vehicles (Avernus war machines) omit it and use
@@ -208,6 +211,8 @@ export interface VehicleComponent {
   damageThreshold?: number;
   speed?: number; // For 'movement' components, in feet
   crewRequired?: number;
+  windSpeeds?: { with: number; into: number }; // Sails: speed sailing with / into the wind (`speed` = crosswind or calm)
+  speedLoss?: { feet: number; perDamage: number }; // Lose `feet` of speed per `perDamage` damage taken
   description?: string;
 }
 
@@ -497,6 +502,7 @@ export interface Environment {
   hazards: string[];
   visibility: 'clear' | 'lightly_obscured' | 'heavily_obscured';
   specialRules?: string[];
+  wind?: CompassPoint; // Direction the wind blows FROM. Unset = calm.
 }
 
 // ==========================================
