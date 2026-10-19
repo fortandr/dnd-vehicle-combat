@@ -11,7 +11,9 @@ import {
   actionForWeapon,
   shipActionsUsedFor,
   shipActionSummary,
+  vehicleInitiative,
 } from './shipTurn';
+import { WARSHIP } from '../data/navalTemplates';
 
 const SHIP_ACTIONS: VehicleTemplate['shipActions'] = {
   actions: [
@@ -114,5 +116,21 @@ describe('actions used', () => {
       movementUsed: { v1: 10 },
       shipActionsUsed: { v1: ['fire_ballista'] },
     }))).toEqual({ available: 1, used: ['fire_ballista', 'move'], remaining: 0, over: 1, crewAboard: 5 });
+  });
+});
+
+describe('vehicleInitiative', () => {
+  const warship = (initiative?: number) => ({ template: WARSHIP, initiative }) as unknown as Vehicle;
+  const warMachine = { template: { id: 'devils-ride', pack: 'avernus' } } as unknown as Vehicle;
+
+  it('ships use their own roll and ignore the driver', () => {
+    expect(vehicleInitiative(warship(17), { initiative: 3 })).toBe(17);
+    expect(vehicleInitiative(warship(), { initiative: 3 })).toBe(0);
+  });
+
+  it('war machines use the driver, or −100 without one', () => {
+    expect(vehicleInitiative(warMachine, { initiative: 9 })).toBe(9);
+    expect(vehicleInitiative(warMachine, undefined)).toBe(-100);
+    expect(vehicleInitiative(warMachine, null)).toBe(-100);
   });
 });

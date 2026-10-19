@@ -5,6 +5,7 @@
  */
 import type { CombatState, ShipActionDef, Vehicle, VehicleTemplate } from '../types';
 import { countCrewAboard } from './navalMovement';
+import { isNavalVehicle } from '../data/navalUpgrades';
 
 export const DEFAULT_CREW_QUALITY = 4;
 
@@ -42,6 +43,12 @@ const signed = (n: number) => (n < 0 ? `−${Math.abs(n)}` : `+${n}`);
 
 export function formatShipInitiativeLog(name: string, roll: ShipInitiativeRoll): string {
   return `${name} rolls initiative ${roll.total} (d20 ${roll.d20}, Dex ${signed(roll.dexMod)}, crew ${signed(roll.quality)})`;
+}
+
+/** Initiative value used to order a vehicle: ships use their own roll (GoS), others their driver's (Avernus). */
+export function vehicleInitiative(vehicle: Vehicle, driver: { initiative: number } | undefined | null): number {
+  if (isNavalVehicle(vehicle.template)) return vehicle.initiative ?? 0;
+  return driver ? driver.initiative : -100;
 }
 
 export function shipActionsAvailable(template: VehicleTemplate, crewAboard: number): number {

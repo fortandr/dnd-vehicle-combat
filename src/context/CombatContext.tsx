@@ -13,8 +13,7 @@ import { logAnalyticsEvent } from '../firebase';
 import { v4 as uuid } from 'uuid';
 import { loadCurrentEncounter } from '../hooks/useLocalStorage';
 import { backfillNavalMovement } from '../utils/navalBackfill';
-import { isNavalVehicle } from '../data/navalUpgrades';
-import { shipActionSummary } from '../utils/shipTurn';
+import { shipActionSummary, vehicleInitiative } from '../utils/shipTurn';
 import { getEffectiveSpeed as computeEffectiveSpeed, speedContextFromState } from '../utils/vehicleSpeed';
 
 const AUTO_SAVE_KEY = 'avernus-current-encounter';
@@ -767,15 +766,9 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
 
       // Add ALL vehicles to initiative
       state.vehicles.forEach((vehicle) => {
-        let initiative: number;
-        if (isNavalVehicle(vehicle.template)) {
-          // Ships roll their own initiative (GoS): set by the sidebar Roll Init buttons; unrolled = 0
-          initiative = vehicle.initiative ?? 0;
-        } else {
-          const driver = findVehicleDriver(vehicle, state.crewAssignments, state.creatures);
-          // Use driver's initiative, or -100 if no driver (acts last)
-          initiative = driver ? driver.initiative : -100;
-        }
+        const driver = findVehicleDriver(vehicle, state.crewAssignments, state.creatures);
+        // Ships use their own roll (unrolled = 0); others use the driver's, or -100 if none (acts last)
+        const initiative = vehicleInitiative(vehicle, driver);
 
         initiativeEntries.push({
           id: vehicle.id,
@@ -1685,8 +1678,7 @@ function rebuildInitiativeOrder(
     if (vehicle.isInoperative || vehicle.currentHp === 0) continue;
 
     const driver = findVehicleDriver(vehicle, crewAssignments, creatures);
-    // Use driver's initiative, or -100 if no driver (acts last)
-    const initiative = driver ? driver.initiative : -100;
+    const initiative = vehicleInitiative(vehicle, driver);
 
     initiativeEntries.push({
       id: vehicle.id,

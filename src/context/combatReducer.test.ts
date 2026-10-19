@@ -6,7 +6,7 @@ vi.mock('../hooks/useLocalStorage', () => ({ loadCurrentEncounter: vi.fn(() => n
 
 import { combatReducer, initialCombatState } from './CombatContext';
 import { GALLEY, WARSHIP } from '../data/navalTemplates';
-import type { Vehicle } from '../types';
+import type { Creature, Vehicle } from '../types';
 
 describe('wind on Environment', () => {
   it('SET_ENVIRONMENT sets and clears wind without touching other fields', () => {
@@ -105,5 +105,24 @@ describe('ship turns', () => {
     const { shipActionsUsed: _x, ...old } = initialCombatState;
     const loaded = combatReducer(initialCombatState, { type: 'LOAD_ENCOUNTER', payload: old as typeof initialCombatState });
     expect(loaded.shipActionsUsed).toEqual({});
+  });
+
+  it('ships keep their own initiative order after NEXT_ROUND, ignoring helmsmen', () => {
+    const helmsman = (id: string, initiative: number) => ({
+      id, name: id, initiative, currentHp: 10, statblock: { type: 'npc', maxHp: 10 },
+    }) as unknown as Creature;
+    const s = {
+      ...initialCombatState,
+      vehicles: [ship('slow', 'Slow', 5), ship('fast', 'Fast', 17)],
+      creatures: [helmsman('d1', 1), helmsman('d2', 20)],
+      crewAssignments: [
+        { creatureId: 'd1', vehicleId: 'fast', zoneId: 'helm' },
+        { creatureId: 'd2', vehicleId: 'slow', zoneId: 'helm' },
+      ],
+    };
+    const started = combatReducer(s, { type: 'START_COMBAT' });
+    expect(started.initiativeOrder).toEqual(['fast', 'slow']);
+    const next = combatReducer(started, { type: 'NEXT_ROUND' });
+    expect(next.initiativeOrder).toEqual(['fast', 'slow']);
   });
 });
