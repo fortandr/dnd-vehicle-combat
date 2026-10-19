@@ -13,6 +13,8 @@ import { logAnalyticsEvent } from '../firebase';
 import { v4 as uuid } from 'uuid';
 import { loadCurrentEncounter } from '../hooks/useLocalStorage';
 import { backfillNavalMovement } from '../utils/navalBackfill';
+import { isNavalVehicle } from '../data/navalUpgrades';
+import { shipActionSummary } from '../utils/shipTurn';
 import { getEffectiveSpeed as computeEffectiveSpeed, speedContextFromState } from '../utils/vehicleSpeed';
 
 const AUTO_SAVE_KEY = 'avernus-current-encounter';
@@ -138,6 +140,8 @@ type CombatAction =
   // Per-round movement tracking
   | { type: 'TRACK_MOVEMENT'; payload: { id: string; delta: number } }
   | { type: 'RESET_MOVEMENT_TRACKING' }
+  | { type: 'MARK_SHIP_ACTION'; payload: { vehicleId: string; actionId: string } }
+  | { type: 'TOGGLE_SHIP_ACTION'; payload: { vehicleId: string; actionId: string } }
   | { type: 'PUSH_MOVE_HISTORY'; payload: MoveHistoryEntry }
   | { type: 'POP_MOVE_HISTORY' }
 
@@ -283,6 +287,7 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
         actionLog: action.payload.actionLog || [],
         movementUsed: action.payload.movementUsed || {},
         moveHistory: action.payload.moveHistory || [],
+        shipActionsUsed: action.payload.shipActionsUsed || {},
       };
     }
 
@@ -751,6 +756,7 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
       // - Each VEHICLE rolls initiative using driver's DEX modifier
       // - ALL crew acts on the vehicle's turn simultaneously
       // - Vehicles without drivers act LAST
+      // - Ships (Saltmarsh) use their own initiative, not a driver's
       // - Only creatures NOT assigned to any vehicle act separately
 
       type InitiativeEntry = { id: string; type: 'creature' | 'vehicle'; initiative: number; name: string };
@@ -761,9 +767,15 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
 
       // Add ALL vehicles to initiative
       state.vehicles.forEach((vehicle) => {
-        const driver = findVehicleDriver(vehicle, state.crewAssignments, state.creatures);
-        // Use driver's initiative, or -100 if no driver (acts last)
-        const initiative = driver ? driver.initiative : -100;
+        let initiative: number;
+        if (isNavalVehicle(vehicle.template)) {
+          // Ships roll their own initiative (GoS): set by the sidebar Roll Init buttons; unrolled = 0
+          initiative = vehicle.initiative ?? 0;
+        } else {
+          const driver = findVehicleDriver(vehicle, state.crewAssignments, state.creatures);
+          // Use driver's initiative, or -100 if no driver (acts last)
+          initiative = driver ? driver.initiative : -100;
+        }
 
         initiativeEntries.push({
           id: vehicle.id,
@@ -800,6 +812,7 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
         initiativeOrder: initiativeEntries.map((e) => e.id),
         currentTurnIndex: 0,
         movementUsed: {},
+        shipActionsUsed: {},
         moveHistory: [],
         actionLog: [
           ...state.actionLog,
@@ -921,6 +934,7 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
         vehicles: updatedVehicles,
         initiativeOrder: resortedInitiativeOrder,
         movementUsed: {},
+        shipActionsUsed: {},
         moveHistory: [],
         actionLog: [
           ...state.actionLog,
@@ -948,6 +962,7 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
         currentTurnIndex: 0,
         initiativeOrder: [],
         movementUsed: {},
+        shipActionsUsed: {},
         moveHistory: [],
         vehicles: state.vehicles.map((v) => ({
           ...v,
@@ -971,6 +986,7 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
         round: 0,
         currentTurnIndex: 0,
         movementUsed: {},
+        shipActionsUsed: {},
         moveHistory: [],
         actionLog: [
           ...state.actionLog,
@@ -1367,8 +1383,29 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
       return {
         ...state,
         movementUsed: {},
+        shipActionsUsed: {},
         moveHistory: [],
       };
+
+    case 'MARK_SHIP_ACTION':
+    case 'TOGGLE_SHIP_ACTION': {
+      const { vehicleId, actionId } = action.payload;
+      const vehicle = state.vehicles.find((v) => v.id === vehicleId);
+      const current = state.shipActionsUsed[vehicleId] ?? [];
+      const has = current.includes(actionId);
+      if (action.type === 'MARK_SHIP_ACTION' && has) return state;
+      const next = has ? current.filter((id) => id !== actionId) : [...current, actionId];
+      const nextState = { ...state, shipActionsUsed: { ...state.shipActionsUsed, [vehicleId]: next } };
+      const actionName = vehicle?.template.shipActions?.actions.find((a) => a.id === actionId)?.name ?? actionId;
+      const summary = vehicle ? shipActionSummary(vehicle, nextState) : null;
+      const text = has
+        ? `${vehicle?.name ?? 'Ship'}: ${actionName} unmarked`
+        : `${vehicle?.name ?? 'Ship'}: ${actionName} (${summary?.used.length ?? next.length} of ${summary?.available ?? 0} actions)`;
+      return {
+        ...nextState,
+        actionLog: [...state.actionLog, createLogEntry(state.round, 'ability', text)],
+      };
+    }
 
     case 'PUSH_MOVE_HISTORY':
       return {

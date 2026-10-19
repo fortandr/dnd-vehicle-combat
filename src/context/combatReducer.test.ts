@@ -5,7 +5,7 @@ vi.mock('../firebase', () => ({ logAnalyticsEvent: vi.fn() }));
 vi.mock('../hooks/useLocalStorage', () => ({ loadCurrentEncounter: vi.fn(() => null) }));
 
 import { combatReducer, initialCombatState } from './CombatContext';
-import { GALLEY } from '../data/navalTemplates';
+import { GALLEY, WARSHIP } from '../data/navalTemplates';
 import type { Vehicle } from '../types';
 
 describe('wind on Environment', () => {
@@ -58,5 +58,52 @@ describe('naval backfill on load', () => {
     });
     const galley = loaded.vehicles.find((v) => v.name === 'Old Galley')!;
     expect(oarsOf(galley).crewRequired).toBe(40);
+  });
+});
+
+describe('ship turns', () => {
+  const ship = (id: string, name: string, initiative?: number) => ({
+    id, name, type: 'enemy', template: WARSHIP, currentHp: 500, currentSpeed: 35,
+    activeMishaps: [], conditions: [], weapons: [], position: { x: 0, y: 0 }, facing: 0, initiative,
+  }) as unknown as Vehicle;
+  const warMachine = (id: string) => ({
+    id, name: 'Devil\'s Ride', type: 'enemy',
+    template: { id: 'devils-ride', name: 'Devil\'s Ride', pack: 'avernus', zones: [], weapons: [], maxHp: 30 },
+    currentHp: 30, currentSpeed: 120, activeMishaps: [], conditions: [], weapons: [], position: { x: 0, y: 0 }, facing: 0,
+  }) as unknown as Vehicle;
+
+  it('START_COMBAT orders ships by their own initiative (unrolled = 0); war machines without a driver get −100', () => {
+    const s = { ...initialCombatState, vehicles: [ship('a', 'Alpha', 5), ship('b', 'Bravo', 17), ship('c', 'Charlie'), warMachine('w')] };
+    const out = combatReducer(s, { type: 'START_COMBAT' });
+    expect(out.initiativeOrder).toEqual(['b', 'a', 'c', 'w']);
+  });
+
+  it('MARK_SHIP_ACTION is idempotent and logs once', () => {
+    const s = { ...initialCombatState, phase: 'combat' as const, round: 1, vehicles: [ship('a', 'Alpha')] };
+    const once = combatReducer(s, { type: 'MARK_SHIP_ACTION', payload: { vehicleId: 'a', actionId: 'fire_ballista' } });
+    const twice = combatReducer(once, { type: 'MARK_SHIP_ACTION', payload: { vehicleId: 'a', actionId: 'fire_ballista' } });
+    expect(twice.shipActionsUsed.a).toEqual(['fire_ballista']);
+    expect(twice.actionLog.length).toBe(once.actionLog.length);
+    expect(once.actionLog.at(-1)?.action).toBe('Alpha: Fire Ballistas (1 of 0 actions)');
+  });
+
+  it('TOGGLE_SHIP_ACTION adds then removes', () => {
+    const s = { ...initialCombatState, phase: 'combat' as const, round: 1, vehicles: [ship('a', 'Alpha')] };
+    const on = combatReducer(s, { type: 'TOGGLE_SHIP_ACTION', payload: { vehicleId: 'a', actionId: 'move' } });
+    expect(on.shipActionsUsed.a).toEqual(['move']);
+    const off = combatReducer(on, { type: 'TOGGLE_SHIP_ACTION', payload: { vehicleId: 'a', actionId: 'move' } });
+    expect(off.shipActionsUsed.a).toEqual([]);
+  });
+
+  it('NEXT_ROUND and RESET_MOVEMENT_TRACKING clear ship action marks', () => {
+    const s = { ...initialCombatState, phase: 'combat' as const, round: 1, shipActionsUsed: { a: ['move'] } };
+    expect(combatReducer(s, { type: 'NEXT_ROUND' }).shipActionsUsed).toEqual({});
+    expect(combatReducer(s, { type: 'RESET_MOVEMENT_TRACKING' }).shipActionsUsed).toEqual({});
+  });
+
+  it('LOAD_ENCOUNTER of an older save defaults shipActionsUsed', () => {
+    const { shipActionsUsed: _x, ...old } = initialCombatState;
+    const loaded = combatReducer(initialCombatState, { type: 'LOAD_ENCOUNTER', payload: old as typeof initialCombatState });
+    expect(loaded.shipActionsUsed).toEqual({});
   });
 });
