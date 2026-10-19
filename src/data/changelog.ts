@@ -14,6 +14,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.10.0',
+    date: '2026-10-19',
+    changes: [
+      { type: 'feature', description: 'Ship initiative (Ghosts of Saltmarsh): ships roll d20 + DEX + crew quality with the existing Roll Init buttons — NPC for enemy ships, PC for party ships — and the roll is logged. Edit a ship\'s Init chip in the Vehicles list before combat. War machines still use their driver\'s initiative.' },
+      { type: 'feature', description: 'Crew quality: each ship has a Crew tile (default +4, −10 to +10) on its card.' },
+      { type: 'feature', description: 'Ship actions: on a ship\'s turn the panel shows how many actions its crew allows (e.g. a galley gets 3 with 40+ crew) and ticks Move and Fire actions as you move the ship and roll its weapons. Over-budget use is shown in red but never blocked.' },
+    ],
+  },
+  {
     version: '2.9.0',
     date: '2026-10-19',
     changes: [

@@ -241,7 +241,7 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               real effects. Knock out the sails/oars to cut its speed, the helm to stop it turning, a weapon to
               silence it, or the hull to wreck the ship. Use <strong>Repair</strong> to restore a part.
             </Typography>
-            <Typography variant="body2">
+            <Typography variant="body2" paragraph>
               <strong>Wind &amp; ship speed:</strong> when a sailing ship is on the map, the toolbar shows a
               <strong> Wind</strong> selector (Calm or the direction it blows from). Sails run at their
               with-wind speed when heading within 45° of downwind, their into-wind speed within 45° of upwind,
@@ -249,6 +249,15 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               oars also lose speed as they take damage, and oars need their minimum crew (the Passengers zone
               doesn&apos;t count). A ship&apos;s speed is worked out from its parts, so its card shows the
               current speed and why.
+            </Typography>
+            <Typography variant="body2">
+              <strong>Ship turns:</strong> ships roll their own initiative (d20 + the ship&apos;s DEX + its crew
+              quality) when you press the same <strong>Roll Init</strong> buttons you use for creatures: NPC rolls
+              enemy ships, PC rolls party ships. Edit a ship&apos;s <strong>Init</strong> chip in the Vehicles list
+              before combat. Crew quality (+4 by default) sits next to AC and Speed on the ship&apos;s card. On a
+              ship&apos;s turn the panel shows how many ship actions it gets from the crew aboard. Moving the ship
+              ticks <strong>Move</strong>, and rolling a weapon from its station ticks that Fire action. Click a
+              chip to tick or untick it by hand. Going over is allowed; it just shows in red.
             </Typography>
           </AccordionDetails>
         </Accordion>
