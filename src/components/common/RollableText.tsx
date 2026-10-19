@@ -18,9 +18,11 @@ interface RollableTextProps {
   text?: string;
   /** Optional context recorded in the combat log (e.g. weapon / vehicle name). */
   source?: string;
+  /** Called after a roll is made (e.g. to mark a ship's Fire action). */
+  onRoll?: (notation: string) => void;
 }
 
-export function RollableText({ text, source }: RollableTextProps) {
+export function RollableText({ text, source, onRoll }: RollableTextProps) {
   const { dispatch } = useCombat();
   const [snack, setSnack] = useState<string | null>(null);
 
@@ -49,6 +51,7 @@ export function RollableText({ text, source }: RollableTextProps) {
         details: formatted,
       },
     });
+    onRoll?.(notation);
   };
 
   return (

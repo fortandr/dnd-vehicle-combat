@@ -24,6 +24,8 @@ import {
   getElevationAttackModifier,
   parseWeaponRange,
 } from '../../utils/elevationCalculator';
+import { isNavalVehicle } from '../../data/navalUpgrades';
+import { shipActionSummary, actionForWeapon } from '../../utils/shipTurn';
 import { getSpeedBreakdown, speedChange, speedReasonText, speedContextFromState } from '../../utils/vehicleSpeed';
 
 export function RightPanel() {
@@ -129,7 +131,7 @@ export function RightPanel() {
 }
 
 function CurrentTurnInfo() {
-  const { state, currentTurnCreature, currentTurnVehicle, currentTurnDriver } = useCombat();
+  const { state, dispatch, currentTurnCreature, currentTurnVehicle, currentTurnDriver } = useCombat();
 
   // Which crew positions are expanded (click a manned station to open its weapon details).
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -219,6 +221,10 @@ function CurrentTurnInfo() {
     const change = speedChange(speedInfo);
     const speedReason = speedReasonText(currentTurnVehicle, speedInfo);
     const shownSpeed = speedInfo.isShip ? speedInfo.nominal : currentTurnVehicle.currentSpeed;
+    const isShip = isNavalVehicle(currentTurnVehicle.template);
+    const shipActions = currentTurnVehicle.template.shipActions;
+    const shipSummary = shipActions ? shipActionSummary(currentTurnVehicle, state) : null;
+    const hasMoved = (state.movementUsed[currentTurnVehicle.id] ?? 0) > 0;
 
     return (
       <Box>
@@ -263,12 +269,53 @@ function CurrentTurnInfo() {
         </Paper>
 
         {/* Driver */}
-        {currentTurnDriver && (
+        {(currentTurnDriver || isShip) && (
           <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
-            <Box component="span" color="text.secondary">Driver: </Box>
-            <Box component="span" fontWeight={600}>{currentTurnDriver.name}</Box>
-            <Box component="span" color="text.secondary"> (Init: {currentTurnDriver.initiative})</Box>
+            {currentTurnDriver && (
+              <>
+                <Box component="span" color="text.secondary">Driver: </Box>
+                <Box component="span" fontWeight={600}>{currentTurnDriver.name}</Box>
+                {!isShip && <Box component="span" color="text.secondary"> (Init: {currentTurnDriver.initiative})</Box>}
+              </>
+            )}
+            {isShip && (
+              <Box component="span" color="text.secondary">{currentTurnDriver ? ' · ' : ''}Ship init: {currentTurnVehicle.initiative ?? 0}</Box>
+            )}
           </Typography>
+        )}
+
+        {/* Ship actions (GoS): budget by crew aboard; marks fill in as the ship moves and fires */}
+        {shipActions && shipSummary && (
+          <Box sx={{ mb: 1 }}>
+            {shipSummary.available === 0 ? (
+              <Typography variant="caption" color="warning.main" sx={{ display: 'block' }}>
+                No ship actions: needs {shipActions.crewThresholds[0]} crew ({shipSummary.crewAboard} aboard)
+              </Typography>
+            ) : (
+              <Typography variant="caption" sx={{ display: 'block', color: shipSummary.over > 0 ? 'error.main' : 'text.secondary' }}>
+                Ship actions: {shipSummary.remaining} of {shipSummary.available} ({shipSummary.crewAboard}/{currentTurnVehicle.template.crewCapacity} crew)
+                {shipSummary.over > 0 && ` · ${shipSummary.over} over`}
+              </Typography>
+            )}
+            <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, flexWrap: 'wrap', rowGap: 0.5 }}>
+              {shipActions.actions.map((a) => {
+                const used = shipSummary.used.includes(a.id);
+                const autoMove = a.id === 'move' && hasMoved;
+                return (
+                  <Chip
+                    key={a.id}
+                    label={used ? `✓ ${a.name}` : a.name}
+                    size="small"
+                    color={used ? 'primary' : 'default'}
+                    variant={used ? 'filled' : 'outlined'}
+                    onClick={autoMove ? undefined : () => dispatch({ type: 'TOGGLE_SHIP_ACTION', payload: { vehicleId: currentTurnVehicle.id, actionId: a.id } })}
+                    title={autoMove ? 'Used: the ship moved this turn' : 'Click to mark or unmark'}
+                    sx={{ height: 20, fontSize: '0.65rem' }}
+                  />
+                );
+              })}
+            </Stack>
+          </Box>
         )}
 
         {/* Crew List */}
@@ -280,6 +327,10 @@ function CurrentTurnInfo() {
               const isAlive = creature!.currentHp > 0;
               const showWeapon = weapon && isAlive;
               const isExpanded = expanded.has(creature!.id);
+              const fireAction = weapon ? actionForWeapon(currentTurnVehicle.template, weapon.id) : undefined;
+              const markFire = fireAction
+                ? () => dispatch({ type: 'MARK_SHIP_ACTION', payload: { vehicleId: currentTurnVehicle.id, actionId: fireAction.id } })
+                : undefined;
               return (
               <Paper
                 key={creature!.id}
@@ -321,7 +372,7 @@ function CurrentTurnInfo() {
                 {/* Collapsed hint for a manned weapon station */}
                 {showWeapon && !isExpanded && (
                   <Typography variant="caption" color="warning.main" fontWeight={600} sx={{ display: 'block', mt: 0.5 }}>
-                    ⚔ {weapon.name} — tap to view &amp; roll
+                    ⚔ {weapon.name} — tap to view &amp; roll{fireAction ? ` · uses ${fireAction.name}` : ''}
                   </Typography>
                 )}
                 {/* Weapon values (expanded) - only show if crew is alive */}
@@ -351,7 +402,7 @@ function CurrentTurnInfo() {
                       {weapon.attackBonus !== undefined ? (
                         <>
                           <Typography variant="caption" component="span" fontFamily="monospace" color="text.secondary">
-                            <RollableText text={`1d20${weapon.attackBonus >= 0 ? '+' : ''}${weapon.attackBonus}`} source={`${currentTurnVehicle.name} · ${weapon.name} to hit`} /> to hit
+                            <RollableText text={`1d20${weapon.attackBonus >= 0 ? '+' : ''}${weapon.attackBonus}`} source={`${currentTurnVehicle.name} · ${weapon.name} to hit`} onRoll={markFire} /> to hit
                           </Typography>
                           {elevMods && (
                             <>
@@ -382,7 +433,7 @@ function CurrentTurnInfo() {
                         </Typography>
                       ) : null}
                       <Typography variant="caption" component="span" fontFamily="monospace" sx={{ color: 'error.light' }}>
-                        <RollableText text={weapon.damage} source={`${currentTurnVehicle.name} · ${weapon.name}`} />
+                        <RollableText text={weapon.damage} source={`${currentTurnVehicle.name} · ${weapon.name}`} onRoll={markFire} />
                       </Typography>
                       {weapon.range && (
                         <Typography variant="caption" fontFamily="monospace" color="text.secondary">
