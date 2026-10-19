@@ -22,11 +22,11 @@ const SHIP_ACTIONS: VehicleTemplate['shipActions'] = {
   crewThresholds: [3, 20, 40],
 };
 
-function makeShip(overrides: Partial<Vehicle> = {}, dex = 4, shipActions = SHIP_ACTIONS): Vehicle {
+function makeShip(overrides: Partial<Vehicle> = {}, dex = 4, shipActions: VehicleTemplate['shipActions'] | null = SHIP_ACTIONS): Vehicle {
   const template = {
     id: 't', name: 'Galley', description: '', maxHp: 500, ac: 15, speed: 30, damageThreshold: 20,
     mishapThreshold: 999, crewCapacity: 80, zones: [], weapons: [], abilityScores: { str: 24, dex, con: 20 },
-    environment: 'water', shipActions,
+    environment: 'water', shipActions: shipActions ?? undefined,
   } as unknown as VehicleTemplate;
   return {
     id: 'v1', name: 'Galley', type: 'enemy', template, currentHp: 500, currentSpeed: 30,
@@ -85,7 +85,7 @@ describe('actions available', () => {
   });
 
   it('is 0 for templates without shipActions', () => {
-    expect(shipActionsAvailable(makeShip({}, 4, undefined).template, 80)).toBe(0);
+    expect(shipActionsAvailable(makeShip({}, 4, null).template, 80)).toBe(0);
   });
 
   it('maps weapons to their Fire action', () => {
