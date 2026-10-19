@@ -27,17 +27,7 @@ import { factionColors, withOpacity } from '../../theme/customColors';
 import IconButton from '@mui/material/IconButton';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
-
-// Calculate effective speed accounting for mishap effects
-function getEffectiveSpeed(vehicle: Vehicle): number {
-  let speed = vehicle.currentSpeed;
-  for (const mishap of vehicle.activeMishaps) {
-    if (mishap.mechanicalEffect?.speedReduction) {
-      speed -= mishap.mechanicalEffect.speedReduction;
-    }
-  }
-  return Math.max(0, speed);
-}
+import { getEffectiveSpeed, speedContextFromState } from '../../utils/vehicleSpeed';
 
 // Calculate effective damage threshold accounting for mishap effects (e.g., Shedding Armor)
 function getEffectiveDamageThreshold(vehicle: Vehicle): number {
@@ -157,6 +147,7 @@ interface VehicleStatsPanelProps {
 
 export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsPanelProps) {
   const { state, dispatch, applyMishap } = useCombat();
+  const effectiveSpeed = getEffectiveSpeed(vehicle, speedContextFromState(state));
   const [damageAmount, setDamageAmount] = useState('');
   const [lastMishapResult, setLastMishapResult] = useState<{ roll: number; mishap: Mishap } | null>(null);
   const [showMishapResult, setShowMishapResult] = useState(false);
@@ -362,7 +353,7 @@ export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsP
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="body2">Speed:</Typography>
-            {getEffectiveSpeed(vehicle) < vehicle.currentSpeed && (
+            {effectiveSpeed < vehicle.currentSpeed && (
               <Typography
                 variant="caption"
                 sx={{
@@ -373,7 +364,7 @@ export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsP
                   borderRadius: 0.5,
                 }}
               >
-                {getEffectiveSpeed(vehicle)} ft effective
+                {effectiveSpeed} ft effective
               </Typography>
             )}
           </Box>
@@ -386,8 +377,8 @@ export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsP
               sx={{
                 width: 72,
                 '& input': {
-                  textDecoration: getEffectiveSpeed(vehicle) < vehicle.currentSpeed ? 'line-through' : 'none',
-                  color: getEffectiveSpeed(vehicle) < vehicle.currentSpeed ? 'text.disabled' : 'inherit',
+                  textDecoration: effectiveSpeed < vehicle.currentSpeed ? 'line-through' : 'none',
+                  color: effectiveSpeed < vehicle.currentSpeed ? 'text.disabled' : 'inherit',
                 },
               }}
               inputProps={{ min: 0, step: 10, style: { textAlign: 'center' } }}

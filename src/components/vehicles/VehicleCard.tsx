@@ -46,6 +46,7 @@ import { v4 as uuid } from 'uuid';
 import { SWAPPABLE_WEAPONS, ARMOR_UPGRADES, MAGICAL_GADGETS, getWeaponStationUpgrade, WEAPON_STATION_EXCLUDED_VEHICLES, resolveZone, isAvernusVehicle } from '../../data/vehicleTemplates';
 import { NAVAL_UPGRADES, NAVAL_UPGRADE_CATEGORIES, isNavalVehicle } from '../../data/navalUpgrades';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
+import { getSpeedBreakdown, speedContextFromState } from '../../utils/vehicleSpeed';
 
 interface VehicleCardProps {
   vehicle: Vehicle;
@@ -94,17 +95,6 @@ function getArmorDefenses(vehicle: Vehicle): { immunities: string[]; resistances
   return { immunities, resistances };
 }
 
-// Calculate effective speed accounting for mishap effects
-function getEffectiveSpeed(vehicle: Vehicle): number {
-  let speed = vehicle.currentSpeed;
-  for (const mishap of vehicle.activeMishaps) {
-    if (mishap.mechanicalEffect?.speedReduction) {
-      speed -= mishap.mechanicalEffect.speedReduction;
-    }
-  }
-  return Math.max(0, speed);
-}
-
 // Calculate effective damage threshold accounting for mishap effects (e.g., Shedding Armor)
 function getEffectiveDamageThreshold(vehicle: Vehicle): number {
   let threshold = vehicle.template.damageThreshold;
@@ -148,8 +138,9 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
     : null;
 
   // Calculate effective speed and damage threshold
-  const effectiveSpeed = getEffectiveSpeed(vehicle);
-  const hasSpeedReduction = effectiveSpeed < vehicle.currentSpeed;
+  const speed = getSpeedBreakdown(vehicle, speedContextFromState(state));
+  const effectiveSpeed = speed.effective;
+  const hasSpeedReduction = effectiveSpeed < speed.nominal;
   const effectiveDamageThreshold = getEffectiveDamageThreshold(vehicle);
   const hasThresholdReduction = effectiveDamageThreshold < vehicle.template.damageThreshold;
 

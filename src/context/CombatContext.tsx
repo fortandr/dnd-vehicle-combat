@@ -12,6 +12,7 @@ import { getWeaponStationUpgrade, resolveZone } from '../data/vehicleTemplates';
 import { logAnalyticsEvent } from '../firebase';
 import { v4 as uuid } from 'uuid';
 import { loadCurrentEncounter } from '../hooks/useLocalStorage';
+import { getEffectiveSpeed as computeEffectiveSpeed, speedContextFromState } from '../utils/vehicleSpeed';
 
 const AUTO_SAVE_KEY = 'avernus-current-encounter';
 
@@ -2252,28 +2253,11 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
     [state.crewAssignments, state.creatures]
   );
 
-  // Get the effective speed of a vehicle after applying all modifiers
+
+  // Effective speed after wind, component damage, crew, mishaps, and speed modifiers.
   const getEffectiveSpeed = useCallback(
-    (vehicle: Vehicle): number => {
-      let speed = vehicle.template.speed;
-
-      // Apply mishap speed reductions
-      for (const mishap of vehicle.activeMishaps) {
-        if (mishap.mechanicalEffect?.speedReduction) {
-          speed = Math.max(0, speed - mishap.mechanicalEffect.speedReduction);
-        }
-      }
-
-      // Apply speed modifiers (multipliers like 0.5 for half speed)
-      if (vehicle.speedModifiers && vehicle.speedModifiers.length > 0) {
-        for (const mod of vehicle.speedModifiers) {
-          speed = Math.floor(speed * mod.multiplier);
-        }
-      }
-
-      return Math.max(0, speed);
-    },
-    []
+    (vehicle: Vehicle): number => computeEffectiveSpeed(vehicle, speedContextFromState(state)),
+    [state]
   );
 
   // Helper to get vehicle driver

@@ -24,6 +24,7 @@ import {
   getElevationAttackModifier,
   parseWeaponRange,
 } from '../../utils/elevationCalculator';
+import { getSpeedBreakdown, speedContextFromState } from '../../utils/vehicleSpeed';
 
 export function RightPanel() {
   const { state, currentTurnVehicle, currentTurnCreature } = useCombat();
@@ -127,17 +128,6 @@ export function RightPanel() {
   );
 }
 
-// Calculate effective speed accounting for mishap effects
-function getEffectiveSpeed(vehicle: { currentSpeed: number; activeMishaps: Array<{ mechanicalEffect?: { speedReduction?: number } }> }): number {
-  let speed = vehicle.currentSpeed;
-  for (const mishap of vehicle.activeMishaps) {
-    if (mishap.mechanicalEffect?.speedReduction) {
-      speed -= mishap.mechanicalEffect.speedReduction;
-    }
-  }
-  return Math.max(0, speed);
-}
-
 function CurrentTurnInfo() {
   const { state, currentTurnCreature, currentTurnVehicle, currentTurnDriver } = useCombat();
 
@@ -224,8 +214,9 @@ function CurrentTurnInfo() {
       .filter((c) => c.creature);
 
     const borderColor = currentTurnVehicle.type === 'party' ? factionColors.party : factionColors.enemy;
-    const effectiveSpeed = getEffectiveSpeed(currentTurnVehicle);
-    const hasSpeedReduction = effectiveSpeed < currentTurnVehicle.currentSpeed;
+    const speedInfo = getSpeedBreakdown(currentTurnVehicle, speedContextFromState(state));
+    const effectiveSpeed = speedInfo.effective;
+    const hasSpeedReduction = effectiveSpeed < speedInfo.nominal;
 
     return (
       <Box>

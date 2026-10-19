@@ -43,21 +43,6 @@ export function canVehicleTurn(vehicle: Vehicle): boolean {
   return controls.some((c) => getComponentHp(vehicle, c) > 0);
 }
 
-/**
- * Speed cap from propulsion: the best speed among surviving movement components.
- * Infinity when the vehicle has no movement components (land vehicles are uncapped);
- * 0 when it has movement components but all are destroyed (dead in the water).
- */
-export function getPropulsionSpeedCap(vehicle: Vehicle): number {
-  const movement = vehicle.template.components?.filter((c) => c.kind === 'movement') ?? [];
-  if (movement.length === 0) return Infinity;
-  let best = 0;
-  for (const c of movement) {
-    if (getComponentHp(vehicle, c) > 0) best = Math.max(best, c.speed ?? 0);
-  }
-  return best;
-}
-
 /** Short status label for a destroyed component, for UI. */
 export function destroyedEffectLabel(component: VehicleComponent): string {
   switch (component.kind) {

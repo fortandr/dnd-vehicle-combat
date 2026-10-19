@@ -24,7 +24,8 @@ import { SCALES, formatDistanceWithUnit, getScaleForDistance, calculateMovementP
 import { resolveZone } from '../../data/vehicleTemplates';
 import { useBroadcastSource } from '../../hooks/useBroadcastChannel';
 import { renderShipIcon } from './shipIcons';
-import { getPropulsionSpeedCap, isWeaponDestroyed, canVehicleTurn } from '../../utils/vehicleComponents';
+import { isWeaponDestroyed, canVehicleTurn } from '../../utils/vehicleComponents';
+import { getEffectiveSpeed, speedContextFromState } from '../../utils/vehicleSpeed';
 import { featureFlags } from '../../config/featureFlags';
 import {
   getBackgroundBounds,
@@ -308,23 +309,6 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     y: delta.y / pixelsPerFoot,
   });
 
-  // Calculate effective speed accounting for mishap effects
-  const getEffectiveSpeed = (vehicle: Vehicle): number => {
-    let speed = vehicle.currentSpeed;
-
-    // Apply speed reductions from active mishaps
-    for (const mishap of vehicle.activeMishaps) {
-      if (mishap.mechanicalEffect?.speedReduction) {
-        speed -= mishap.mechanicalEffect.speedReduction;
-      }
-    }
-
-    // Component combat: propulsion loss caps speed (0 if all movement components are destroyed).
-    speed = Math.min(speed, getPropulsionSpeedCap(vehicle));
-
-    return Math.max(0, speed);
-  };
-
   // Get the minimum engagement distance between any party and enemy vehicle
   // This determines movement scale for ALL vehicles (once engaged, everyone is committed)
   // Also considers creatures on the battlefield (ejected crew, etc.)
@@ -401,7 +385,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   // Get max movement for a vehicle this round
   // Uses movementScale (based on closest engagement) not visual state.scale
   const getMaxMovement = (vehicle: Vehicle): number => {
-    return calculateMovementPerRound(getEffectiveSpeed(vehicle), movementScale);
+    return calculateMovementPerRound(getEffectiveSpeed(vehicle, speedContextFromState(state)), movementScale);
   };
 
   // Get remaining movement for a vehicle
