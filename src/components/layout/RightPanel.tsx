@@ -301,6 +301,9 @@ function CurrentTurnInfo() {
               {shipActions.actions.map((a) => {
                 const used = shipSummary.used.includes(a.id);
                 const autoMove = a.id === 'move' && hasMoved;
+                const storedMove = a.id === 'move' && (state.shipActionsUsed[currentTurnVehicle.id] ?? []).includes('move');
+                // An auto-moved ship's Move is locked, unless a stray stored mark exists to clear
+                const locked = autoMove && !storedMove;
                 return (
                   <Chip
                     key={a.id}
@@ -308,8 +311,8 @@ function CurrentTurnInfo() {
                     size="small"
                     color={used ? 'primary' : 'default'}
                     variant={used ? 'filled' : 'outlined'}
-                    onClick={autoMove ? undefined : () => dispatch({ type: 'TOGGLE_SHIP_ACTION', payload: { vehicleId: currentTurnVehicle.id, actionId: a.id } })}
-                    title={autoMove ? 'Used: the ship moved this turn' : 'Click to mark or unmark'}
+                    onClick={locked ? undefined : () => dispatch({ type: 'TOGGLE_SHIP_ACTION', payload: { vehicleId: currentTurnVehicle.id, actionId: a.id } })}
+                    title={locked ? 'Used: the ship moved this turn' : storedMove && autoMove ? 'Click to clear the stray Move mark' : 'Click to mark or unmark'}
                     sx={{ height: 20, fontSize: '0.65rem' }}
                   />
                 );

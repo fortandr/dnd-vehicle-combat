@@ -281,7 +281,9 @@ export function Sidebar() {
   // Ship initiative edit state
   const [editingShipInitId, setEditingShipInitId] = useState<string | null>(null);
   const [shipInitDraft, setShipInitDraft] = useState('');
+  const cancelShipInitRef = useRef(false);
   const saveShipInit = (id: string) => {
+    if (cancelShipInitRef.current) return;
     const n = parseInt(shipInitDraft, 10);
     if (Number.isFinite(n)) dispatch({ type: 'UPDATE_VEHICLE', payload: { id, updates: { initiative: n } } });
     setEditingShipInitId(null);
@@ -1036,7 +1038,10 @@ export function Sidebar() {
                             value={shipInitDraft}
                             onChange={(e) => setShipInitDraft(e.target.value)}
                             onBlur={() => saveShipInit(vehicle.id)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') saveShipInit(vehicle.id); if (e.key === 'Escape') setEditingShipInitId(null); }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveShipInit(vehicle.id);
+                              if (e.key === 'Escape') { cancelShipInitRef.current = true; setEditingShipInitId(null); }
+                            }}
                             inputProps={{ 'aria-label': `${vehicle.name} initiative`, style: { width: 40, padding: '2px 4px' } }}
                           />
                         ) : (
@@ -1045,7 +1050,7 @@ export function Sidebar() {
                               label={`Init ${vehicle.initiative ?? 0}`}
                               size="small"
                               variant="outlined"
-                              onClick={state.phase === 'setup' ? () => { setShipInitDraft(String(vehicle.initiative ?? 0)); setEditingShipInitId(vehicle.id); } : undefined}
+                              onClick={state.phase === 'setup' ? () => { cancelShipInitRef.current = false; setShipInitDraft(String(vehicle.initiative ?? 0)); setEditingShipInitId(vehicle.id); } : undefined}
                               sx={{ height: 18, fontSize: '0.625rem' }}
                             />
                           </Tooltip>
