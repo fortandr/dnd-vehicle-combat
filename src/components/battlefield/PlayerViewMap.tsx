@@ -10,6 +10,8 @@ import { Vehicle, Creature, Position, CrewAssignment, ElevationZone } from '../.
 import { featureFlags } from '../../config/featureFlags';
 import { resolveZone } from '../../data/vehicleTemplates';
 import { renderShipIcon } from './shipIcons';
+import { WindIndicator } from './WindIndicator';
+import { encounterHasSailingShips } from '../../utils/navalMovement';
 
 export function PlayerViewMap() {
   const { state, isConnected } = useBroadcastReceiver();
@@ -153,6 +155,8 @@ export function PlayerViewMap() {
         ref={mapRef}
         className="player-view-map"
       >
+        {encounterHasSailingShips(state.vehicles) && <WindIndicator wind={state.wind} />}
+
         {/* Background Image */}
         {state.backgroundImage && (
           <img

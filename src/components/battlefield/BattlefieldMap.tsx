@@ -19,7 +19,9 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useCombat } from '../../context/CombatContext';
 import { useSettings } from '../../context/SettingsContext';
-import { Vehicle, VehicleTemplate, Position, ScaleName, Creature, CrewAssignment, ElevationZone } from '../../types';
+import { Vehicle, VehicleTemplate, Position, ScaleName, Creature, CrewAssignment, ElevationZone, CompassPoint } from '../../types';
+import { COMPASS_POINTS, encounterHasSailingShips } from '../../utils/navalMovement';
+import { WindIndicator } from './WindIndicator';
 import { SCALES, formatDistanceWithUnit, getScaleForDistance, calculateMovementPerRound } from '../../data/scaleConfig';
 import { resolveZone } from '../../data/vehicleTemplates';
 import { useBroadcastSource } from '../../hooks/useBroadcastChannel';
@@ -122,6 +124,13 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   // RETURN_TO_SETUP — no local bookkeeping needed here.
   const movementUsed = state.movementUsed;
   const moveHistory = state.moveHistory;
+
+  const showWind = encounterHasSailingShips(state.vehicles);
+  const handleWindChange = (value: string) => {
+    const wind = value === 'calm' ? undefined : (value as CompassPoint);
+    dispatch({ type: 'SET_ENVIRONMENT', payload: { wind } });
+    dispatch({ type: 'LOG_ACTION', payload: { type: 'system', action: wind ? `Wind now from the ${wind}` : 'Wind falls calm' } });
+  };
 
   // Undo last movement
   const handleUndoMove = () => {
@@ -1428,6 +1437,24 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
             </div>
           )}
 
+          {/* Wind (sailing ships only) */}
+          {showWind && (
+            <label className="flex items-center gap-sm text-xs" title="Direction the wind blows from">
+              <span className="text-muted">Wind</span>
+              <select
+                className="btn btn-secondary text-xs"
+                value={state.environment.wind ?? 'calm'}
+                onChange={(e) => handleWindChange(e.target.value)}
+                aria-label="Wind direction"
+              >
+                <option value="calm">Calm</option>
+                {COMPASS_POINTS.map((p) => (
+                  <option key={p} value={p}>From {p}</option>
+                ))}
+              </select>
+            </label>
+          )}
+
           {/* Undo Move Button */}
           {state.phase === 'combat' && (
             <button
@@ -2139,6 +2166,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
               </p>
             </div>
           )}
+          {showWind && <WindIndicator wind={state.environment.wind} />}
         </div>
       </DndContext>
 
