@@ -5,12 +5,13 @@
  * (wind, damage, oar crew — see navalMovement.ts); every other vehicle uses currentSpeed.
  * Then mishap speed reductions, then speedModifier multipliers, clamped at 0.
  */
-import type { CombatState, CompassPoint, CrewAssignment, Vehicle } from '../types';
+import type { CombatState, CompassPoint, CrewAssignment, Creature, Vehicle } from '../types';
 import { countCrewAboard, getPropulsionSpeed, nominalPropulsionSpeed, speedReasonLabel, type PropulsionSpeed } from './navalMovement';
 
 export interface SpeedContext {
   wind?: CompassPoint;
   crewAssignments: CrewAssignment[];
+  creatures?: Creature[];
 }
 
 export interface SpeedBreakdown {
@@ -20,12 +21,12 @@ export interface SpeedBreakdown {
   propulsion: PropulsionSpeed;
 }
 
-export function speedContextFromState(state: Pick<CombatState, 'environment' | 'crewAssignments'>): SpeedContext {
-  return { wind: state.environment?.wind, crewAssignments: state.crewAssignments };
+export function speedContextFromState(state: Pick<CombatState, 'environment' | 'crewAssignments' | 'creatures'>): SpeedContext {
+  return { wind: state.environment?.wind, crewAssignments: state.crewAssignments, creatures: state.creatures };
 }
 
 export function getSpeedBreakdown(vehicle: Vehicle, ctx: SpeedContext): SpeedBreakdown {
-  const propulsion = getPropulsionSpeed(vehicle, ctx.wind, countCrewAboard(vehicle.id, ctx.crewAssignments));
+  const propulsion = getPropulsionSpeed(vehicle, ctx.wind, countCrewAboard(vehicle.id, ctx.crewAssignments, ctx.creatures));
   const shipNominal = nominalPropulsionSpeed(vehicle);
   const isShip = shipNominal !== null;
 

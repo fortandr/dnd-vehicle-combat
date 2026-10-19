@@ -257,7 +257,7 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               before combat. Crew quality (+4 by default) sits next to AC and Speed on the ship&apos;s card. On a
               ship&apos;s turn the panel shows how many ship actions it gets from the crew aboard. Moving the ship
               ticks <strong>Move</strong>, and rolling a weapon from its station ticks that Fire action. Click a
-              chip to tick or untick it by hand. Going over is allowed; it just shows in red.
+              chip to tick or untick it by hand. Going over is allowed; it just shows in red. Fallen crew don&apos;t count toward actions or rowing.
             </Typography>
           </AccordionDetails>
         </Accordion>

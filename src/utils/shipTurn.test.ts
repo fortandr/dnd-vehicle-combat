@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { CrewAssignment, Vehicle, VehicleTemplate } from '../types';
+import type { CrewAssignment, Creature, Vehicle, VehicleTemplate } from '../types';
 import {
   clampCrewQuality,
   getCrewQuality,
@@ -38,8 +38,8 @@ function makeShip(overrides: Partial<Vehicle> = {}, dex = 4, shipActions: Vehicl
 }
 const crew = (n: number, zoneId = 'deck_crew'): CrewAssignment[] =>
   Array.from({ length: n }, (_, i) => ({ creatureId: `c${i}`, vehicleId: 'v1', zoneId }));
-const turn = (over: Partial<{ shipActionsUsed: Record<string, string[]>; movementUsed: Record<string, number>; crewAssignments: CrewAssignment[] }> = {}) => ({
-  shipActionsUsed: {}, movementUsed: {}, crewAssignments: [], ...over,
+const turn = (over: Partial<{ shipActionsUsed: Record<string, string[]>; movementUsed: Record<string, number>; crewAssignments: CrewAssignment[]; creatures: Creature[] }> = {}) => ({
+  shipActionsUsed: {}, movementUsed: {}, crewAssignments: [], creatures: [], ...over,
 });
 
 describe('crew quality', () => {
@@ -95,6 +95,15 @@ describe('actions available', () => {
     expect(actionForWeapon(t, 'ballista_2')?.id).toBe('fire_ballista');
     expect(actionForWeapon(t, 'mangonel_1')?.id).toBe('fire_mangonel');
     expect(actionForWeapon(t, 'harpoon')).toBeUndefined();
+  });
+});
+
+describe('slain crew', () => {
+  it('do not count toward ship actions', () => {
+    const creatures = Array.from({ length: 25 }, (_, i) => ({ id: `c${i}`, currentHp: i < 6 ? 0 : 10 })) as unknown as Creature[];
+    const s = shipActionSummary(makeShip(), turn({ crewAssignments: crew(25), creatures }));
+    expect(s.crewAboard).toBe(19);
+    expect(s.available).toBe(1);
   });
 });
 

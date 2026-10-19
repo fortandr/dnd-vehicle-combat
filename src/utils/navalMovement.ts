@@ -6,7 +6,7 @@
  * propulsion speed (best surviving component). Vehicles with no movement components
  * (Avernus war machines, other land vehicles) get Infinity, i.e. "no constraint".
  */
-import type { CompassPoint, CrewAssignment, Vehicle, VehicleComponent } from '../types';
+import type { CompassPoint, CrewAssignment, Creature, Vehicle, VehicleComponent } from '../types';
 import { getComponentHp } from './vehicleComponents';
 
 export const COMPASS_POINTS: CompassPoint[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -118,9 +118,16 @@ export function nominalPropulsionSpeed(vehicle: Vehicle): number | null {
 
 export const PASSENGER_ZONE_ID = 'passengers';
 
-/** Crew aboard for crew-minimum rules: everyone assigned to the vehicle except passengers. */
-export function countCrewAboard(vehicleId: string, crewAssignments: CrewAssignment[]): number {
-  return crewAssignments.filter((a) => a.vehicleId === vehicleId && a.zoneId !== PASSENGER_ZONE_ID).length;
+/**
+ * Crew aboard for crew-minimum rules: everyone assigned to the vehicle except passengers.
+ * When `creatures` is given, slain crew (currentHp <= 0) don't count; unknown creatures still do.
+ */
+export function countCrewAboard(vehicleId: string, crewAssignments: CrewAssignment[], creatures?: Creature[]): number {
+  return crewAssignments.filter((a) => {
+    if (a.vehicleId !== vehicleId || a.zoneId === PASSENGER_ZONE_ID) return false;
+    const creature = creatures?.find((c) => c.id === a.creatureId);
+    return !creature || creature.currentHp > 0;
+  }).length;
 }
 
 export function speedReasonLabel(reason: SpeedReason): string {

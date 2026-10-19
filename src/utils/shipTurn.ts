@@ -59,7 +59,7 @@ export function actionForWeapon(template: VehicleTemplate, weaponId: string): Sh
   return template.shipActions?.actions.find((a) => a.weaponIds?.includes(weaponId));
 }
 
-export type ShipTurnState = Pick<CombatState, 'shipActionsUsed' | 'movementUsed' | 'crewAssignments'>;
+export type ShipTurnState = Pick<CombatState, 'shipActionsUsed' | 'movementUsed' | 'crewAssignments' | 'creatures'>;
 
 /** Stored marks plus Move once the ship has moved this round. */
 export function shipActionsUsedFor(vehicle: Vehicle, state: ShipTurnState): string[] {
@@ -78,7 +78,7 @@ export interface ShipActionSummary {
 }
 
 export function shipActionSummary(vehicle: Vehicle, state: ShipTurnState): ShipActionSummary {
-  const crewAboard = countCrewAboard(vehicle.id, state.crewAssignments);
+  const crewAboard = countCrewAboard(vehicle.id, state.crewAssignments, state.creatures);
   const available = shipActionsAvailable(vehicle.template, crewAboard);
   const used = shipActionsUsedFor(vehicle, state);
   return {

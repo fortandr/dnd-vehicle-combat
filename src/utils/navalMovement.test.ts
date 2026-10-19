@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { CrewAssignment, Vehicle, VehicleComponent, VehicleTemplate } from '../types';
+import type { CrewAssignment, Creature, Vehicle, VehicleComponent, VehicleTemplate } from '../types';
 import {
   windSpeedBand,
   componentSpeed,
@@ -168,6 +168,17 @@ describe('countCrewAboard', () => {
       { creatureId: 'c4', vehicleId: 'v2', zoneId: 'deck_crew' },
     ];
     expect(countCrewAboard('v1', a)).toBe(2);
+  });
+
+  it('excludes slain crew when creatures are passed; unchanged when omitted', () => {
+    const a: CrewAssignment[] = [
+      { creatureId: 'c1', vehicleId: 'v1', zoneId: 'helm' },
+      { creatureId: 'c2', vehicleId: 'v1', zoneId: 'deck_crew' },
+      { creatureId: 'c3', vehicleId: 'v1', zoneId: 'deck_crew' },
+    ];
+    const creatures = [{ id: 'c1', currentHp: 5 }, { id: 'c2', currentHp: 0 }] as unknown as Creature[];
+    expect(countCrewAboard('v1', a, creatures)).toBe(2); // c2 dead; c3 missing still counted
+    expect(countCrewAboard('v1', a)).toBe(3);
   });
 });
 
