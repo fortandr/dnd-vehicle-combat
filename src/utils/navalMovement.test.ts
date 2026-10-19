@@ -76,6 +76,15 @@ describe('componentSpeed', () => {
     expect(componentSpeed(makeVehicle([SAILS], { facing: 180 }), SAILS, undefined, 0).speed).toBe(45);
   });
 
+  it('into-wind reports the into_wind reason', () => {
+    expect(componentSpeed(makeVehicle([SAILS], { facing: 0 }), SAILS, 'N', 0).reasons).toEqual([{ kind: 'into_wind' }]);
+  });
+
+  it('combines wind and damage', () => {
+    const v = makeVehicle([SAILS], { facing: 180, componentHp: { sails: 50 } }); // with wind 60, 50 damage → −10
+    expect(componentSpeed(v, SAILS, 'N', 0).speed).toBe(50);
+  });
+
   it('loses speed in steps of perDamage', () => {
     const at = (hp: number) => componentSpeed(makeVehicle([SAILS], { componentHp: { sails: hp } }), SAILS, undefined, 0);
     expect(at(76).speed).toBe(45); // 24 damage
@@ -125,6 +134,11 @@ describe('getPropulsionSpeed', () => {
     expect(p.speed).toBe(60);
     expect(p.componentId).toBe('sails');
     expect(findUndermanned(p)).toEqual({ have: 12, need: 40 });
+  });
+
+  it('findUndermanned is null when crew is sufficient', () => {
+    const p = getPropulsionSpeed(makeVehicle([HULL, SAILS, OARS], { facing: 0 }), 'N', 40);
+    expect(findUndermanned(p)).toBeNull();
   });
 
   it('all movement destroyed → 0', () => {

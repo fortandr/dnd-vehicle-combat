@@ -52,7 +52,7 @@ function hull(ac: number, maxHp: number, damageThreshold?: number): VehicleCompo
   return { id: 'hull', name: 'Hull', kind: 'hull', ac, maxHp, damageThreshold, description: 'If the hull is destroyed, the ship is wrecked.' };
 }
 function helm(ac: number, maxHp: number): VehicleComponent {
-  return { id: 'helm', name: 'Helm', kind: 'control', ac, maxHp, description: 'If destroyed, the ship can\'t turn.' };
+  return { id: 'helm', name: 'Helm', kind: 'control', ac, maxHp, description: 'If destroyed, the ship can’t turn.' };
 }
 
 type SpeedLoss = NonNullable<VehicleComponent['speedLoss']>;

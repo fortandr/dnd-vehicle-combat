@@ -2260,7 +2260,6 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
     [state.crewAssignments, state.creatures]
   );
 
-
   // Effective speed after wind, component damage, crew, mishaps, and speed modifiers.
   const getEffectiveSpeed = useCallback(
     (vehicle: Vehicle): number => computeEffectiveSpeed(vehicle, speedContextFromState(state)),
