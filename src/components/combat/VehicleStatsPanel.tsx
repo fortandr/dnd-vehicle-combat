@@ -27,7 +27,7 @@ import { factionColors, withOpacity } from '../../theme/customColors';
 import IconButton from '@mui/material/IconButton';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
-import { getEffectiveSpeed, speedContextFromState } from '../../utils/vehicleSpeed';
+import { getSpeedBreakdown, speedContextFromState } from '../../utils/vehicleSpeed';
 
 // Calculate effective damage threshold accounting for mishap effects (e.g., Shedding Armor)
 function getEffectiveDamageThreshold(vehicle: Vehicle): number {
@@ -147,7 +147,9 @@ interface VehicleStatsPanelProps {
 
 export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsPanelProps) {
   const { state, dispatch, applyMishap } = useCombat();
-  const effectiveSpeed = getEffectiveSpeed(vehicle, speedContextFromState(state));
+  const speedBreakdown = getSpeedBreakdown(vehicle, speedContextFromState(state));
+  const effectiveSpeed = speedBreakdown.effective;
+  const speedReduced = speedBreakdown.isShip ? effectiveSpeed !== speedBreakdown.nominal : effectiveSpeed < speedBreakdown.nominal;
   const [damageAmount, setDamageAmount] = useState('');
   const [lastMishapResult, setLastMishapResult] = useState<{ roll: number; mishap: Mishap } | null>(null);
   const [showMishapResult, setShowMishapResult] = useState(false);
@@ -353,7 +355,7 @@ export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsP
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="body2">Speed:</Typography>
-            {effectiveSpeed < vehicle.currentSpeed && (
+            {speedReduced && (
               <Typography
                 variant="caption"
                 sx={{
@@ -377,8 +379,8 @@ export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsP
               sx={{
                 width: 72,
                 '& input': {
-                  textDecoration: effectiveSpeed < vehicle.currentSpeed ? 'line-through' : 'none',
-                  color: effectiveSpeed < vehicle.currentSpeed ? 'text.disabled' : 'inherit',
+                  textDecoration: speedReduced ? 'line-through' : 'none',
+                  color: speedReduced ? 'text.disabled' : 'inherit',
                 },
               }}
               inputProps={{ min: 0, step: 10, style: { textAlign: 'center' } }}

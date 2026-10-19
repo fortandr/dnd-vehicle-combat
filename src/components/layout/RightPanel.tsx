@@ -25,6 +25,7 @@ import {
   parseWeaponRange,
 } from '../../utils/elevationCalculator';
 import { getSpeedBreakdown, speedContextFromState } from '../../utils/vehicleSpeed';
+import { speedReasonLabel } from '../../utils/navalMovement';
 
 export function RightPanel() {
   const { state, currentTurnVehicle, currentTurnCreature } = useCombat();
@@ -216,7 +217,8 @@ function CurrentTurnInfo() {
     const borderColor = currentTurnVehicle.type === 'party' ? factionColors.party : factionColors.enemy;
     const speedInfo = getSpeedBreakdown(currentTurnVehicle, speedContextFromState(state));
     const effectiveSpeed = speedInfo.effective;
-    const hasSpeedReduction = effectiveSpeed < speedInfo.nominal;
+    const hasSpeedReduction = speedInfo.isShip ? effectiveSpeed !== speedInfo.nominal : effectiveSpeed < speedInfo.nominal;
+    const shownSpeed = speedInfo.isShip ? speedInfo.nominal : currentTurnVehicle.currentSpeed;
 
     return (
       <Box>
@@ -242,12 +244,17 @@ function CurrentTurnInfo() {
                   {effectiveSpeed} ft
                 </Box>
                 <Box component="span" sx={{ color: 'text.disabled', textDecoration: 'line-through', ml: 0.5 }}>
-                  {currentTurnVehicle.currentSpeed}
+                  {shownSpeed}
                 </Box>
               </Typography>
             ) : (
               <Typography variant="caption" color="text.secondary">
-                Speed: {currentTurnVehicle.currentSpeed} ft
+                Speed: {shownSpeed} ft
+              </Typography>
+            )}
+            {speedInfo.propulsion.reasons.length > 0 && (
+              <Typography variant="caption" sx={{ color: '#f59e0b', ml: 0.5 }}>
+                {speedInfo.propulsion.reasons.map(speedReasonLabel).join(' · ')}
               </Typography>
             )}
           </Box>

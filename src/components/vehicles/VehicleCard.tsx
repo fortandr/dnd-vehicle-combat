@@ -47,6 +47,7 @@ import { SWAPPABLE_WEAPONS, ARMOR_UPGRADES, MAGICAL_GADGETS, getWeaponStationUpg
 import { NAVAL_UPGRADES, NAVAL_UPGRADE_CATEGORIES, isNavalVehicle } from '../../data/navalUpgrades';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
 import { getSpeedBreakdown, speedContextFromState } from '../../utils/vehicleSpeed';
+import { speedReasonLabel, findUndermanned, type PropulsionSpeed } from '../../utils/navalMovement';
 
 interface VehicleCardProps {
   vehicle: Vehicle;
@@ -141,6 +142,8 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
   const speed = getSpeedBreakdown(vehicle, speedContextFromState(state));
   const effectiveSpeed = speed.effective;
   const hasSpeedReduction = effectiveSpeed < speed.nominal;
+  const speedReason = speed.propulsion.reasons.map(speedReasonLabel).join(' · ');
+  const undermanned = findUndermanned(speed.propulsion);
   const effectiveDamageThreshold = getEffectiveDamageThreshold(vehicle);
   const hasThresholdReduction = effectiveDamageThreshold < vehicle.template.damageThreshold;
 
@@ -379,7 +382,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
             </Paper>
           </Tooltip>
           <Tooltip
-            title={hasSpeedReduction ? `${vehicle.currentSpeed} ft reduced by mishap effects` : 'Current speed'}
+            title={speed.isShip ? `Book speed ${speed.nominal} ft${speedReason ? ` — ${speedReason}` : ''}` : hasSpeedReduction ? `${vehicle.currentSpeed} ft reduced by mishap effects` : 'Current speed'}
             arrow
             placement="top"
           >
@@ -388,11 +391,16 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                 flex: 1,
                 p: 1,
                 textAlign: 'center',
-                bgcolor: hasSpeedReduction ? withOpacity('#f59e0b', 0.15) : '#242424',
-                border: hasSpeedReduction ? 1 : 0,
+                bgcolor: (speed.isShip ? effectiveSpeed !== speed.nominal : hasSpeedReduction) ? withOpacity('#f59e0b', 0.15) : '#242424',
+                border: (speed.isShip ? effectiveSpeed !== speed.nominal : hasSpeedReduction) ? 1 : 0,
                 borderColor: '#f59e0b',
               }}
             >
+              {speed.isShip ? (
+                <Typography variant="h6" fontWeight={700} sx={{ color: effectiveSpeed !== speed.nominal ? '#f59e0b' : 'inherit' }}>
+                  {effectiveSpeed}
+                </Typography>
+              ) : (
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                 <TextField
                   type="number"
@@ -413,12 +421,16 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                   inputProps={{ min: 0, step: 10 }}
                 />
               </Box>
-              {hasSpeedReduction && (
+              )}
+              {speed.isShip ? (
+                <Typography variant="caption" sx={{ color: speedReason ? '#f59e0b' : 'text.secondary', fontWeight: speedReason ? 600 : 400 }}>
+                  {speedReason || 'Speed (ft)'}
+                </Typography>
+              ) : hasSpeedReduction ? (
                 <Typography variant="caption" sx={{ color: '#f59e0b', fontWeight: 600 }}>
                   {effectiveSpeed} ft actual
                 </Typography>
-              )}
-              {!hasSpeedReduction && (
+              ) : (
                 <Typography variant="caption" color="text.secondary">Speed (ft)</Typography>
               )}
             </Paper>
@@ -441,6 +453,15 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
             </Paper>
           </Tooltip>
         </Stack>
+
+        {undermanned && (
+          <Chip
+            label={`Oars undermanned (${undermanned.have}/${undermanned.need})`}
+            size="small"
+            color="warning"
+            sx={{ mb: 1 }}
+          />
+        )}
 
         {/* Defenses (Immunities & Resistances) */}
         {(defenses.immunities.length > 0 || defenses.resistances.length > 0) && (
@@ -962,7 +983,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
         )}
 
         {/* Component combat — per-part HP & targeted damage (component vehicles only) */}
-        <ComponentDamageSection vehicle={vehicle} />
+        <ComponentDamageSection vehicle={vehicle} propulsion={speed.propulsion} />
 
         {/* Deal Damage Section */}
         <Paper sx={{ p: 1.5, bgcolor: '#242424', mb: 2 }}>
@@ -1614,9 +1635,10 @@ function formatCoverShort(cover: string): string {
 // ==========================================
 interface ComponentDamageSectionProps {
   vehicle: Vehicle;
+  propulsion: PropulsionSpeed;
 }
 
-function ComponentDamageSection({ vehicle }: ComponentDamageSectionProps) {
+function ComponentDamageSection({ vehicle, propulsion }: ComponentDamageSectionProps) {
   const { damageVehicleComponent, setVehicleComponentHp } = useCombat();
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const components = vehicle.template.components ?? [];
@@ -1654,6 +1676,10 @@ function ComponentDamageSection({ vehicle }: ComponentDamageSectionProps) {
                 </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                   {cur}/{comp.maxHp}{comp.damageThreshold ? ` · DT ${comp.damageThreshold}` : ''}
+                  {comp.kind === 'movement' && (() => {
+                    const part = propulsion.parts.find((p) => p.componentId === comp.id);
+                    return part ? ` · ${part.speed} ft` : null;
+                  })()}
                 </Typography>
               </Box>
               <LinearProgress
