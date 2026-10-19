@@ -49,7 +49,7 @@ import { Creature, Statblock } from '../../types';
 import { resolveZone } from '../../data/vehicleTemplates';
 import { factionColors, withOpacity } from '../../theme/customColors';
 import { isNavalVehicle } from '../../data/navalUpgrades';
-import { rollShipInitiative, formatShipInitiativeLog } from '../../utils/shipTurn';
+import { rollShipInitiative, formatShipInitiativeLog, vehicleInitiative } from '../../utils/shipTurn';
 
 // Quick presets for NPCs/Enemies
 const NPC_PRESETS: Partial<Statblock>[] = [
@@ -663,13 +663,15 @@ export function Sidebar() {
                     >
                       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
                         <Typography variant="body2" fontFamily="monospace" sx={{ minWidth: 24 }}>
-                          {driver?.initiative ?? '—'}
+                          {isNavalVehicle(vehicle.template) || driver ? vehicleInitiative(vehicle, driver) : '—'}
                         </Typography>
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Typography variant="body2" fontWeight={600}>{vehicle.name}</Typography>
-                          <Typography variant="caption" sx={{ color: driver ? 'text.secondary' : 'warning.main' }}>
-                            {driver ? `Driver: ${driver.name}` : 'No driver - acts last!'}
-                          </Typography>
+                          {(driver || !isNavalVehicle(vehicle.template)) && (
+                            <Typography variant="caption" sx={{ color: driver ? 'text.secondary' : 'warning.main' }}>
+                              {driver ? `Driver: ${driver.name}` : 'No driver - acts last!'}
+                            </Typography>
+                          )}
                           {vehicleCrew.length > 0 && (
                             <Box sx={{ ml: 1, mt: 0.5 }}>
                               {vehicleCrew.map(({ creature, zone }) => (
