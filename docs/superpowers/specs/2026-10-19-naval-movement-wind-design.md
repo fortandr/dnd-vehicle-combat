@@ -86,7 +86,7 @@ Pure functions with no React or context imports:
 - `getPropulsionSpeed(vehicle, wind, crewAboard): { speed: number; source?: componentId; reasons: SpeedReason[] }`
   - Returns the best component speed.
   - Returns `Infinity` with no reasons when the vehicle has no movement components (land vehicles).
-- `crewAboard(vehicle, creatures)`: the number of creatures assigned to the vehicle's zones, excluding the `passengers` zone.
+- `countCrewAboard(vehicleId, crewAssignments)`: the number of creatures assigned to the vehicle's zones, excluding the `passengers` zone.
 
 `SpeedReason` is a small tagged union (`with_wind`, `into_wind`, `damage_loss { feet }`, `undermanned { have, need }`, `destroyed`) that the UI turns into labels.
 
@@ -96,14 +96,16 @@ Pure functions with no React or context imports:
 
 There will be one `getEffectiveSpeed(vehicle, state)` in a shared util (alongside `navalMovement.ts`, or in `vehicleComponents.ts`). It replaces both current copies. Order:
 
-1. Start from `vehicle.currentSpeed` (what the map uses today, which is authoritative).
+1. **Base speed:**
+   - Vehicles with movement components (ships): the propulsion speed (which includes wind, damage and crew). `currentSpeed` is ignored. This replaces an earlier "cap" wording that would have stopped a with-wind speed (60) from ever exceeding the stored 45.
+   - All other vehicles: `vehicle.currentSpeed`, as today.
 2. Subtract mishap `speedReduction`s.
-3. Cap at the propulsion speed (which now includes wind, damage and crew). `Infinity` for land vehicles, so it has no effect there.
-4. Apply `speedModifiers` multipliers (so "half speed" halves the wind-adjusted speed).
-5. Clamp to ≥ 0.
+3. Apply `speedModifiers` multipliers (so "half speed" halves the wind-adjusted speed).
+4. Clamp to ≥ 0.
 
-Steps 1–3 keep the map's current order, so the map's behaviour only changes by gaining multipliers.
-Both `BattlefieldMap` and `CombatContext` consume it. Land vehicles are unchanged, apart from now applying both mishaps and multipliers consistently. Implementation must check whether either path depended on the old divergence and note it in the changelog.
+The breakdown also reports a **nominal** speed: for ships, the best calm, undamaged movement-component speed; for other vehicles, `currentSpeed`. The UI highlights when effective ≠ nominal.
+
+All five existing copies (`BattlefieldMap`, `CombatContext`, `VehicleCard`, `VehicleStatsPanel`, `RightPanel`) switch to the shared function. Land vehicles change only by gaining `speedModifiers` multipliers where a copy lacked them. On ship cards, the editable Speed field becomes a read-only display of effective speed plus the reason; land vehicles keep the editable field.
 
 Remaining movement stays as `movementPerRound(effectiveSpeed) − movementUsed`, clamped at 0. Because the speed is computed live, a mid-turn heading change takes effect immediately.
 
