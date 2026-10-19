@@ -46,8 +46,8 @@ import { v4 as uuid } from 'uuid';
 import { SWAPPABLE_WEAPONS, ARMOR_UPGRADES, MAGICAL_GADGETS, getWeaponStationUpgrade, WEAPON_STATION_EXCLUDED_VEHICLES, resolveZone, isAvernusVehicle } from '../../data/vehicleTemplates';
 import { NAVAL_UPGRADES, NAVAL_UPGRADE_CATEGORIES, isNavalVehicle } from '../../data/navalUpgrades';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
-import { getSpeedBreakdown, speedContextFromState } from '../../utils/vehicleSpeed';
-import { speedReasonLabel, findUndermanned, type PropulsionSpeed } from '../../utils/navalMovement';
+import { getSpeedBreakdown, speedChange, speedReasonText, speedContextFromState } from '../../utils/vehicleSpeed';
+import { findUndermanned, type PropulsionSpeed } from '../../utils/navalMovement';
 
 interface VehicleCardProps {
   vehicle: Vehicle;
@@ -141,8 +141,9 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
   // Calculate effective speed and damage threshold
   const speed = getSpeedBreakdown(vehicle, speedContextFromState(state));
   const effectiveSpeed = speed.effective;
-  const hasSpeedReduction = effectiveSpeed < speed.nominal;
-  const speedReason = speed.propulsion.reasons.map(speedReasonLabel).join(' · ');
+  const change = speedChange(speed);
+  const hasSpeedReduction = !speed.isShip && change === 'down';
+  const speedReason = speedReasonText(vehicle, speed);
   const undermanned = findUndermanned(speed.propulsion);
   const effectiveDamageThreshold = getEffectiveDamageThreshold(vehicle);
   const hasThresholdReduction = effectiveDamageThreshold < vehicle.template.damageThreshold;
@@ -391,13 +392,13 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                 flex: 1,
                 p: 1,
                 textAlign: 'center',
-                bgcolor: (speed.isShip ? effectiveSpeed !== speed.nominal : hasSpeedReduction) ? withOpacity('#f59e0b', 0.15) : '#242424',
-                border: (speed.isShip ? effectiveSpeed !== speed.nominal : hasSpeedReduction) ? 1 : 0,
+                bgcolor: change !== 'none' ? withOpacity('#f59e0b', 0.15) : '#242424',
+                border: change !== 'none' ? 1 : 0,
                 borderColor: '#f59e0b',
               }}
             >
               {speed.isShip ? (
-                <Typography variant="h6" fontWeight={700} sx={{ color: effectiveSpeed !== speed.nominal ? '#f59e0b' : 'inherit' }}>
+                <Typography variant="h6" fontWeight={700} sx={{ color: change !== 'none' ? '#f59e0b' : 'inherit' }}>
                   {effectiveSpeed}
                 </Typography>
               ) : (

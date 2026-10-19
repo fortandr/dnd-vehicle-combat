@@ -6,7 +6,7 @@
  * Then mishap speed reductions, then speedModifier multipliers, clamped at 0.
  */
 import type { CombatState, CompassPoint, CrewAssignment, Vehicle } from '../types';
-import { countCrewAboard, getPropulsionSpeed, nominalPropulsionSpeed, type PropulsionSpeed } from './navalMovement';
+import { countCrewAboard, getPropulsionSpeed, nominalPropulsionSpeed, speedReasonLabel, type PropulsionSpeed } from './navalMovement';
 
 export interface SpeedContext {
   wind?: CompassPoint;
@@ -43,4 +43,23 @@ export function getSpeedBreakdown(vehicle: Vehicle, ctx: SpeedContext): SpeedBre
 
 export function getEffectiveSpeed(vehicle: Vehicle, ctx: SpeedContext): number {
   return getSpeedBreakdown(vehicle, ctx).effective;
+}
+
+export type SpeedChange = 'up' | 'down' | 'none';
+
+/** Ships: compare effective vs nominal both ways (wind can boost). Land: only reductions count, as before. */
+export function speedChange(b: SpeedBreakdown): SpeedChange {
+  if (b.isShip) {
+    if (b.effective > b.nominal) return 'up';
+    if (b.effective < b.nominal) return 'down';
+    return 'none';
+  }
+  return b.effective < b.nominal ? 'down' : 'none';
+}
+
+/** Reason text: propulsion reasons (via speedReasonLabel) plus 'speed effects' when mishaps/modifiers changed a ship's speed. Joined with ' · '. Empty string when none. */
+export function speedReasonText(_vehicle: Vehicle, b: SpeedBreakdown): string {
+  const labels = b.propulsion.reasons.map(speedReasonLabel);
+  if (b.isShip && b.effective !== b.propulsion.speed) labels.push('speed effects');
+  return labels.join(' · ');
 }

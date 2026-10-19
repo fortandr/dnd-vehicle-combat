@@ -24,8 +24,7 @@ import {
   getElevationAttackModifier,
   parseWeaponRange,
 } from '../../utils/elevationCalculator';
-import { getSpeedBreakdown, speedContextFromState } from '../../utils/vehicleSpeed';
-import { speedReasonLabel } from '../../utils/navalMovement';
+import { getSpeedBreakdown, speedChange, speedReasonText, speedContextFromState } from '../../utils/vehicleSpeed';
 
 export function RightPanel() {
   const { state, currentTurnVehicle, currentTurnCreature } = useCombat();
@@ -217,7 +216,8 @@ function CurrentTurnInfo() {
     const borderColor = currentTurnVehicle.type === 'party' ? factionColors.party : factionColors.enemy;
     const speedInfo = getSpeedBreakdown(currentTurnVehicle, speedContextFromState(state));
     const effectiveSpeed = speedInfo.effective;
-    const hasSpeedReduction = speedInfo.isShip ? effectiveSpeed !== speedInfo.nominal : effectiveSpeed < speedInfo.nominal;
+    const hasSpeedReduction = speedChange(speedInfo) !== 'none';
+    const speedReason = speedReasonText(currentTurnVehicle, speedInfo);
     const shownSpeed = speedInfo.isShip ? speedInfo.nominal : currentTurnVehicle.currentSpeed;
 
     return (
@@ -252,9 +252,9 @@ function CurrentTurnInfo() {
                 Speed: {shownSpeed} ft
               </Typography>
             )}
-            {speedInfo.propulsion.reasons.length > 0 && (
+            {speedReason && (
               <Typography variant="caption" sx={{ color: '#f59e0b', ml: 0.5 }}>
-                {speedInfo.propulsion.reasons.map(speedReasonLabel).join(' · ')}
+                {speedReason}
               </Typography>
             )}
           </Box>

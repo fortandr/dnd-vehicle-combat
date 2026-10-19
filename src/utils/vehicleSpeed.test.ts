@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Mishap, SpeedModifier, Vehicle, VehicleComponent, VehicleTemplate } from '../types';
-import { getEffectiveSpeed, getSpeedBreakdown } from './vehicleSpeed';
+import { getEffectiveSpeed, getSpeedBreakdown, speedChange, speedReasonText } from './vehicleSpeed';
 
 const SAILS: VehicleComponent = {
   id: 'sails', name: 'Sails', kind: 'movement', ac: 12, maxHp: 100, speed: 45,
@@ -59,5 +59,37 @@ describe('ships (movement components)', () => {
     const crew = Array.from({ length: 40 }, (_, i) => ({ creatureId: `c${i}`, vehicleId: 'v1', zoneId: 'deck_crew' }));
     expect(getEffectiveSpeed(v, { crewAssignments: crew })).toBe(30);
     expect(getEffectiveSpeed(v, { crewAssignments: crew.slice(1) })).toBe(0);
+  });
+});
+
+describe('speedChange / speedReasonText', () => {
+  const sailing = (facing: number, o: Partial<Vehicle> = {}) => makeVehicle([SAILS], { facing, ...o });
+
+  it('ship with a wind boost is up', () => {
+    expect(speedChange(getSpeedBreakdown(sailing(180), { wind: 'N', crewAssignments: [] }))).toBe('up');
+  });
+
+  it('ship sailing into the wind is down', () => {
+    expect(speedChange(getSpeedBreakdown(sailing(0), { wind: 'N', crewAssignments: [] }))).toBe('down');
+  });
+
+  it('land vehicle with a mishap is down', () => {
+    const v = makeVehicle(undefined, { activeMishaps: [mishap(20)] });
+    expect(speedChange(getSpeedBreakdown(v, NO_CREW))).toBe('down');
+  });
+
+  it('unaffected land vehicle is none', () => {
+    expect(speedChange(getSpeedBreakdown(makeVehicle(undefined), NO_CREW))).toBe('none');
+  });
+
+  it('reason text joins propulsion reasons with speed effects', () => {
+    const v = sailing(180, { speedModifiers: [half] });
+    const ctx = { wind: 'N' as const, crewAssignments: [] };
+    expect(speedReasonText(v, getSpeedBreakdown(v, ctx))).toBe('with wind · speed effects');
+  });
+
+  it('reason text is empty when nothing applies', () => {
+    const v = makeVehicle(undefined);
+    expect(speedReasonText(v, getSpeedBreakdown(v, NO_CREW))).toBe('');
   });
 });

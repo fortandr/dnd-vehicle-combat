@@ -27,7 +27,7 @@ import { factionColors, withOpacity } from '../../theme/customColors';
 import IconButton from '@mui/material/IconButton';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
-import { getSpeedBreakdown, speedContextFromState } from '../../utils/vehicleSpeed';
+import { getSpeedBreakdown, speedChange, speedContextFromState } from '../../utils/vehicleSpeed';
 
 // Calculate effective damage threshold accounting for mishap effects (e.g., Shedding Armor)
 function getEffectiveDamageThreshold(vehicle: Vehicle): number {
@@ -149,7 +149,7 @@ export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsP
   const { state, dispatch, applyMishap } = useCombat();
   const speedBreakdown = getSpeedBreakdown(vehicle, speedContextFromState(state));
   const effectiveSpeed = speedBreakdown.effective;
-  const speedReduced = speedBreakdown.isShip ? effectiveSpeed !== speedBreakdown.nominal : effectiveSpeed < speedBreakdown.nominal;
+  const speedReduced = speedChange(speedBreakdown) !== 'none';
   const [damageAmount, setDamageAmount] = useState('');
   const [lastMishapResult, setLastMishapResult] = useState<{ roll: number; mishap: Mishap } | null>(null);
   const [showMishapResult, setShowMishapResult] = useState(false);
