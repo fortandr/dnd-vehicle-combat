@@ -37,6 +37,7 @@ import type {
   CoverType,
   VehicleEnvironment,
 } from '../../types';
+import { withWindSpeed, withSpeedLoss } from '../../utils/movementFields';
 
 const COVER_OPTIONS: { value: CoverType; label: string }[] = [
   { value: 'none', label: 'None' },
@@ -186,7 +187,14 @@ export function VehicleTemplateEditor({ open, initial, onClose, onSave }: Vehicl
                 <TextField type="number" label="HP" value={c.maxHp} onChange={(e) => updateComponent(i, { maxHp: num(e.target.value) })} sx={{ width: 90 }} size="small" />
                 <TextField type="number" label="DT" value={c.damageThreshold ?? ''} onChange={(e) => updateComponent(i, { damageThreshold: optNum(e.target.value) })} sx={{ width: 70 }} size="small" />
                 {c.kind === 'movement' && (
-                  <TextField type="number" label="Speed" value={c.speed ?? ''} onChange={(e) => updateComponent(i, { speed: optNum(e.target.value) })} sx={{ width: 90 }} size="small" />
+                  <>
+                    <TextField type="number" label="Speed" value={c.speed ?? ''} onChange={(e) => updateComponent(i, { speed: optNum(e.target.value) })} sx={{ width: 90 }} size="small" />
+                    <TextField type="number" label="With wind" value={c.windSpeeds?.with ?? ''} onChange={(e) => updateComponent(i, { windSpeeds: withWindSpeed(c, 'with', e.target.value) })} sx={{ width: 100 }} size="small" helperText="Sails only" />
+                    <TextField type="number" label="Into wind" value={c.windSpeeds?.into ?? ''} onChange={(e) => updateComponent(i, { windSpeeds: withWindSpeed(c, 'into', e.target.value) })} sx={{ width: 100 }} size="small" />
+                    <TextField type="number" label="Lose ft" value={c.speedLoss?.feet || ''} onChange={(e) => updateComponent(i, { speedLoss: withSpeedLoss(c, 'feet', e.target.value) })} sx={{ width: 80 }} size="small" />
+                    <TextField type="number" label="per dmg" value={c.speedLoss?.perDamage || ''} onChange={(e) => updateComponent(i, { speedLoss: withSpeedLoss(c, 'perDamage', e.target.value) })} sx={{ width: 80 }} size="small" />
+                    <TextField type="number" label="Crew needed" value={c.crewRequired ?? ''} onChange={(e) => updateComponent(i, { crewRequired: optNum(e.target.value) })} sx={{ width: 100 }} size="small" />
+                  </>
                 )}
                 <IconButton onClick={() => removeComponent(i)} size="small" aria-label="remove component"><DeleteIcon fontSize="small" /></IconButton>
               </Stack>

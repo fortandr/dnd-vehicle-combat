@@ -52,12 +52,16 @@ function hull(ac: number, maxHp: number, damageThreshold?: number): VehicleCompo
   return { id: 'hull', name: 'Hull', kind: 'hull', ac, maxHp, damageThreshold, description: 'If the hull is destroyed, the ship is wrecked.' };
 }
 function helm(ac: number, maxHp: number): VehicleComponent {
-  return { id: 'helm', name: 'Helm', kind: 'control', ac, maxHp, description: 'If destroyed, the ship can’t turn.' };
+  return { id: 'helm', name: 'Helm', kind: 'control', ac, maxHp, description: 'If destroyed, the ship can\'t turn.' };
 }
-function oars(ac: number, maxHp: number, speed: number, note?: string): VehicleComponent {
-  return { id: 'oars', name: 'Oars', kind: 'movement', ac, maxHp, speed, description: note ?? 'Movement component (oars).' };
+
+type SpeedLoss = NonNullable<VehicleComponent['speedLoss']>;
+const loss = (feet: number, perDamage: number): SpeedLoss => ({ feet, perDamage });
+
+function oars(ac: number, maxHp: number, speed: number, speedLoss: SpeedLoss, crewRequired?: number): VehicleComponent {
+  return { id: 'oars', name: 'Oars', kind: 'movement', ac, maxHp, speed, speedLoss, crewRequired, description: 'Movement component (oars).' };
 }
-function sails(ac: number, maxHp: number, speed: number, withWind: number, intoWind: number): VehicleComponent {
+function sails(ac: number, maxHp: number, speed: number, withWind: number, intoWind: number, speedLoss: SpeedLoss): VehicleComponent {
   return {
     id: 'sails',
     name: 'Sails',
@@ -65,7 +69,9 @@ function sails(ac: number, maxHp: number, speed: number, withWind: number, intoW
     ac,
     maxHp,
     speed,
-    description: `Movement component (sails). ${withWind} ft. with the wind, ${intoWind} ft. into the wind.`,
+    windSpeeds: { with: withWind, into: intoWind },
+    speedLoss,
+    description: 'Movement component (sails).',
   };
 }
 function ballistaComponent(id: string): VehicleComponent {
@@ -146,8 +152,8 @@ export const KEELBOAT: VehicleTemplate = {
   components: [
     hull(15, 100, 10),
     helm(12, 50),
-    oars(12, 100, 20),
-    sails(12, 100, 25, 35, 15),
+    oars(12, 100, 20, loss(5, 25)),
+    sails(12, 100, 25, 35, 15, loss(5, 20)),
     ballistaComponent('ballista'),
   ],
 };
@@ -173,8 +179,8 @@ export const LONGSHIP: VehicleTemplate = {
   components: [
     hull(15, 300, 15),
     helm(16, 50),
-    oars(12, 100, 20, 'Movement component (oars). Requires at least 20 crew.'),
-    sails(12, 100, 45, 60, 15),
+    oars(12, 100, 20, loss(5, 25), 20),
+    sails(12, 100, 45, 60, 15, loss(10, 25)),
   ],
 };
 
@@ -205,7 +211,7 @@ export const SAILING_SHIP: VehicleTemplate = {
   components: [
     hull(15, 300, 15),
     helm(18, 50),
-    sails(12, 100, 45, 60, 15),
+    sails(12, 100, 45, 60, 15, loss(5, 25)),
     ballistaComponent('ballista'),
     mangonelComponent('mangonel'),
   ],
@@ -245,8 +251,8 @@ export const WARSHIP: VehicleTemplate = {
   components: [
     hull(15, 500, 20),
     helm(18, 50),
-    oars(12, 100, 20, 'Movement component (oars). Requires at least 20 crew.'),
-    sails(12, 100, 35, 50, 15),
+    oars(12, 100, 20, loss(5, 25), 20),
+    sails(12, 100, 35, 50, 15, loss(10, 25)),
     ballistaComponent('ballista_1'),
     ballistaComponent('ballista_2'),
     mangonelComponent('mangonel_1'),
@@ -293,8 +299,8 @@ export const GALLEY: VehicleTemplate = {
   components: [
     hull(15, 500, 20),
     helm(16, 50),
-    oars(12, 100, 30, 'Movement component (oars). Requires at least 40 crew.'),
-    sails(12, 100, 35, 50, 15),
+    oars(12, 100, 30, loss(5, 25), 40),
+    sails(12, 100, 35, 50, 15, loss(10, 25)),
     ballistaComponent('ballista_1'),
     ballistaComponent('ballista_2'),
     ballistaComponent('ballista_3'),
