@@ -310,7 +310,8 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
         const newId = uuid();
         vehicleIdMap.set(v.id, newId);
         return {
-          ...v,
+          // Presets saved before 2.9.0 carry ship templates without wind/speed-loss/oar-crew data
+          ...backfillNavalMovement(v),
           id: newId,
           // Reset position to party side
           position: { x: 200, y: 200 + vehicleIdMap.size * 100 },

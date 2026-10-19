@@ -32,21 +32,31 @@ describe('wind on Environment', () => {
 });
 
 describe('naval backfill on load', () => {
+  const strippedGalley = {
+    ...GALLEY,
+    components: GALLEY.components!.map((c) => {
+      if (c.kind !== 'movement') return c;
+      const { windSpeeds: _w, speedLoss: _s, crewRequired: _c, ...rest } = c;
+      return rest;
+    }),
+  };
+  const oldGalley = {
+    id: 'v1', name: 'Old Galley', type: 'party', template: strippedGalley, currentHp: 500, currentSpeed: 35,
+    activeMishaps: [], conditions: [], weapons: [], position: { x: 0, y: 0 }, facing: 0,
+  } as unknown as Vehicle;
+  const oarsOf = (v: Vehicle) => v.template.components!.find((c) => c.id === 'oars')!;
+
   it('LOAD_ENCOUNTER backfills oar crew into a pre-2.9.0 galley', () => {
-    const strippedGalley = {
-      ...GALLEY,
-      components: GALLEY.components!.map((c) => {
-        if (c.kind !== 'movement') return c;
-        const { windSpeeds: _w, speedLoss: _s, crewRequired: _c, ...rest } = c;
-        return rest;
-      }),
-    };
-    const vehicle = {
-      id: 'v1', name: 'Old Galley', type: 'party', template: strippedGalley, currentHp: 500, currentSpeed: 35,
-      activeMishaps: [], conditions: [], weapons: [], position: { x: 0, y: 0 }, facing: 0,
-    } as unknown as Vehicle;
-    const loaded = combatReducer(initialCombatState, { type: 'LOAD_ENCOUNTER', payload: { ...initialCombatState, vehicles: [vehicle] } });
-    const oars = loaded.vehicles[0].template.components!.find((c) => c.id === 'oars')!;
-    expect(oars.crewRequired).toBe(40);
+    const loaded = combatReducer(initialCombatState, { type: 'LOAD_ENCOUNTER', payload: { ...initialCombatState, vehicles: [oldGalley] } });
+    expect(oarsOf(loaded.vehicles[0]).crewRequired).toBe(40);
+  });
+
+  it('LOAD_PARTY_PRESET backfills a galley saved in a pre-2.9.0 preset', () => {
+    const loaded = combatReducer(initialCombatState, {
+      type: 'LOAD_PARTY_PRESET',
+      payload: { vehicles: [oldGalley], creatures: [], crewAssignments: [] },
+    });
+    const galley = loaded.vehicles.find((v) => v.name === 'Old Galley')!;
+    expect(oarsOf(galley).crewRequired).toBe(40);
   });
 });
