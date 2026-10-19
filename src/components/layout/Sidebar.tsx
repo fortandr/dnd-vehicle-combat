@@ -781,7 +781,7 @@ export function Sidebar() {
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="subtitle2" sx={{ color: 'success.main' }}>Player Characters</Typography>
-              {pcs.length > 0 && (
+              {(pcs.length > 0 || state.vehicles.some((v) => v.type === 'party' && isNavalVehicle(v.template))) && (
                 <Tooltip title="Roll initiative for all PCs (1d20 + DEX Save) and party ships (1d20 + DEX + crew quality)" arrow>
                   <IconButton
                     size="small"
@@ -885,7 +885,7 @@ export function Sidebar() {
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="subtitle2" sx={{ color: 'primary.main' }}>NPCs / Enemies</Typography>
-              {npcs.length > 0 && (
+              {(npcs.length > 0 || state.vehicles.some((v) => v.type === 'enemy' && isNavalVehicle(v.template))) && (
                 <Tooltip title="Roll initiative for all NPCs (1d20 + DEX Save) and enemy ships (1d20 + DEX + crew quality)" arrow>
                   <IconButton
                     size="small"
