@@ -12,6 +12,7 @@ import { getWeaponStationUpgrade, resolveZone } from '../data/vehicleTemplates';
 import { logAnalyticsEvent } from '../firebase';
 import { v4 as uuid } from 'uuid';
 import { loadCurrentEncounter } from '../hooks/useLocalStorage';
+import { backfillNavalMovement } from '../utils/navalBackfill';
 import { getEffectiveSpeed as computeEffectiveSpeed, speedContextFromState } from '../utils/vehicleSpeed';
 
 const AUTO_SAVE_KEY = 'avernus-current-encounter';
@@ -157,7 +158,9 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
     case 'LOAD_ENCOUNTER': {
       // Migrate vehicles to add isSwappableStation flag to harpoon weapons
       // Also mark vehicles at 0 HP as inoperative
-      const migratedVehicles = (action.payload.vehicles || []).map((vehicle) => ({
+      const migratedVehicles = (action.payload.vehicles || []).map((rawVehicle) => {
+        const vehicle = backfillNavalMovement(rawVehicle);
+        return {
         ...vehicle,
         // Mark as inoperative if at 0 HP but not already marked
         isInoperative: vehicle.isInoperative ?? (vehicle.currentHp === 0),
@@ -166,7 +169,8 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
           // Mark harpoon weapons as swappable if not already set
           isSwappableStation: weapon.isSwappableStation ?? weapon.id.includes('harpoon') ?? weapon.name.toLowerCase().includes('harpoon'),
         })),
-      }));
+        };
+      });
 
       // Find vehicles that are at 0 HP (destroyed) - we need to eject their crew
       const destroyedVehicleIds = migratedVehicles
@@ -1826,7 +1830,9 @@ function getInitialState(providedState?: CombatState): CombatState {
       const loadedState = saved as Partial<CombatState>;
 
       // Migrate vehicles to fix weapon zones and add isSwappableStation flag
-      const migratedVehicles = (loadedState.vehicles || []).map((vehicle) => ({
+      const migratedVehicles = (loadedState.vehicles || []).map((rawVehicle) => {
+        const vehicle = backfillNavalMovement(rawVehicle);
+        return {
         ...vehicle,
         weapons: vehicle.weapons.map((weapon) => {
           let zoneId = weapon.zoneId;
@@ -1849,7 +1855,8 @@ function getInitialState(providedState?: CombatState): CombatState {
             isSwappableStation: weapon.isSwappableStation ?? weapon.id.includes('harpoon') ?? weapon.name?.toLowerCase().includes('harpoon'),
           };
         }),
-      }));
+        };
+      });
 
       // Build the restored state, explicitly preserving all combat-critical fields
       const restoredState: CombatState = {

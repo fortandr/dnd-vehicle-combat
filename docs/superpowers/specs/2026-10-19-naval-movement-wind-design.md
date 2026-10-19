@@ -33,7 +33,7 @@ Out of scope: voyage/travel mechanics (naval hazards, daily pace), crew-scaled s
 | Wind control | The GM sets wind per encounter (Calm or one of 8 compass points) and can change it at any time. No automatic random shifts. |
 | Heading vs wind | 90° cones. A heading within 45° of downwind uses the with-wind speed; within 45° of upwind uses the into-wind speed; anything else uses base speed. An angle of exactly 45° counts as **base**. |
 | Mid-turn heading change | Live. Remaining movement = speed at the current heading − distance already moved this round, minimum 0. |
-| Oar crew minimum | Enforced in this piece. Below `crewRequired`, oars have speed 0. This also changes existing saved encounters that have few crew assigned. The GM accepted that behaviour change. |
+| Oar crew minimum | Enforced in this piece. Below `crewRequired`, oars have speed 0. This also changes existing saved encounters that have few crew assigned. The GM accepted that behaviour change. Encounters saved before 2.9.0 are backfilled on load for built-in ships (matched by template id); personal-library copies of ships made before 2.9.0 must be re-saved with the new editor fields. |
 | Architecture | Compute speed on demand from stored state with pure functions. No reducer-maintained derived modifiers. |
 
 ## Data model
