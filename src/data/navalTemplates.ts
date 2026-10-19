@@ -12,7 +12,7 @@
  * station holding the remaining crew. Station capacities sum to crewCapacity.
  * Each weapon sets `zoneId` so it maps to its own station on add.
  */
-import type { VehicleTemplate, VehicleComponent, WeaponTemplate, VehicleZone, CoverType } from '../types';
+import type { VehicleTemplate, VehicleComponent, WeaponTemplate, VehicleZone, CoverType, ShipActionDef } from '../types';
 
 // Ships resolve damage via naval hazards, not the Avernus mishap table — set the
 // mishap trigger far out of reach so it never fires.
@@ -106,6 +106,11 @@ function passengers(capacity: number): VehicleZone {
   return { id: 'passengers', name: 'Passengers', cover: 'half', capacity, canAttackOut: true, visibleFromArcs: ALL_ARCS, bulk: true };
 }
 
+// ---- Ship action helpers ----
+const MOVE: ShipActionDef = { id: 'move', name: 'Move' };
+const fireBallista = (name: string, weaponIds: string[]): ShipActionDef => ({ id: 'fire_ballista', name, weaponIds });
+const fireMangonel = (name: string, weaponIds: string[]): ShipActionDef => ({ id: 'fire_mangonel', name, weaponIds });
+
 export const ROWBOAT: VehicleTemplate = {
   id: 'rowboat',
   name: 'Rowboat',
@@ -125,6 +130,7 @@ export const ROWBOAT: VehicleTemplate = {
   environment: 'water',
   zones: [crewDeck(2, 'Oars & Deck', 'none', false), passengers(2)],
   weapons: [],
+  shipActions: { actions: [MOVE], crewThresholds: [1] },
   components: [
     hull(11, 50),
     { id: 'oars', name: 'Oars', kind: 'movement', ac: 12, maxHp: 25, speed: 15, description: 'Control & movement. Without oars, speed is 0.' },
@@ -149,6 +155,7 @@ export const KEELBOAT: VehicleTemplate = {
   environment: 'water',
   zones: [helmZone(), weaponStation('ballista', 'Ballista'), crewDeck(1), passengers(4)],
   weapons: [ballistaWeapon('ballista')],
+  shipActions: { actions: [fireBallista('Fire Ballista', ['ballista']), MOVE], crewThresholds: [1, 2] },
   components: [
     hull(15, 100, 10),
     helm(12, 50),
@@ -176,6 +183,7 @@ export const LONGSHIP: VehicleTemplate = {
   environment: 'water',
   zones: [helmZone(), crewDeck(39, 'Rowers & Deck'), passengers(100)],
   weapons: [],
+  shipActions: { actions: [MOVE], crewThresholds: [1] },
   components: [
     hull(15, 300, 15),
     helm(16, 50),
@@ -208,6 +216,10 @@ export const SAILING_SHIP: VehicleTemplate = {
     passengers(20),
   ],
   weapons: [ballistaWeapon('ballista'), mangonelWeapon('mangonel')],
+  shipActions: {
+    actions: [fireBallista('Fire Ballista', ['ballista']), fireMangonel('Fire Mangonel', ['mangonel']), MOVE],
+    crewThresholds: [3, 10, 20],
+  },
   components: [
     hull(15, 300, 15),
     helm(18, 50),
@@ -248,6 +260,14 @@ export const WARSHIP: VehicleTemplate = {
     mangonelWeapon('mangonel_1'),
     mangonelWeapon('mangonel_2'),
   ],
+  shipActions: {
+    actions: [
+      fireBallista('Fire Ballistas', ['ballista_1', 'ballista_2']),
+      fireMangonel('Fire Mangonels', ['mangonel_1', 'mangonel_2']),
+      MOVE,
+    ],
+    crewThresholds: [3, 10, 20],
+  },
   components: [
     hull(15, 500, 20),
     helm(18, 50),
@@ -296,6 +316,14 @@ export const GALLEY: VehicleTemplate = {
     mangonelWeapon('mangonel_1'),
     mangonelWeapon('mangonel_2'),
   ],
+  shipActions: {
+    actions: [
+      fireBallista('Fire Ballistas', ['ballista_1', 'ballista_2', 'ballista_3', 'ballista_4']),
+      fireMangonel('Fire Mangonels', ['mangonel_1', 'mangonel_2']),
+      MOVE,
+    ],
+    crewThresholds: [3, 20, 40],
+  },
   components: [
     hull(15, 500, 20),
     helm(16, 50),

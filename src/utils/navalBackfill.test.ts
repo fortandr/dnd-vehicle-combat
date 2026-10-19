@@ -46,3 +46,17 @@ describe('backfillNavalMovement', () => {
     expect(part(out, 'sails').windSpeeds).toEqual({ with: 50, into: 15 });
   });
 });
+
+describe('backfillNavalMovement — ship actions', () => {
+  it('adds shipActions to a saved built-in ship that lacks them', () => {
+    const { shipActions: _sa, ...oldGalley } = GALLEY;
+    const out = backfillNavalMovement(makeVehicle(oldGalley as typeof GALLEY));
+    expect(out.template.shipActions).toEqual(GALLEY.shipActions);
+  });
+
+  it('keeps existing shipActions untouched', () => {
+    const custom = { ...GALLEY, shipActions: { actions: [{ id: 'move', name: 'Move' }], crewThresholds: [1] } };
+    const v = makeVehicle(custom);
+    expect(backfillNavalMovement(v).template.shipActions).toBe(custom.shipActions);
+  });
+});

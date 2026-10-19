@@ -4,6 +4,36 @@ import { ROWBOAT, KEELBOAT, LONGSHIP, SAILING_SHIP, WARSHIP, GALLEY } from './na
 
 const part = (t: VehicleTemplate, id: string) => t.components?.find((c) => c.id === id);
 
+describe('Saltmarsh ship actions (GoS stat blocks / 5e.tools actionThresholds)', () => {
+  const summary = (t: VehicleTemplate) => ({
+    names: t.shipActions?.actions.map((a) => a.name),
+    thresholds: t.shipActions?.crewThresholds,
+  });
+
+  it('action names and crew thresholds', () => {
+    expect(summary(ROWBOAT)).toEqual({ names: ['Move'], thresholds: [1] });
+    expect(summary(KEELBOAT)).toEqual({ names: ['Fire Ballista', 'Move'], thresholds: [1, 2] });
+    expect(summary(LONGSHIP)).toEqual({ names: ['Move'], thresholds: [1] });
+    expect(summary(SAILING_SHIP)).toEqual({ names: ['Fire Ballista', 'Fire Mangonel', 'Move'], thresholds: [3, 10, 20] });
+    expect(summary(WARSHIP)).toEqual({ names: ['Fire Ballistas', 'Fire Mangonels', 'Move'], thresholds: [3, 10, 20] });
+    expect(summary(GALLEY)).toEqual({ names: ['Fire Ballistas', 'Fire Mangonels', 'Move'], thresholds: [3, 20, 40] });
+  });
+
+  it('every Fire action covers exactly the ship\'s weapons of that kind', () => {
+    for (const t of [KEELBOAT, SAILING_SHIP, WARSHIP, GALLEY]) {
+      for (const kind of ['ballista', 'mangonel']) {
+        const action = t.shipActions!.actions.find((a) => a.id === `fire_${kind}`);
+        const weaponIds = t.weapons.filter((w) => w.id.startsWith(kind)).map((w) => w.id);
+        if (weaponIds.length === 0) {
+          expect(action).toBeUndefined();
+        } else {
+          expect(action?.weaponIds).toEqual(weaponIds);
+        }
+      }
+    }
+  });
+});
+
 describe('Saltmarsh ship movement data (spec table)', () => {
   it('oars: speed, speed loss, crew required', () => {
     expect(part(ROWBOAT, 'oars')).toMatchObject({ speed: 15 });
