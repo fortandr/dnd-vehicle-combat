@@ -27,7 +27,7 @@ import { factionColors, withOpacity } from '../../theme/customColors';
 import IconButton from '@mui/material/IconButton';
 import RemoveIcon from '@mui/icons-material/Remove';
 import AddIcon from '@mui/icons-material/Add';
-import { getSpeedBreakdown, speedChange, speedContextFromState } from '../../utils/vehicleSpeed';
+import { getSpeedBreakdown, speedChange, speedReasonText, speedContextFromState } from '../../utils/vehicleSpeed';
 
 // Calculate effective damage threshold accounting for mishap effects (e.g., Shedding Armor)
 function getEffectiveDamageThreshold(vehicle: Vehicle): number {
@@ -151,6 +151,7 @@ export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsP
   const effectiveSpeed = speedBreakdown.effective;
   const change = speedChange(speedBreakdown);
   const speedReduced = change === 'down';
+  const speedReason = speedReasonText(vehicle, speedBreakdown);
   const [damageAmount, setDamageAmount] = useState('');
   const [lastMishapResult, setLastMishapResult] = useState<{ roll: number; mishap: Mishap } | null>(null);
   const [showMishapResult, setShowMishapResult] = useState(false);
@@ -356,7 +357,7 @@ export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsP
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="body2">Speed:</Typography>
-            {change !== 'none' && (
+            {!speedBreakdown.isShip && change !== 'none' && (
               <Typography
                 variant="caption"
                 sx={{
@@ -371,6 +372,23 @@ export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsP
               </Typography>
             )}
           </Box>
+          {speedBreakdown.isShip ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography
+                variant="body2"
+                fontFamily="monospace"
+                fontWeight={700}
+                sx={{ color: change === 'up' ? '#10b981' : change === 'down' ? 'warning.main' : 'inherit' }}
+              >
+                {effectiveSpeed} ft
+              </Typography>
+              {speedReason && (
+                <Typography variant="caption" sx={{ color: change === 'up' ? '#10b981' : 'warning.main' }}>
+                  {speedReason}
+                </Typography>
+              )}
+            </Box>
+          ) : (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <TextField
               type="number"
@@ -388,6 +406,7 @@ export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsP
             />
             <Typography variant="body2" color="text.secondary">ft</Typography>
           </Box>
+          )}
         </Box>
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
