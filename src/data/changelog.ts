@@ -14,6 +14,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.9.0',
+    date: '2026-10-19',
+    changes: [
+      { type: 'feature', description: 'Wind for naval combat: set the wind direction from the battlefield toolbar (shown when a sailing ship is present). Sails use their with-wind or into-wind speed based on the ship\'s heading, and a wind arrow appears on the DM map and Player View.' },
+      { type: 'feature', description: 'Ship sails and oars now lose speed as they take damage (per Ghosts of Saltmarsh), and oars need their minimum crew — longships and warships 20, galleys 40. An "Oars undermanned" badge explains when they stop.' },
+      { type: 'improvement', description: 'Ship speed is now calculated from its components and shown with the reason (e.g. "with wind", "−10 ft (damage)"). Speed is now calculated the same way everywhere in the app, and half-speed effects from complications apply consistently on the map as well as the cards.' },
+    ],
+  },
+  {
     version: '2.8.3',
     date: '2026-09-30',
     changes: [

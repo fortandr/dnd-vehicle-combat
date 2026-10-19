@@ -235,11 +235,20 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               export icon offers <strong>Copy as Markdown</strong>, <strong>Copy as JSON</strong>, or
               <strong>Download Markdown</strong> — handy for a session recap.
             </Typography>
-            <Typography variant="body2">
+            <Typography variant="body2" paragraph>
               <strong>Ships take component damage</strong> (not mishaps): each part — hull, helm, sails/oars, and
               weapon stations — has its own HP in the <strong>Components</strong> panel, and destroying a part has
               real effects. Knock out the sails/oars to cut its speed, the helm to stop it turning, a weapon to
               silence it, or the hull to wreck the ship. Use <strong>Repair</strong> to restore a part.
+            </Typography>
+            <Typography variant="body2">
+              <strong>Wind &amp; ship speed:</strong> when a sailing ship is on the map, the toolbar shows a
+              <strong> Wind</strong> selector (Calm or the direction it blows from). Sails run at their
+              with-wind speed when heading within 45° of downwind, their into-wind speed within 45° of upwind,
+              and normal speed otherwise. Turning mid-move changes the remaining movement right away. Sails and
+              oars also lose speed as they take damage, and oars need their minimum crew (the Passengers zone
+              doesn&apos;t count). A ship&apos;s speed is worked out from its parts, so its card shows the
+              current speed and why.
             </Typography>
           </AccordionDetails>
         </Accordion>
