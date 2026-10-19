@@ -41,6 +41,7 @@ import { Vehicle, VehicleZone, CrewAssignment, Mishap, VehicleWeapon, Creature, 
 import { getComponentHp, destroyedEffectLabel, hasComponents } from '../../utils/vehicleComponents';
 import { RollableText } from '../common/RollableText';
 import { useCombat } from '../../context/CombatContext';
+import { getCrewQuality, clampCrewQuality } from '../../utils/shipTurn';
 import { getMishapSeverity, canRepairMishap, getRepairDescription, checkMishapFromDamage, rollMishapForVehicle } from '../../data/mishapTable';
 import { v4 as uuid } from 'uuid';
 import { SWAPPABLE_WEAPONS, ARMOR_UPGRADES, MAGICAL_GADGETS, getWeaponStationUpgrade, WEAPON_STATION_EXCLUDED_VEHICLES, resolveZone, isAvernusVehicle } from '../../data/vehicleTemplates';
@@ -436,6 +437,29 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
               )}
             </Paper>
           </Tooltip>
+          {isNavalVehicle(vehicle.template) && (() => {
+            const quality = getCrewQuality(vehicle);
+            const setQuality = (n: number) =>
+              dispatch({ type: 'UPDATE_VEHICLE', payload: { id: vehicle.id, updates: { crewQuality: clampCrewQuality(n) } } });
+            return (
+              <Tooltip title="Crew quality: adds to ship initiative (d20 + Dex + quality). Book default +4." arrow placement="top">
+                <Paper sx={{ flex: 1, p: 1, textAlign: 'center', bgcolor: '#242424' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.25 }}>
+                    <IconButton size="small" aria-label="Lower crew quality" disabled={quality <= -10} onClick={() => setQuality(quality - 1)} sx={{ p: 0.25 }}>
+                      <RemoveIcon fontSize="inherit" />
+                    </IconButton>
+                    <Typography variant="h6" fontWeight={700}>
+                      {quality >= 0 ? '+' : ''}{quality}
+                    </Typography>
+                    <IconButton size="small" aria-label="Raise crew quality" disabled={quality >= 10} onClick={() => setQuality(quality + 1)} sx={{ p: 0.25 }}>
+                      <AddIcon fontSize="inherit" />
+                    </IconButton>
+                  </Box>
+                  <Typography variant="caption" color="text.secondary">Crew</Typography>
+                </Paper>
+              </Tooltip>
+            );
+          })()}
           <Tooltip title="Driver's DEX save (for avoiding hazards)" arrow placement="top">
             <Paper sx={{ flex: 1, p: 1, textAlign: 'center', bgcolor: '#242424' }}>
               {driverDexSave !== null ? (
