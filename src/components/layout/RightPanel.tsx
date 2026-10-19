@@ -216,7 +216,7 @@ function CurrentTurnInfo() {
     const borderColor = currentTurnVehicle.type === 'party' ? factionColors.party : factionColors.enemy;
     const speedInfo = getSpeedBreakdown(currentTurnVehicle, speedContextFromState(state));
     const effectiveSpeed = speedInfo.effective;
-    const hasSpeedReduction = speedChange(speedInfo) !== 'none';
+    const change = speedChange(speedInfo);
     const speedReason = speedReasonText(currentTurnVehicle, speedInfo);
     const shownSpeed = speedInfo.isShip ? speedInfo.nominal : currentTurnVehicle.currentSpeed;
 
@@ -237,15 +237,17 @@ function CurrentTurnInfo() {
             <Typography variant="caption" color="text.secondary">
               HP: {currentTurnVehicle.currentHp}/{currentTurnVehicle.template.maxHp}
             </Typography>
-            {hasSpeedReduction ? (
+            {change !== 'none' ? (
               <Typography variant="caption" component="span">
                 <Box component="span" color="text.secondary">Speed: </Box>
-                <Box component="span" sx={{ color: 'warning.main', fontWeight: 600 }}>
+                <Box component="span" sx={{ color: change === 'up' ? '#10b981' : 'warning.main', fontWeight: 600 }}>
                   {effectiveSpeed} ft
                 </Box>
-                <Box component="span" sx={{ color: 'text.disabled', textDecoration: 'line-through', ml: 0.5 }}>
-                  {shownSpeed}
-                </Box>
+                {change === 'down' && (
+                  <Box component="span" sx={{ color: 'text.disabled', textDecoration: 'line-through', ml: 0.5 }}>
+                    {shownSpeed}
+                  </Box>
+                )}
               </Typography>
             ) : (
               <Typography variant="caption" color="text.secondary">
@@ -253,7 +255,7 @@ function CurrentTurnInfo() {
               </Typography>
             )}
             {speedReason && (
-              <Typography variant="caption" sx={{ color: '#f59e0b', ml: 0.5 }}>
+              <Typography variant="caption" sx={{ color: change === 'up' ? '#10b981' : '#f59e0b', ml: 0.5 }}>
                 {speedReason}
               </Typography>
             )}

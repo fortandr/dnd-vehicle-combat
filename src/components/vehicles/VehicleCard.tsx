@@ -392,13 +392,13 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
                 flex: 1,
                 p: 1,
                 textAlign: 'center',
-                bgcolor: change !== 'none' ? withOpacity('#f59e0b', 0.15) : '#242424',
+                bgcolor: change !== 'none' ? withOpacity(change === 'up' ? '#10b981' : '#f59e0b', 0.15) : '#242424',
                 border: change !== 'none' ? 1 : 0,
-                borderColor: '#f59e0b',
+                borderColor: change === 'up' ? '#10b981' : '#f59e0b',
               }}
             >
               {speed.isShip ? (
-                <Typography variant="h6" fontWeight={700} sx={{ color: change !== 'none' ? '#f59e0b' : 'inherit' }}>
+                <Typography variant="h6" fontWeight={700} sx={{ color: change === 'up' ? '#10b981' : change === 'down' ? '#f59e0b' : 'inherit' }}>
                   {effectiveSpeed}
                 </Typography>
               ) : (
@@ -424,7 +424,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
               </Box>
               )}
               {speed.isShip ? (
-                <Typography variant="caption" sx={{ color: speedReason ? '#f59e0b' : 'text.secondary', fontWeight: speedReason ? 600 : 400 }}>
+                <Typography variant="caption" sx={{ color: speedReason ? (change === 'up' ? '#10b981' : '#f59e0b') : 'text.secondary', fontWeight: speedReason ? 600 : 400 }}>
                   {speedReason || 'Speed (ft)'}
                 </Typography>
               ) : hasSpeedReduction ? (

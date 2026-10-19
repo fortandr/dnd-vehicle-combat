@@ -149,7 +149,8 @@ export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsP
   const { state, dispatch, applyMishap } = useCombat();
   const speedBreakdown = getSpeedBreakdown(vehicle, speedContextFromState(state));
   const effectiveSpeed = speedBreakdown.effective;
-  const speedReduced = speedChange(speedBreakdown) !== 'none';
+  const change = speedChange(speedBreakdown);
+  const speedReduced = change === 'down';
   const [damageAmount, setDamageAmount] = useState('');
   const [lastMishapResult, setLastMishapResult] = useState<{ roll: number; mishap: Mishap } | null>(null);
   const [showMishapResult, setShowMishapResult] = useState(false);
@@ -355,13 +356,13 @@ export function VehicleStatsPanel({ vehicle, expanded, onToggle }: VehicleStatsP
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="body2">Speed:</Typography>
-            {speedReduced && (
+            {change !== 'none' && (
               <Typography
                 variant="caption"
                 sx={{
-                  color: 'warning.main',
+                  color: change === 'up' ? '#10b981' : 'warning.main',
                   fontWeight: 600,
-                  bgcolor: withOpacity('#f59e0b', 0.2),
+                  bgcolor: withOpacity(change === 'up' ? '#10b981' : '#f59e0b', 0.2),
                   px: 0.5,
                   borderRadius: 0.5,
                 }}
