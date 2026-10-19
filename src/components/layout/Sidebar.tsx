@@ -48,6 +48,8 @@ import { useCombat } from '../../context/CombatContext';
 import { Creature, Statblock } from '../../types';
 import { resolveZone } from '../../data/vehicleTemplates';
 import { factionColors, withOpacity } from '../../theme/customColors';
+import { isNavalVehicle } from '../../data/navalUpgrades';
+import { rollShipInitiative, formatShipInitiativeLog } from '../../utils/shipTurn';
 
 // Quick presets for NPCs/Enemies
 const NPC_PRESETS: Partial<Statblock>[] = [
@@ -276,6 +278,15 @@ export function Sidebar() {
   const [editDexSave, setEditDexSave] = useState(0); // DEX saving throw modifier
   const [editFaction, setEditFaction] = useState<'party' | 'enemy'>('enemy');
 
+  // Ship initiative edit state
+  const [editingShipInitId, setEditingShipInitId] = useState<string | null>(null);
+  const [shipInitDraft, setShipInitDraft] = useState('');
+  const saveShipInit = (id: string) => {
+    const n = parseInt(shipInitDraft, 10);
+    if (Number.isFinite(n)) dispatch({ type: 'UPDATE_VEHICLE', payload: { id, updates: { initiative: n } } });
+    setEditingShipInitId(null);
+  };
+
   // Open5e search state
   const [showOpen5eSearch, setShowOpen5eSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -499,6 +510,17 @@ export function Sidebar() {
 
   const cancelEdit = () => setEditingCreatureId(null);
 
+  // Ships roll their own initiative (GoS): d20 + Dex + crew quality, rolled alongside creatures
+  const rollShipsInit = (faction: 'party' | 'enemy') => {
+    state.vehicles
+      .filter((v) => v.type === faction && isNavalVehicle(v.template))
+      .forEach((ship) => {
+        const roll = rollShipInitiative(ship, Math.floor(Math.random() * 20) + 1);
+        dispatch({ type: 'UPDATE_VEHICLE', payload: { id: ship.id, updates: { initiative: roll.total } } });
+        dispatch({ type: 'LOG_ACTION', payload: { type: 'system', action: formatShipInitiativeLog(ship.name, roll) } });
+      });
+  };
+
   // Roll initiative for all NPCs/Enemies
   const handleRollAllNpcInit = () => {
     const npcs = state.creatures.filter(c => c.statblock.type !== 'pc');
@@ -517,6 +539,7 @@ export function Sidebar() {
         },
       });
     });
+    rollShipsInit('enemy');
   };
 
   // Roll initiative for all Player Characters
@@ -537,6 +560,7 @@ export function Sidebar() {
         },
       });
     });
+    rollShipsInit('party');
   };
 
   const pcs = state.creatures.filter((c) => c.statblock.type === 'pc');
@@ -758,7 +782,7 @@ export function Sidebar() {
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="subtitle2" sx={{ color: 'success.main' }}>Player Characters</Typography>
               {pcs.length > 0 && (
-                <Tooltip title="Roll initiative for all PCs (1d20 + DEX Save)" arrow>
+                <Tooltip title="Roll initiative for all PCs (1d20 + DEX Save) and party ships (1d20 + DEX + crew quality)" arrow>
                   <IconButton
                     size="small"
                     onClick={handleRollAllPcInit}
@@ -862,7 +886,7 @@ export function Sidebar() {
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="subtitle2" sx={{ color: 'primary.main' }}>NPCs / Enemies</Typography>
               {npcs.length > 0 && (
-                <Tooltip title="Roll initiative for all NPCs (1d20 + DEX Save)" arrow>
+                <Tooltip title="Roll initiative for all NPCs (1d20 + DEX Save) and enemy ships (1d20 + DEX + crew quality)" arrow>
                   <IconButton
                     size="small"
                     onClick={handleRollAllNpcInit}
@@ -998,11 +1022,37 @@ export function Sidebar() {
                     borderColor: vehicle.type === 'party' ? factionColors.party : factionColors.enemy,
                   }}
                 >
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
                     <Typography variant="body2" fontWeight={600}>{vehicle.name}</Typography>
-                    <Typography variant="caption" fontFamily="monospace">
-                      {vehicle.currentHp}/{vehicle.template.maxHp}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      {isNavalVehicle(vehicle.template) && (
+                        editingShipInitId === vehicle.id ? (
+                          <TextField
+                            size="small"
+                            type="number"
+                            autoFocus
+                            value={shipInitDraft}
+                            onChange={(e) => setShipInitDraft(e.target.value)}
+                            onBlur={() => saveShipInit(vehicle.id)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') saveShipInit(vehicle.id); if (e.key === 'Escape') setEditingShipInitId(null); }}
+                            inputProps={{ 'aria-label': `${vehicle.name} initiative`, style: { width: 40, padding: '2px 4px' } }}
+                          />
+                        ) : (
+                          <Tooltip title={state.phase === 'setup' ? 'Ship initiative (d20 + DEX + crew quality). Click to edit.' : 'Ship initiative (fixed once combat starts)'} arrow>
+                            <Chip
+                              label={`Init ${vehicle.initiative ?? 0}`}
+                              size="small"
+                              variant="outlined"
+                              onClick={state.phase === 'setup' ? () => { setShipInitDraft(String(vehicle.initiative ?? 0)); setEditingShipInitId(vehicle.id); } : undefined}
+                              sx={{ height: 18, fontSize: '0.625rem' }}
+                            />
+                          </Tooltip>
+                        )
+                      )}
+                      <Typography variant="caption" fontFamily="monospace">
+                        {vehicle.currentHp}/{vehicle.template.maxHp}
+                      </Typography>
+                    </Box>
                   </Box>
                   <LinearProgress
                     variant="determinate"
