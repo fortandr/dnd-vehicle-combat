@@ -1362,6 +1362,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
       showDistanceLines,
       showRangeArcs,
       showHpBars,
+      wind: state.environment.wind,
     });
   }, [
     state.vehicles,
@@ -1373,6 +1374,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     state.round,
     state.phase,
     state.playerViewSettings,
+    state.environment.wind,
     zoom,
     panOffset,
     broadcast,

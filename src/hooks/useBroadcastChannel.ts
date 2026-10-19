@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Vehicle, Creature, ScaleName, BackgroundImageConfig, CrewAssignment, CombatPhase, ElevationZone } from '../types';
+import { Vehicle, Creature, ScaleName, BackgroundImageConfig, CrewAssignment, CombatPhase, ElevationZone, CompassPoint } from '../types';
 
 export interface BattlefieldSyncState {
   vehicles: Vehicle[];
@@ -25,6 +25,7 @@ export interface BattlefieldSyncState {
   showDistanceLines?: boolean;
   showRangeArcs?: boolean;
   showHpBars?: boolean;
+  wind?: CompassPoint; // Direction the wind blows FROM; unset = calm
 }
 
 const CHANNEL_NAME = 'avernus-battlefield-sync';

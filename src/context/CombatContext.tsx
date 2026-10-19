@@ -151,7 +151,7 @@ type CombatAction =
 // Reducer
 // ==========================================
 
-function combatReducer(state: CombatState, action: CombatAction): CombatState {
+export function combatReducer(state: CombatState, action: CombatAction): CombatState {
   switch (action.type) {
     // ========== Encounter Management ==========
     case 'LOAD_ENCOUNTER': {
