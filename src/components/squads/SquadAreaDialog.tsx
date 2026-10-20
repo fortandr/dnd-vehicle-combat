@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Stack, TextField, MenuItem,
-  FormControlLabel, Switch, Typography, Table, TableBody, TableRow, TableCell,
+  FormControlLabel, Switch, Typography, Table, TableBody, TableRow, TableCell, ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
 import { useCombat } from '../../context/CombatContext';
-import type { AbilityName, Creature } from '../../types';
+import type { AbilityName, Creature, DmgEdition } from '../../types';
 import {
-  AOE_SHAPES, aoeTargetCount, resolveSquadArea, formatAreaSummary, DAMAGE_TYPES, damageNotation,
+  AOE_SHAPES, aoeTargetCount, aoeAdvice, resolveSquadArea, formatAreaSummary, DAMAGE_TYPES, damageNotation,
   type AoeShape, type SquadAreaResult,
 } from '../../utils/squad';
 import { rollDie, roll } from '../../utils/diceEngine';
@@ -14,7 +14,9 @@ import { rollDie, roll } from '../../utils/diceEngine';
 const ABILITIES: AbilityName[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
 export function SquadAreaDialog({ creature, open, onClose }: { creature: Creature; open: boolean; onClose: () => void }) {
-  const { dispatch } = useCombat();
+  const { state, dispatch } = useCombat();
+  const edition: DmgEdition = state.dmgEdition ?? '2014';
+  const [width, setWidth] = useState(5);
   const bodies = creature.squad?.bodies ?? 0;
   const [source, setSource] = useState('Area effect');
   const [shape, setShape] = useState<AoeShape>('sphere');
@@ -28,7 +30,8 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
   const [magical, setMagical] = useState(false);
   const [result, setResult] = useState<{ damage: number; area: SquadAreaResult } | null>(null);
 
-  const suggested = Math.min(aoeTargetCount(shape, size), bodies);
+  const suggested = Math.min(aoeTargetCount(shape, size, edition, width), bodies);
+  const advice = aoeAdvice(edition);
   const caught = Math.min(caughtOverride ?? suggested, bodies);
   const damagePreview = damageNotation(damageText);
   const sizeLabel = AOE_SHAPES.find((s) => s.value === shape)?.sizeLabel ?? 'Size (ft)';
@@ -88,6 +91,20 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
           </Stack>
         ) : (
           <Stack spacing={1.5} sx={{ mt: 1 }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="caption" color="text.secondary">DMG rules</Typography>
+              <ToggleButtonGroup
+                size="small" exclusive value={edition}
+                onChange={(_, value: DmgEdition | null) => {
+                  if (!value) return;
+                  dispatch({ type: 'SET_DMG_EDITION', payload: { edition: value } });
+                  setCaughtOverride(null);
+                }}
+              >
+                <ToggleButton value="2014" sx={{ py: 0.25, px: 1, fontSize: '0.7rem' }}>2014</ToggleButton>
+                <ToggleButton value="2024" sx={{ py: 0.25, px: 1, fontSize: '0.7rem' }}>2024</ToggleButton>
+              </ToggleButtonGroup>
+            </Stack>
             <TextField size="small" label="Effect" value={source} onChange={(e) => setSource(e.target.value)} />
             <Stack direction="row" spacing={1}>
               <TextField select size="small" label="Shape" value={shape} onChange={(e) => { setShape(e.target.value as AoeShape); setCaughtOverride(null); }} sx={{ flex: 2 }}>
@@ -95,10 +112,14 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
               </TextField>
               <TextField size="small" type="number" label={sizeLabel} value={size} onChange={(e) => { setSize(Math.max(0, parseInt(e.target.value) || 0)); setCaughtOverride(null); }} sx={{ flex: 1 }} />
             </Stack>
+            {shape === 'line' && edition === '2024' && (
+              <TextField size="small" type="number" label="Width (ft)" value={width}
+                onChange={(e) => { setWidth(Math.max(5, parseInt(e.target.value) || 5)); setCaughtOverride(null); }} />
+            )}
             <TextField
               size="small" type="number" label="Bodies caught" value={caught}
               onChange={(e) => setCaughtOverride(Math.max(0, parseInt(e.target.value) || 0))}
-              helperText={`DMG p. 249 suggests ${suggested} — add or remove for how bunched up they are (${bodies} left)`}
+              helperText={`${advice.citation} suggests ${suggested} — ${advice.advice} (${bodies} left)${edition === '2024' ? '. VVTT rule: sizes between rows use the row below' : ''}`}
             />
             <Stack direction="row" spacing={1}>
               <TextField select size="small" label="Save" value={ability} onChange={(e) => setAbility(e.target.value as AbilityName)} sx={{ flex: 1 }}>
