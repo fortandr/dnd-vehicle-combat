@@ -38,6 +38,8 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import { nextSquadName } from '../../utils/squad';
 import { SquadRowControls } from '../squads/SquadRowControls';
+import { SquadLeaderSelect } from '../morale/SquadLeaderSelect';
+import { MoraleRowControls } from '../morale/MoraleRowControls';
 import RemoveIcon from '@mui/icons-material/Remove';
 import EditIcon from '@mui/icons-material/Edit';
 import MapIcon from '@mui/icons-material/Map';
@@ -282,6 +284,7 @@ export function Sidebar() {
   const [editDexSave, setEditDexSave] = useState(0); // DEX saving throw modifier
   const [editFaction, setEditFaction] = useState<'party' | 'enemy'>('enemy');
   const [editBodies, setEditBodies] = useState(0);
+  const [editLeaderId, setEditLeaderId] = useState('');
 
   // Ship initiative edit state
   const [editingShipInitId, setEditingShipInitId] = useState<string | null>(null);
@@ -502,6 +505,7 @@ export function Sidebar() {
     setEditDexSave(dexSave);
     setEditFaction(creature.faction || 'enemy');
     setEditBodies(creature.squad?.bodies ?? 0);
+    setEditLeaderId(creature.squad?.leaderId ?? '');
   };
 
   const saveEdit = () => {
@@ -518,7 +522,7 @@ export function Sidebar() {
           initiative: editInit,
           initiativeModifier: editDexSave,
           faction: editFaction,
-          ...(existing.squad && { squad: { ...existing.squad, bodies: editBodies } }),
+          ...(existing.squad && { squad: { ...existing.squad, bodies: editBodies, leaderId: editLeaderId || undefined } }),
           statblock: {
             ...existingStatblock,
             name: editName,
@@ -879,7 +883,7 @@ export function Sidebar() {
                   creature={creature}
                   isPC={true}
                   isEditing={editingCreatureId === creature.id}
-                  editState={{ editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave, editFaction, setEditFaction, editBodies, setEditBodies }}
+                  editState={{ editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave, editFaction, setEditFaction, editBodies, setEditBodies, editLeaderId, setEditLeaderId }}
                   onStartEdit={() => startEdit(creature)}
                   onSaveEdit={saveEdit}
                   onCancelEdit={cancelEdit}
@@ -993,7 +997,7 @@ export function Sidebar() {
                   creature={creature}
                   isPC={false}
                   isEditing={editingCreatureId === creature.id}
-                  editState={{ editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave, editFaction, setEditFaction, editBodies, setEditBodies }}
+                  editState={{ editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave, editFaction, setEditFaction, editBodies, setEditBodies, editLeaderId, setEditLeaderId }}
                   onStartEdit={() => startEdit(creature)}
                   onSaveEdit={saveEdit}
                   onCancelEdit={cancelEdit}
@@ -1299,6 +1303,7 @@ interface CreatureEntryProps {
     editDexSave: number; setEditDexSave: (v: number) => void;
     editFaction: 'party' | 'enemy'; setEditFaction: (v: 'party' | 'enemy') => void;
     editBodies: number; setEditBodies: (v: number) => void;
+    editLeaderId: string; setEditLeaderId: (v: string) => void;
   };
   onStartEdit: () => void;
   onSaveEdit: () => void;
@@ -1415,6 +1420,9 @@ function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSa
             <TextField size="small" label={creature.squad ? 'Front HP' : 'HP'} type="number" value={editState.editHp} onChange={(e) => editState.setEditHp(parseInt(e.target.value) || 0)} sx={{ flex: 1 }} />
             <TextField size="small" label="Max" type="number" value={editState.editMaxHp} onChange={(e) => editState.setEditMaxHp(parseInt(e.target.value) || 1)} sx={{ flex: 1 }} />
           </Stack>
+          {creature.squad && (
+            <SquadLeaderSelect squad={creature} value={editState.editLeaderId} onChange={editState.setEditLeaderId} />
+          )}
           <Stack direction="row" spacing={1}>
             <TextField size="small" label="AC" type="number" value={editState.editAc} onChange={(e) => editState.setEditAc(parseInt(e.target.value) || 10)} sx={{ flex: 1 }} />
             <TextField size="small" label="Init" type="number" value={editState.editInit} onChange={(e) => editState.setEditInit(parseInt(e.target.value) || 0)} sx={{ flex: 1 }} />
@@ -1592,6 +1600,7 @@ function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSa
         )}
         {/* Damage/Heal controls for non-PCs */}
         {!isPC && creature.squad && <SquadRowControls creature={creature} />}
+        {!isPC && <MoraleRowControls creature={creature} />}
         {!isPC && !creature.squad && onHpChange && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
             <TextField

@@ -13,6 +13,7 @@ import { renderShipIcon } from './shipIcons';
 import { WindIndicator } from './WindIndicator';
 import { encounterHasSailingShips } from '../../utils/navalMovement';
 import { SquadTokenOverlay } from '../squads/SquadTokenOverlay';
+import { MoraleTokenMarker } from '../morale/MoraleTokenMarker';
 
 export function PlayerViewMap() {
   const { state, isConnected } = useBroadcastReceiver();
@@ -398,6 +399,7 @@ export function PlayerViewMap() {
                   )}
 
                   {creature.squad && <SquadTokenOverlay squad={creature.squad} tokenSize={tokenSize} />}
+                  {creature.morale?.status && <MoraleTokenMarker status={creature.morale.status} tokenSize={tokenSize} />}
                 </div>
                 {state.showHpBars !== false && (
                   <div className="token-label">{creature.name}</div>

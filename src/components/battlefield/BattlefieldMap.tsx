@@ -30,6 +30,7 @@ import { isWeaponDestroyed, canVehicleTurn } from '../../utils/vehicleComponents
 import { getEffectiveSpeed, getSpeedBreakdown, speedReasonText, speedContextFromState } from '../../utils/vehicleSpeed';
 import { featureFlags } from '../../config/featureFlags';
 import { SquadTokenOverlay } from '../squads/SquadTokenOverlay';
+import { MoraleTokenMarker } from '../morale/MoraleTokenMarker';
 import {
   getBackgroundBounds,
   getPointsBounds,
@@ -3956,6 +3957,7 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
         )}
 
         {creature.squad && <SquadTokenOverlay squad={creature.squad} tokenSize={tokenSize} />}
+        {creature.morale?.status && <MoraleTokenMarker status={creature.morale.status} tokenSize={tokenSize} />}
       </div>
 
       {/* Name and HP bar below - shown when HP bars enabled or when hovered */}
