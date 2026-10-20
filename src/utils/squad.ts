@@ -114,10 +114,11 @@ export function rollGroupAttack({ attackBonus, ac, damage, attacks, roll }: {
 /** PHB: immunity → 0, resistance → half (round down), vulnerability → double. "nonmagical" entries skip magical attacks. */
 export function adjustForDefenses(amount: number, type: string, statblock: Statblock, magical = false): number {
   if (!type) return amount;
-  const has = (list?: string[]) => (list ?? []).some((entry) => {
-    const e = entry.toLowerCase();
-    return e.includes(type) && !(magical && e.includes('nonmagical'));
-  });
+  // Open5e lists are comma-split, so a "nonmagical" qualifier may sit only on the last fragment;
+  // rejoin and test per ';'-separated clause.
+  const has = (list?: string[]) => (list ?? []).length > 0 && (list ?? []).join(', ').toLowerCase().split(';').some(
+    (clause) => clause.includes(type) && !(magical && clause.includes('nonmagical')),
+  );
   if (has(statblock.damageImmunities)) return 0;
   let result = amount;
   if (has(statblock.damageResistances)) result = Math.floor(result / 2);

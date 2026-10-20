@@ -25,6 +25,7 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
   const [damageText, setDamageText] = useState('8d6');
   const [damageType, setDamageType] = useState('');
   const [halfOnSave, setHalfOnSave] = useState(true);
+  const [magical, setMagical] = useState(false);
   const [result, setResult] = useState<{ damage: number; area: SquadAreaResult } | null>(null);
 
   const suggested = Math.min(aoeTargetCount(shape, size), bodies);
@@ -41,7 +42,7 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
     } catch {
       return;
     }
-    const area = resolveSquadArea({ creature, caught, dc, ability, damage, halfOnSave, damageType, roll: rollDie });
+    const area = resolveSquadArea({ creature, caught, dc, ability, damage, halfOnSave, damageType, magical, roll: rollDie });
     const details = `${damage}${damageType ? ` ${damageType}` : ''} damage, DC ${dc} ${ability.toUpperCase()} save: ` +
       area.saves.map((s) => `${s.d20} (${s.total}) ${s.success ? 'save' : 'fail'} −${s.taken}${s.fell ? ' falls' : ''}`).join('; ');
     dispatch({
@@ -116,6 +117,7 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
               </TextField>
             </Stack>
             <FormControlLabel control={<Switch checked={halfOnSave} onChange={(e) => setHalfOnSave(e.target.checked)} />} label="Half damage on a successful save" />
+            <FormControlLabel control={<Switch checked={magical} onChange={(e) => setMagical(e.target.checked)} />} label="Magical damage" />
             <Typography variant="caption" color="text.secondary">
               VVTT rule: the wounded front body is caught first; of the bodies left wounded, the most hurt becomes the new front body.
             </Typography>

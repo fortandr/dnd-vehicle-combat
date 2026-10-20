@@ -13,7 +13,7 @@ type TargetKey = `c:${string}` | `v:${string}`;
 /** On a squad's turn: pick action + target, roll every attack, then apply hit by hit through the target's own damage path. */
 export function SquadAttackPanel({ squad }: { squad: Creature }) {
   const { state, dispatch } = useCombat();
-  const attacks = useMemo(() => (squad.statblock.actions ?? []).filter((a) => a.attackBonus !== undefined), [squad.statblock.actions]);
+  const attacks = useMemo(() => (squad.statblock.actions ?? []).filter((a) => typeof a.attackBonus === 'number'), [squad.statblock.actions]);
   const bodies = squad.squad?.bodies ?? 0;
 
   const targets = useMemo(() => [
@@ -31,7 +31,7 @@ export function SquadAttackPanel({ squad }: { squad: Creature }) {
   const [attackers, setAttackers] = useState(bodies);
   const [attacksEach, setAttacksEach] = useState(() => parseMultiattackCount(squad.statblock));
   const [manualDamage, setManualDamage] = useState(0);
-  const [result, setResult] = useState<GroupAttackResult | null>(null);
+  const [result, setResult] = useState<{ r: GroupAttackResult; ac: number } | null>(null);
   const [applied, setApplied] = useState(false);
   const [showRolls, setShowRolls] = useState(false);
 
@@ -45,15 +45,18 @@ export function SquadAttackPanel({ squad }: { squad: Creature }) {
   const damage: DamagePart[] = parsed.length > 0 ? parsed : [{ count: 0, sides: 0, bonus: manualDamage, type: '' }];
   const target = targets.find((t) => t.key === targetKey);
 
+  const clearResult = () => { setResult(null); setApplied(false); };
+
   const handleTarget = (key: TargetKey) => {
     setTargetKey(key);
+    clearResult();
     const t = targets.find((x) => x.key === key);
     if (t) setAc(t.ac);
   };
 
   const handleRoll = () => {
     const r = rollGroupAttack({ attackBonus: action.attackBonus ?? 0, ac, damage, attacks: Math.max(0, attackers) * Math.max(1, attacksEach), roll: rollDie });
-    setResult(r);
+    setResult({ r, ac });
     setApplied(false);
     setShowRolls(false);
     dispatch({
@@ -70,7 +73,7 @@ export function SquadAttackPanel({ squad }: { squad: Creature }) {
     if (!result || !target) return;
     const source = `${squad.name} (${action.name})`;
     const id = target.key.slice(2);
-    const hitRolls = result.rolls.filter((r) => r.hit);
+    const hitRolls = result.r.rolls.filter((r) => r.hit);
     if (target.key.startsWith('v:')) {
       hitRolls.forEach((r) => {
         const amount = r.damage.reduce((sum, d) => sum + d.amount, 0);
@@ -94,7 +97,7 @@ export function SquadAttackPanel({ squad }: { squad: Creature }) {
     <Box sx={{ mt: 1.5, p: 1, border: 1, borderColor: 'divider', borderRadius: 1 }}>
       <Typography variant="caption" fontWeight={600} sx={{ display: 'block', mb: 1 }}>Squad attack</Typography>
       <Stack spacing={1}>
-        <TextField select size="small" label="Action" value={action.name} onChange={(e) => { setActionName(e.target.value); setResult(null); }}>
+        <TextField select size="small" label="Action" value={action.name} onChange={(e) => { setActionName(e.target.value); clearResult(); }}>
           {attacks.map((a) => <MenuItem key={a.name} value={a.name}>{a.name} (+{a.attackBonus})</MenuItem>)}
         </TextField>
         {parsed.length === 0 && (
@@ -105,26 +108,26 @@ export function SquadAttackPanel({ squad }: { squad: Creature }) {
           <TextField select size="small" label="Target" value={targetKey} onChange={(e) => handleTarget(e.target.value as TargetKey)} sx={{ flex: 2 }}>
             {targets.map((t) => <MenuItem key={t.key} value={t.key}>{t.label}</MenuItem>)}
           </TextField>
-          <TextField size="small" type="number" label="AC" value={ac} onChange={(e) => setAc(num(e.target.value))} sx={{ flex: 1 }} />
+          <TextField size="small" type="number" label="AC" value={ac} onChange={(e) => { setAc(num(e.target.value)); clearResult(); }} sx={{ flex: 1 }} />
         </Stack>
         <Stack direction="row" spacing={1}>
-          <TextField size="small" type="number" label={`Attackers (of ${bodies})`} value={attackers} onChange={(e) => setAttackers(Math.min(bodies, num(e.target.value)))} sx={{ flex: 1 }} />
-          <TextField size="small" type="number" label="Attacks each" value={attacksEach} onChange={(e) => setAttacksEach(Math.max(1, num(e.target.value)))} sx={{ flex: 1 }} />
+          <TextField size="small" type="number" label={`Attackers (of ${bodies})`} value={attackers} onChange={(e) => { setAttackers(Math.min(bodies, num(e.target.value))); clearResult(); }} sx={{ flex: 1 }} />
+          <TextField size="small" type="number" label="Attacks each" value={attacksEach} onChange={(e) => { setAttacksEach(Math.max(1, num(e.target.value))); clearResult(); }} sx={{ flex: 1 }} />
         </Stack>
-        <Button variant="contained" size="small" onClick={handleRoll} disabled={attackers === 0}>Roll {Math.max(0, attackers) * Math.max(1, attacksEach)} attacks</Button>
+        <Button variant="contained" size="small" onClick={handleRoll} disabled={attackers === 0 || !target}>Roll {Math.max(0, attackers) * Math.max(1, attacksEach)} attacks</Button>
         {result && (
           <Box>
             <Typography variant="body2" fontWeight={600}>
-              {formatGroupAttack({ attackerName: squad.name, actionName: action.name, ac, result })}
+              {formatGroupAttack({ attackerName: squad.name, actionName: action.name, ac: result.ac, result: result.r })}
             </Typography>
             <Button size="small" onClick={() => setShowRolls((s) => !s)} sx={{ p: 0, minWidth: 0, fontSize: '0.7rem' }}>
               {showRolls ? 'Hide rolls' : 'Show rolls'}
             </Button>
             <Collapse in={showRolls}>
-              <Typography variant="caption" color="text.secondary">{formatAttackRolls(result)}</Typography>
+              <Typography variant="caption" color="text.secondary">{formatAttackRolls(result.r)}</Typography>
             </Collapse>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
-              <Button size="small" variant="outlined" color="error" onClick={handleApply} disabled={!target || applied || result.hits === 0}>
+              <Button size="small" variant="outlined" color="error" onClick={handleApply} disabled={!target || applied || result.r.hits === 0}>
                 {applied ? 'Applied' : `Apply to ${target?.label ?? '…'}`}
               </Button>
               {!target && <Typography variant="caption" color="text.secondary">Pick a target to apply</Typography>}

@@ -267,7 +267,8 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               sends each hit to the target. In the squad&apos;s row, <strong>Hit</strong> deals single-target hits,
               and <strong>Area…</strong> handles spells like fireball. It suggests how many bodies are caught using the
               DMG&apos;s Targets in Areas of Effect table (p. 249), which you can adjust, then rolls each body&apos;s
-              save. Healing restores the front body only and never brings back the fallen.
+              save. Healing restores the front body only and never brings back the fallen. Tick <strong>Magical</strong> when the damage comes from a magic
+              weapon or spell, so resistances to nonmagical attacks don&apos;t apply.
             </Typography>
             <Typography variant="body2">
               <strong>VVTT rules</strong> (not in the books, to keep big fights fast): a squad acts as one creature

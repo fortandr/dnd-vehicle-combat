@@ -146,6 +146,16 @@ describe('battle mode squads', () => {
   }) as unknown as Creature;
   const withCreatures = (...creatures: Creature[]) => ({ ...initialCombatState, round: 1, creatures });
 
+  it('RESET_COMBAT restores a wiped squad to full bodies and HP; non-squads get no squad key', () => {
+    const out = combatReducer(
+      { ...withCreatures(hob('a', 0, 0), solo('b', 3)), phase: 'combat' as const },
+      { type: 'RESET_COMBAT' },
+    );
+    expect(out.creatures[0]).toMatchObject({ currentHp: 11, squad: { size: 10, bodies: 10 } });
+    expect(out.creatures[1].currentHp).toBe(20);
+    expect('squad' in out.creatures[1]).toBe(false);
+  });
+
   it('SQUAD_HITS drops bodies and logs', () => {
     const out = combatReducer(withCreatures(hob('a', 10, 11)), { type: 'SQUAD_HITS', payload: { creatureId: 'a', hits: [11, 4], source: 'Bitter Breath' } });
     expect(out.creatures[0]).toMatchObject({ currentHp: 7, squad: { size: 10, bodies: 9 } });

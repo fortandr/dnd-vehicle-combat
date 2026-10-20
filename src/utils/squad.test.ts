@@ -171,6 +171,21 @@ describe('saveBonus', () => {
   });
 });
 
+describe('adjustForDefenses with comma-split nonmagical lists', () => {
+  const split = statblock({ damageResistances: ['bludgeoning', 'piercing', "and slashing from nonmagical attacks that aren't silvered"] });
+  it('applies resistance to nonmagical damage on any fragment', () => {
+    expect(adjustForDefenses(9, 'piercing', split)).toBe(4);
+  });
+  it('skips the resistance for magical damage', () => {
+    expect(adjustForDefenses(9, 'piercing', split, true)).toBe(9);
+  });
+  it('treats a ;-separated clause without the qualifier as always applying', () => {
+    const mixed = statblock({ damageResistances: ['cold; bludgeoning', 'piercing', 'and slashing from nonmagical attacks'] });
+    expect(adjustForDefenses(9, 'cold', mixed, true)).toBe(4);
+    expect(adjustForDefenses(9, 'piercing', mixed, true)).toBe(9);
+  });
+});
+
 describe('resolveSquadArea', () => {
   // DEX 12 → +1. DC 15. 20 damage, half on save.
   const base = { dc: 15, ability: 'dex' as const, damage: 20, halfOnSave: true, damageType: 'fire' };
@@ -180,6 +195,14 @@ describe('resolveSquadArea', () => {
     const r = resolveSquadArea({ ...base, creature: squad(10, 7), caught: 3, roll: dice(14, 2, 19) });
     expect(r.saves.map((s) => [s.success, s.taken, s.fell])).toEqual([[true, 10, true], [false, 20, true], [true, 10, false]]);
     expect(r).toMatchObject({ bodies: 8, fell: 2, currentHp: 1 });
+  });
+  it('the lowest survivor becomes the front even when a fresh body ends lower than the wounded front', () => {
+    // 6 damage, half on save. Front at 10 HP rolls 14 (+1 = 15, saves) → takes 3 → 7.
+    // Body 2 rolls 1 (+1 = 2, fails) → takes 6 from 11 → 5. Body 3 rolls 19 (saves) → takes 3 from 11 → 8.
+    // Lowest survivor = 5, nobody falls.
+    const r = resolveSquadArea({ ...base, damage: 6, creature: squad(10, 10), caught: 3, roll: dice(14, 1, 19) });
+    expect(r.saves.map((s) => s.taken)).toEqual([3, 6, 3]);
+    expect(r).toMatchObject({ bodies: 10, fell: 0, currentHp: 5 });
   });
   it('when every caught body falls, the next uncaught body is at full HP', () => {
     const r = resolveSquadArea({ ...base, creature: squad(5, 11), caught: 2, roll: dice(3, 4) });

@@ -975,6 +975,7 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
           ...c,
           currentHp: c.statblock.maxHp,
           initiative: 0,
+          ...(c.squad && { squad: { ...c.squad, bodies: c.squad.size } }),
         })),
         actionLog: [
           createLogEntry(0, 'system', 'Encounter reset - HP and mishaps restored'),

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, Button, IconButton, MenuItem, TextField, Typography } from '@mui/material';
+import { Box, Button, Checkbox, FormControlLabel, IconButton, MenuItem, TextField, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { useCombat } from '../../context/CombatContext';
 import type { Creature } from '../../types';
@@ -12,6 +12,7 @@ export function SquadRowControls({ creature }: { creature: Creature }) {
   const [amount, setAmount] = useState('');
   const [count, setCount] = useState('1');
   const [type, setType] = useState('');
+  const [magical, setMagical] = useState(false);
   const [areaOpen, setAreaOpen] = useState(false);
   const value = parseInt(amount, 10);
   const n = Math.max(1, parseInt(count, 10) || 1);
@@ -20,7 +21,7 @@ export function SquadRowControls({ creature }: { creature: Creature }) {
 
   const handleHit = () => {
     if (!valid) return;
-    const each = adjustForDefenses(value, type, creature.statblock);
+    const each = adjustForDefenses(value, type, creature.statblock, magical);
     dispatch({ type: 'SQUAD_HITS', payload: { creatureId: creature.id, hits: Array(n).fill(each), source: type ? `${value} ${type} × ${n}` : undefined } });
     setAmount('');
     setCount('1');
@@ -45,6 +46,10 @@ export function SquadRowControls({ creature }: { creature: Creature }) {
         <MenuItem value=""><em>type</em></MenuItem>
         {DAMAGE_TYPES.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
       </TextField>
+      <FormControlLabel
+        sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: '0.65rem' } }}
+        control={<Checkbox size="small" checked={magical} onChange={(e) => setMagical(e.target.checked)} sx={{ p: 0.25, '& .MuiSvgIcon-root': { fontSize: 14 } }} />}
+        label="Magical" title="Tick for magic weapons or spells, so resistances to nonmagical attacks don't apply" />
       <Button size="small" color="error" variant="outlined" onClick={handleHit} disabled={!valid || wiped}
         sx={{ minWidth: 0, px: 0.75, py: 0, fontSize: '0.65rem' }} title="Single-target hits: each damages the front body only">
         Hit
