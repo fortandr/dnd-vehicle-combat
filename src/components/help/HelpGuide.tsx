@@ -266,15 +266,29 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               rolls every attack at once: a natural 20 is a critical hit and a natural 1 misses. Then <strong>Apply</strong>
               sends each hit to the target. In the squad&apos;s row, <strong>Hit</strong> deals single-target hits,
               and <strong>Area…</strong> handles spells like fireball. It suggests how many bodies are caught using the
-              DMG&apos;s Targets in Areas of Effect table (p. 249), which you can adjust, then rolls each body&apos;s
-              save. Healing restores the front body only and never brings back the fallen. Tick <strong>Magical</strong> when the damage comes from a magic
+              DMG&apos;s area-of-effect guidance — 2014 (p. 249) or 2024 (p. 82); pick the edition with the
+              <strong> DMG rules</strong> toggle at the top of the dialog (the 2024 table catches more creatures) — which
+              you can adjust, then rolls each body&apos;s save. Healing restores the front body only and never brings back the fallen. Tick <strong>Magical</strong> when the damage comes from a magic
               weapon or spell, so resistances to nonmagical attacks don&apos;t apply.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Morale (DMG 2014 p. 273, optional rule; the 2024 DMG has none).</strong> Give a squad a
+              <strong> Leader</strong> in its edit form. The app shows a morale card at the top of the right panel when
+              a squad&apos;s leader drops to 0 HP, is incapacitated or is removed; when a squad first falls to half
+              strength (the DMG only counts this if the other side has had no losses, so dismiss it otherwise); or when
+              a single monster first drops to half its HP. The leader, or the squad itself if no leader is standing,
+              makes a DC 10 Wisdom save. Tick disadvantage for overwhelming odds, or mark it as failing automatically.
+              A failure marks the creature <strong>Fleeing</strong>; click the chip in its row to change it to
+              <strong> Surrendered</strong> or clear it. Use the row&apos;s <strong>Morale</strong> button for surprise
+              or any other reason.
             </Typography>
             <Typography variant="body2">
               <strong>VVTT rules</strong> (not in the books, to keep big fights fast): a squad acts as one creature
               on one initiative; only its front body is tracked, so a single hit can drop at most one body and
               overkill is lost; attackers default to every standing body; after an area effect the most wounded
-              survivor becomes the front body; squads don&apos;t use temporary HP.
+              survivor becomes the front body; squads don&apos;t use temporary HP; each morale trigger is asked only once per battle; a squad with no
+              leader standing saves with its own statblock; fleeing and surrendered creatures keep their place in
+              initiative; with the 2024 area table, sizes between rows use the row below.
             </Typography>
           </AccordionDetails>
         </Accordion>
