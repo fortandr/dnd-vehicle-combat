@@ -32,8 +32,12 @@ import {
   MenuItem,
   ToggleButton,
   ToggleButtonGroup,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import { nextSquadName } from '../../utils/squad';
+import { SquadRowControls } from '../squads/SquadRowControls';
 import RemoveIcon from '@mui/icons-material/Remove';
 import EditIcon from '@mui/icons-material/Edit';
 import MapIcon from '@mui/icons-material/Map';
@@ -277,6 +281,7 @@ export function Sidebar() {
   const [editSpeed, setEditSpeed] = useState(30);
   const [editDexSave, setEditDexSave] = useState(0); // DEX saving throw modifier
   const [editFaction, setEditFaction] = useState<'party' | 'enemy'>('enemy');
+  const [editBodies, setEditBodies] = useState(0);
 
   // Ship initiative edit state
   const [editingShipInitId, setEditingShipInitId] = useState<string | null>(null);
@@ -299,6 +304,7 @@ export function Sidebar() {
 
   // Open5e quantity state
   const [addQuantity, setAddQuantity] = useState(1);
+  const [addAsSquad, setAddAsSquad] = useState(false);
 
   // Add NPC menu state
   const [addNpcMenuAnchor, setAddNpcMenuAnchor] = useState<null | HTMLElement>(null);
@@ -354,6 +360,20 @@ export function Sidebar() {
   const handleAddOpen5eMonster = (monster: Open5eMonster) => {
     const qty = Math.max(1, Math.min(addQuantity, 20));
     const existingNpcCount = state.creatures.filter(c => c.statblock.type !== 'pc').length;
+
+    if (qty > 1 && addAsSquad) {
+      const offsetX = (existingNpcCount % 5) * 30 - 60;
+      const offsetY = Math.floor(existingNpcCount / 5) * 30 + 50;
+      const creature = convertOpen5eToCreature(monster, { x: offsetX, y: offsetY });
+      creature.name = nextSquadName(monster.name, qty, state.creatures);
+      creature.squad = { size: qty, bodies: qty };
+      addCreature(creature);
+      setShowOpen5eSearch(false);
+      setSearchQuery('');
+      setSearchResults([]);
+      setAddQuantity(1);
+      return;
+    }
 
     for (let i = 0; i < qty; i++) {
       const index = existingNpcCount + i;
@@ -481,11 +501,13 @@ export function Sidebar() {
       ?? Math.floor(((creature.statblock.abilities?.dex || 10) - 10) / 2);
     setEditDexSave(dexSave);
     setEditFaction(creature.faction || 'enemy');
+    setEditBodies(creature.squad?.bodies ?? 0);
   };
 
   const saveEdit = () => {
     if (!editingCreatureId) return;
-    const existingStatblock = state.creatures.find(c => c.id === editingCreatureId)!.statblock;
+    const existing = state.creatures.find(c => c.id === editingCreatureId)!;
+    const existingStatblock = existing.statblock;
     dispatch({
       type: 'UPDATE_CREATURE',
       payload: {
@@ -496,6 +518,7 @@ export function Sidebar() {
           initiative: editInit,
           initiativeModifier: editDexSave,
           faction: editFaction,
+          ...(existing.squad && { squad: { ...existing.squad, bodies: editBodies } }),
           statblock: {
             ...existingStatblock,
             name: editName,
@@ -856,7 +879,7 @@ export function Sidebar() {
                   creature={creature}
                   isPC={true}
                   isEditing={editingCreatureId === creature.id}
-                  editState={{ editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave, editFaction, setEditFaction }}
+                  editState={{ editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave, editFaction, setEditFaction, editBodies, setEditBodies }}
                   onStartEdit={() => startEdit(creature)}
                   onSaveEdit={saveEdit}
                   onCancelEdit={cancelEdit}
@@ -970,7 +993,7 @@ export function Sidebar() {
                   creature={creature}
                   isPC={false}
                   isEditing={editingCreatureId === creature.id}
-                  editState={{ editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave, editFaction, setEditFaction }}
+                  editState={{ editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave, editFaction, setEditFaction, editBodies, setEditBodies }}
                   onStartEdit={() => startEdit(creature)}
                   onSaveEdit={saveEdit}
                   onCancelEdit={cancelEdit}
@@ -1138,9 +1161,21 @@ export function Sidebar() {
               <AddIcon fontSize="small" />
             </IconButton>
             {addQuantity > 1 && (
-              <Typography variant="caption" color="text.secondary">
-                (will be numbered, e.g. "Goblin 1", "Goblin 2")
-              </Typography>
+              <Box>
+                <FormControlLabel
+                  control={<Switch size="small" checked={addAsSquad} onChange={(e) => setAddAsSquad(e.target.checked)} />}
+                  label={<Typography variant="caption">Add as one squad</Typography>}
+                />
+                {addAsSquad ? (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    One row and token; tracks bodies (e.g. 8/{addQuantity})
+                  </Typography>
+                ) : (
+                  <Typography variant="caption" color="text.secondary">
+                    (will be numbered, e.g. "Goblin 1", "Goblin 2")
+                  </Typography>
+                )}
+              </Box>
             )}
           </Box>
 
@@ -1263,6 +1298,7 @@ interface CreatureEntryProps {
     editSpeed: number; setEditSpeed: (v: number) => void;
     editDexSave: number; setEditDexSave: (v: number) => void;
     editFaction: 'party' | 'enemy'; setEditFaction: (v: 'party' | 'enemy') => void;
+    editBodies: number; setEditBodies: (v: number) => void;
   };
   onStartEdit: () => void;
   onSaveEdit: () => void;
@@ -1372,7 +1408,11 @@ function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSa
         <Stack spacing={1}>
           <TextField fullWidth size="small" value={editState.editName} onChange={(e) => editState.setEditName(e.target.value)} placeholder="Name" />
           <Stack direction="row" spacing={1}>
-            <TextField size="small" label="HP" type="number" value={editState.editHp} onChange={(e) => editState.setEditHp(parseInt(e.target.value) || 0)} sx={{ flex: 1 }} />
+            {creature.squad && (
+              <TextField size="small" label={`Bodies (of ${creature.squad.size})`} type="number" value={editState.editBodies}
+                onChange={(e) => editState.setEditBodies(parseInt(e.target.value) || 0)} sx={{ flex: 1 }} />
+            )}
+            <TextField size="small" label={creature.squad ? 'Front HP' : 'HP'} type="number" value={editState.editHp} onChange={(e) => editState.setEditHp(parseInt(e.target.value) || 0)} sx={{ flex: 1 }} />
             <TextField size="small" label="Max" type="number" value={editState.editMaxHp} onChange={(e) => editState.setEditMaxHp(parseInt(e.target.value) || 1)} sx={{ flex: 1 }} />
           </Stack>
           <Stack direction="row" spacing={1}>
@@ -1539,7 +1579,9 @@ function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSa
           </Typography>
         ) : (
           <Typography variant="caption" color="text.secondary">
-            HP: {creature.currentHp}/{creature.statblock.maxHp} | AC: {creature.statblock.ac} | Init: {creature.initiative} | DEX Save: {
+            {creature.squad
+              ? <>Bodies {creature.squad.bodies}/{creature.squad.size} · front {creature.currentHp}/{creature.statblock.maxHp} HP</>
+              : <>HP: {creature.currentHp}/{creature.statblock.maxHp}</>} | AC: {creature.statblock.ac} | Init: {creature.initiative} | DEX Save: {
               creature.statblock.savingThrows?.dex !== undefined
                 ? (creature.statblock.savingThrows.dex >= 0 ? '+' : '') + creature.statblock.savingThrows.dex
                 : (creature.statblock.abilities?.dex
@@ -1549,7 +1591,8 @@ function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSa
           </Typography>
         )}
         {/* Damage/Heal controls for non-PCs */}
-        {!isPC && onHpChange && (
+        {!isPC && creature.squad && <SquadRowControls creature={creature} />}
+        {!isPC && !creature.squad && onHpChange && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
             <TextField
               type="number"
