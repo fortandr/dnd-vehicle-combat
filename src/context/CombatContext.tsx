@@ -15,6 +15,7 @@ import { loadCurrentEncounter } from '../hooks/useLocalStorage';
 import { backfillNavalMovement } from '../utils/navalBackfill';
 import { isNavalVehicle } from '../data/navalUpgrades';
 import { shipActionSummary, vehicleInitiative } from '../utils/shipTurn';
+import { applySquadHits, healSquad, normalizeSquad, formatSquadHits } from '../utils/squad';
 import { getEffectiveSpeed as computeEffectiveSpeed, speedContextFromState } from '../utils/vehicleSpeed';
 
 const AUTO_SAVE_KEY = 'avernus-current-encounter';
@@ -112,6 +113,8 @@ type CombatAction =
   | { type: 'SET_VEHICLE_COMPONENT_HP'; payload: { vehicleId: string; componentId: string; hp: number } }
   | { type: 'HEAL_VEHICLE'; payload: { vehicleId: string; amount: number } }
   | { type: 'DEAL_DAMAGE_TO_CREATURE'; payload: { creatureId: string; amount: number; source?: string } }
+  | { type: 'SQUAD_HITS'; payload: { creatureId: string; hits: number[]; source?: string } }
+  | { type: 'SQUAD_AREA'; payload: { creatureId: string; currentHp: number; bodies: number; summary: string; details?: string } }
   | { type: 'HEAL_CREATURE'; payload: { creatureId: string; amount: number } }
 
   // Mishaps
@@ -585,7 +588,10 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
       const creature = state.creatures.find((c) => c.id === action.payload.id);
       if (!creature) return state;
 
-      const updates = action.payload.updates;
+      let updates = action.payload.updates;
+      if (creature.squad || updates.squad) {
+        updates = { ...updates, ...normalizeSquad(creature, { ...creature, ...updates }) };
+      }
       const newHp = updates.currentHp !== undefined ? updates.currentHp : creature.currentHp;
 
       // Check if creature just died (HP going to 0 from > 0)
@@ -1152,6 +1158,9 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
     case 'DEAL_DAMAGE_TO_CREATURE': {
       const creature = state.creatures.find((c) => c.id === action.payload.creatureId);
       if (!creature) return state;
+      if (creature.squad) {
+        return applySquadHitsToState(state, creature, [action.payload.amount], action.payload.source);
+      }
 
       let remaining = action.payload.amount;
       let newTempHp = creature.tempHp;
@@ -1209,10 +1218,9 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
       const creature = state.creatures.find((c) => c.id === action.payload.creatureId);
       if (!creature) return state;
 
-      const newHp = Math.min(
-        creature.statblock.maxHp,
-        creature.currentHp + action.payload.amount
-      );
+      const newHp = creature.squad
+        ? healSquad(creature, action.payload.amount)
+        : Math.min(creature.statblock.maxHp, creature.currentHp + action.payload.amount);
       return {
         ...state,
         creatures: state.creatures.map((c) =>
@@ -1226,6 +1234,27 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
             `${creature.name} heals for ${action.payload.amount} HP`
           ),
         ],
+      };
+    }
+
+    case 'SQUAD_HITS': {
+      const creature = state.creatures.find((c) => c.id === action.payload.creatureId);
+      if (!creature?.squad) return state;
+      return applySquadHitsToState(state, creature, action.payload.hits, action.payload.source);
+    }
+
+    case 'SQUAD_AREA': {
+      const creature = state.creatures.find((c) => c.id === action.payload.creatureId);
+      if (!creature?.squad) return state;
+      const next = normalizeSquad(creature, {
+        ...creature,
+        currentHp: action.payload.currentHp,
+        squad: { ...creature.squad, bodies: action.payload.bodies },
+      });
+      return {
+        ...state,
+        creatures: state.creatures.map((c) => (c.id === creature.id ? { ...c, ...next } : c)),
+        actionLog: [...state.actionLog, createLogEntry(state.round, 'damage', action.payload.summary, action.payload.details)],
       };
     }
 
@@ -1728,6 +1757,22 @@ function createLogEntry(
     type,
     action,
     details,
+  };
+}
+
+/** Battle mode: single-target hits on a squad (front body only; overkill lost). */
+function applySquadHitsToState(state: CombatState, creature: Creature, hits: number[], source?: string): CombatState {
+  const size = creature.squad?.size ?? 0;
+  const result = applySquadHits(creature, hits);
+  return {
+    ...state,
+    creatures: state.creatures.map((c) =>
+      c.id === creature.id ? { ...c, currentHp: result.currentHp, squad: { size, bodies: result.bodies } } : c
+    ),
+    actionLog: [
+      ...state.actionLog,
+      createLogEntry(state.round, 'damage', formatSquadHits(creature.name, hits.length, result.fell, result.bodies, size), source),
+    ],
   };
 }
 

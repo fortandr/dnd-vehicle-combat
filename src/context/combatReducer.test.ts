@@ -134,3 +134,64 @@ describe('ship turns', () => {
     expect(out.vehicles[1]).toEqual({ ...wm, currentHp: wm.template.maxHp, activeMishaps: [] });
   });
 });
+
+describe('battle mode squads', () => {
+  const hob = (id: string, bodies: number, currentHp: number, size = 10) => ({
+    id, name: `Hob ${id}`, currentHp, tempHp: 0, conditions: [], initiative: 10, initiativeModifier: 1, faction: 'enemy',
+    statblock: { type: 'humanoid', maxHp: 11, ac: 18 }, squad: { size, bodies },
+  }) as unknown as Creature;
+  const solo = (id: string, currentHp: number) => ({
+    id, name: id, currentHp, tempHp: 2, conditions: [], initiative: 5, initiativeModifier: 0, faction: 'enemy',
+    statblock: { type: 'humanoid', maxHp: 20, ac: 12 },
+  }) as unknown as Creature;
+  const withCreatures = (...creatures: Creature[]) => ({ ...initialCombatState, round: 1, creatures });
+
+  it('SQUAD_HITS drops bodies and logs', () => {
+    const out = combatReducer(withCreatures(hob('a', 10, 11)), { type: 'SQUAD_HITS', payload: { creatureId: 'a', hits: [11, 4], source: 'Bitter Breath' } });
+    expect(out.creatures[0]).toMatchObject({ currentHp: 7, squad: { size: 10, bodies: 9 } });
+    expect(out.actionLog.at(-1)).toMatchObject({ type: 'damage', action: 'Hob a takes 2 hits: 1 fall (9/10)', details: 'Bitter Breath' });
+  });
+
+  it('SQUAD_AREA stores the resolved result and logs the summary', () => {
+    const out = combatReducer(withCreatures(hob('a', 10, 11)), {
+      type: 'SQUAD_AREA', payload: { creatureId: 'a', currentHp: 1, bodies: 6, summary: 'Fireball: 4 caught, 3 failed → 4 fall (6/10)', details: 'saves…' },
+    });
+    expect(out.creatures[0]).toMatchObject({ currentHp: 1, squad: { bodies: 6 } });
+    expect(out.actionLog.at(-1)).toMatchObject({ action: 'Fireball: 4 caught, 3 failed → 4 fall (6/10)', details: 'saves…' });
+  });
+
+  it('DEAL_DAMAGE_TO_CREATURE on a squad is one hit (overkill lost)', () => {
+    const out = combatReducer(withCreatures(hob('a', 3, 11)), { type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: 'a', amount: 50 } });
+    expect(out.creatures[0]).toMatchObject({ currentHp: 11, squad: { bodies: 2 } });
+  });
+
+  it('HEAL_CREATURE heals the front body and never revives', () => {
+    const healed = combatReducer(withCreatures(hob('a', 3, 4)), { type: 'HEAL_CREATURE', payload: { creatureId: 'a', amount: 50 } });
+    expect(healed.creatures[0]).toMatchObject({ currentHp: 11, squad: { bodies: 3 } });
+    const wiped = combatReducer(withCreatures(hob('a', 0, 0)), { type: 'HEAL_CREATURE', payload: { creatureId: 'a', amount: 5 } });
+    expect(wiped.creatures[0]).toMatchObject({ currentHp: 0, squad: { bodies: 0 } });
+  });
+
+  it('UPDATE_CREATURE keeps the bodies/HP invariant', () => {
+    const zero = combatReducer(withCreatures(hob('a', 3, 4)), { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { squad: { size: 10, bodies: 0 } } } });
+    expect(zero.creatures[0].currentHp).toBe(0);
+    const back = combatReducer(zero, { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { squad: { size: 10, bodies: 5 } } } });
+    expect(back.creatures[0]).toMatchObject({ currentHp: 11, squad: { bodies: 5 } });
+    const init = combatReducer(back, { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { initiative: 17 } } });
+    expect(init.creatures[0]).toMatchObject({ initiative: 17, currentHp: 11, squad: { bodies: 5 } });
+  });
+
+  it('a wiped squad is skipped in turn order like a dead NPC', () => {
+    const s = { ...withCreatures(solo('x', 20), hob('a', 0, 0), solo('y', 20)), phase: 'combat' as const, initiativeOrder: ['x', 'a', 'y'], currentTurnIndex: 0 };
+    const out = combatReducer(s, { type: 'NEXT_TURN' });
+    expect(out.initiativeOrder[out.currentTurnIndex]).toBe('y');
+  });
+
+  it('creatures without squad behave as before (temp HP absorbs first; HP clamps to 0)', () => {
+    const out = combatReducer(withCreatures(solo('x', 20)), { type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: 'x', amount: 25 } });
+    expect(out.creatures[0]).toMatchObject({ currentHp: 0, tempHp: 0 });
+    expect(out.creatures[0].squad).toBeUndefined();
+    const healed = combatReducer(out, { type: 'HEAL_CREATURE', payload: { creatureId: 'x', amount: 5 } });
+    expect(healed.creatures[0].currentHp).toBe(5);
+  });
+});
