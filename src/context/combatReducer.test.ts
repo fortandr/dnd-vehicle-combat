@@ -298,4 +298,51 @@ describe('battle mode morale', () => {
     expect(loaded.moralePrompts).toEqual([]);
     expect(loaded.dmgEdition).toBeUndefined();
   });
+
+  describe('leaderId survives squad rebuilds', () => {
+    const led = () => combat(npc('k', 30), { ...squadOf('a', 10, 'k'), id: 'a' });
+    it('UPDATE_CREATURE setting squad with leaderId on a leaderless squad', () => {
+      const out = combatReducer(combat(npc('k', 30), squadOf('a', 10)), { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { squad: { size: 10, bodies: 10, leaderId: 'k' } } } });
+      expect(out.creatures[1].squad?.leaderId).toBe('k');
+    });
+    it('unrelated UPDATE_CREATURE', () => {
+      const out = combatReducer(led(), { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { initiative: 5 } } });
+      expect(out.creatures[1].squad?.leaderId).toBe('k');
+    });
+    it('SQUAD_HITS', () => {
+      const out = combatReducer(led(), { type: 'SQUAD_HITS', payload: { creatureId: 'a', hits: [11] } });
+      expect(out.creatures[1].squad).toMatchObject({ bodies: 9, leaderId: 'k' });
+    });
+    it('SQUAD_AREA', () => {
+      const out = combatReducer(led(), { type: 'SQUAD_AREA', payload: { creatureId: 'a', currentHp: 11, bodies: 8, summary: 's' } });
+      expect(out.creatures[1].squad).toMatchObject({ bodies: 8, leaderId: 'k' });
+    });
+    it('DEAL_DAMAGE_TO_CREATURE', () => {
+      const out = combatReducer(led(), { type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: 'a', amount: 11 } });
+      expect(out.creatures[1].squad).toMatchObject({ bodies: 9, leaderId: 'k' });
+    });
+  });
+
+  describe('state replacement', () => {
+    it('LOAD_ENCOUNTER of a combat save with a hurt NPC raises no prompts', () => {
+      const saved = combat(npc('x', 10));
+      const out = combatReducer(combat(npc('x', 30)), { type: 'LOAD_ENCOUNTER', payload: saved });
+      expect(out.moralePrompts).toEqual([]);
+    });
+    it('LOAD_PARTY_PRESET drops prompts for creatures no longer present', () => {
+      const s = combatReducer(combat(npc('x', 30)), { type: 'REQUEST_MORALE', payload: { creatureId: 'x' } });
+      expect(s.moralePrompts).toHaveLength(1);
+      const out = combatReducer(s, { type: 'LOAD_PARTY_PRESET', payload: { vehicles: [], creatures: [npc('p', 10)], crewAssignments: [] } });
+      expect(out.moralePrompts).toEqual([]);
+    });
+    it('LOAD_PARTY_PRESET remaps squad leaderId and strips morale', () => {
+      const leader = npc('k', 30, 30, { morale: { asked: [], status: 'fleeing' } });
+      const out = combatReducer(combat(), { type: 'LOAD_PARTY_PRESET', payload: { vehicles: [], creatures: [leader, squadOf('a', 10, 'k'), squadOf('b', 10, 'gone')], crewAssignments: [] } });
+      const [k, a, b] = out.creatures;
+      expect(k.morale).toBeUndefined();
+      expect(a.squad?.leaderId).toBe(k.id);
+      expect(k.id).not.toBe('k');
+      expect(b.squad?.leaderId).toBeUndefined();
+    });
+  });
 });

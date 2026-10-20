@@ -312,3 +312,11 @@ describe('damageNotation', () => {
     expect(damageNotation('')).toBeNull();
   });
 });
+
+describe('normalizeSquad leaderId', () => {
+  it('keeps leaderId', () => {
+    const prev = squad(10, 11);
+    const next = { ...prev, squad: { size: 10, bodies: 10, leaderId: 'k' } } as Creature;
+    expect(normalizeSquad(prev, next).squad).toEqual({ size: 10, bodies: 10, leaderId: 'k' });
+  });
+});

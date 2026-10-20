@@ -23,7 +23,7 @@ const pcOf = (id: string, currentHp: number) => {
   const base = npc(id, currentHp);
   return { ...base, statblock: { ...base.statblock, type: 'pc' } } as Creature;
 };
-const st = (creatures: Creature[], phase = 'combat') => ({ phase, creatures }) as unknown as CombatState;
+const st = (creatures: Creature[], phase = 'combat', moralePrompts: MoralePrompt[] = []) => ({ phase, creatures, moralePrompts }) as unknown as CombatState;
 const detect = (before: Creature[], after: Creature[], phase = 'combat') =>
   detectMoraleTriggers(st(before, phase), st(after, phase), newId);
 const triggers = (r: { prompts: MoralePrompt[] }) => r.prompts.map((p) => [p.creatureId, p.trigger]);
@@ -120,5 +120,24 @@ describe('morale text', () => {
     expect(moraleTriggerText(p('half-size'), squadOf('a', 5))).toBe('Down to half strength (5/10)');
     expect(moraleTriggerText(p('half-hp'), npc('x', 10))).toBe('Below half HP');
     expect(moraleTriggerText(p('manual'), npc('x', 10))).toBe('Morale check');
+  });
+});
+
+describe('detectMoraleTriggers: priority and open prompts', () => {
+  it('raises one prompt by priority but records every fired trigger', () => {
+    const before = [npc('k', 30), squadOf('a', 6, 'k')];
+    const after = [npc('k', 0), squadOf('a', 5, 'k')];
+    const r = detect(before, after);
+    expect(triggers(r)).toEqual([['a', 'leader-down']]);
+    expect(r.creatures.find((c) => c.id === 'a')!.morale!.asked).toEqual(['leader-down', 'half-size']);
+  });
+
+  it('a creature with an open prompt gets no automatic prompt and keeps its asked list', () => {
+    const before = [npc('x', 30)];
+    const after = [npc('x', 10)];
+    const open = [{ id: 'm1', creatureId: 'x', trigger: 'manual' }] as MoralePrompt[];
+    const r = detectMoraleTriggers(st(before), st(after, 'combat', open), newId);
+    expect(r.prompts).toEqual([]);
+    expect(r.creatures.find((c) => c.id === 'x')!.morale).toBeUndefined();
   });
 });

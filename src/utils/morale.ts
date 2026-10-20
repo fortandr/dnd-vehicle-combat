@@ -28,10 +28,12 @@ export function detectMoraleTriggers(prev: CombatState, next: CombatState, newId
   const now = new Map(next.creatures.map((c) => [c.id, c]));
   const prompts: MoralePrompt[] = [];
   let changed = false;
+  const open = new Set((next.moralePrompts ?? []).map((p) => p.creatureId));
 
   const creatures = next.creatures.map((c) => {
     const was = before.get(c.id);
     if (!was || c.statblock.type === 'pc' || c.morale?.status || isOut(c)) return c;
+    if (open.has(c.id)) return c;
     const fired: MoraleTrigger[] = [];
     let leaderName: string | undefined;
 
@@ -55,9 +57,9 @@ export function detectMoraleTriggers(prev: CombatState, next: CombatState, newId
 
     if (fired.length === 0) return c;
     changed = true;
-    for (const trigger of fired) {
-      prompts.push({ id: newId(), creatureId: c.id, trigger, ...(trigger === 'leader-down' ? { leaderName } : {}) });
-    }
+    // One prompt per creature per step, by priority (fired is already in priority order); all triggers recorded.
+    const trigger = fired[0];
+    prompts.push({ id: newId(), creatureId: c.id, trigger, ...(trigger === 'leader-down' ? { leaderName } : {}) });
     return { ...c, morale: { ...c.morale, asked: [...(c.morale?.asked ?? []), ...fired] } };
   });
 

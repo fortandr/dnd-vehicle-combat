@@ -290,7 +290,7 @@ export function normalizeSquad(prev: Creature, next: Creature): { currentHp: num
     if (!wasWiped) bodies -= 1;
     currentHp = bodies > 0 ? max : 0;
   }
-  return { currentHp, squad: { size, bodies } };
+  return { currentHp, squad: { ...next.squad, size, bodies } };
 }
 
 // ==========================================

@@ -16,7 +16,8 @@ const ABILITIES: AbilityName[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 export function SquadAreaDialog({ creature, open, onClose }: { creature: Creature; open: boolean; onClose: () => void }) {
   const { state, dispatch } = useCombat();
   const edition: DmgEdition = state.dmgEdition ?? '2014';
-  const [width, setWidth] = useState(5);
+  const [widthText, setWidthText] = useState('5');
+  const width = Math.max(5, parseInt(widthText) || 5);
   const bodies = creature.squad?.bodies ?? 0;
   const [source, setSource] = useState('Area effect');
   const [shape, setShape] = useState<AoeShape>('sphere');
@@ -113,8 +114,8 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
               <TextField size="small" type="number" label={sizeLabel} value={size} onChange={(e) => { setSize(Math.max(0, parseInt(e.target.value) || 0)); setCaughtOverride(null); }} sx={{ flex: 1 }} />
             </Stack>
             {shape === 'line' && edition === '2024' && (
-              <TextField size="small" type="number" label="Width (ft)" value={width}
-                onChange={(e) => { setWidth(Math.max(5, parseInt(e.target.value) || 5)); setCaughtOverride(null); }} />
+              <TextField size="small" type="number" label="Width (ft)" value={widthText} inputProps={{ min: 5, step: 5 }}
+                onChange={(e) => { setWidthText(e.target.value); setCaughtOverride(null); }} />
             )}
             <TextField
               size="small" type="number" label="Bodies caught" value={caught}

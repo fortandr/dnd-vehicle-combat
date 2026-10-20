@@ -176,7 +176,17 @@ function applyMoraleDetection(prev: CombatState, next: CombatState): CombatState
 }
 
 export function combatReducer(state: CombatState, action: CombatAction): CombatState {
-  return applyMoraleDetection(state, baseCombatReducer(state, action));
+  const next = baseCombatReducer(state, action);
+  // Wholesale state replacements: don't diff old vs new creatures for morale triggers.
+  switch (action.type) {
+    case 'LOAD_ENCOUNTER':
+    case 'NEW_ENCOUNTER':
+    case 'LOAD_PARTY_PRESET':
+    case 'RESET_COMBAT':
+      return next;
+    default:
+      return applyMoraleDetection(state, next);
+  }
 }
 
 function baseCombatReducer(state: CombatState, action: CombatAction): CombatState {
@@ -351,12 +361,20 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
       const newCreatures = presetCreatures.map((c) => {
         const newId = uuid();
         creatureIdMap.set(c.id, newId);
+        const { morale: _morale, ...rest } = c;
         return {
-          ...c,
+          ...rest,
           id: newId,
           // Update vehicleId reference if assigned
           vehicleId: c.vehicleId ? vehicleIdMap.get(c.vehicleId) : undefined,
         };
+      });
+      // Remap squad leaders now that every creature has its new id (drop leaders not in the preset)
+      const remappedCreatures = newCreatures.map((c) => {
+        if (!c.squad?.leaderId) return c;
+        const { leaderId, ...squadRest } = c.squad;
+        const mapped = creatureIdMap.get(leaderId);
+        return { ...c, squad: mapped ? { ...squadRest, leaderId: mapped } : squadRest };
       });
 
       // Update crew assignments with new IDs
@@ -374,8 +392,9 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
       return {
         ...state,
         vehicles: [...enemyVehicles, ...newVehicles],
-        creatures: newCreatures,
+        creatures: remappedCreatures,
         crewAssignments: newAssignments,
+        moralePrompts: (state.moralePrompts ?? []).filter((p) => remappedCreatures.some((c) => c.id === p.creatureId)),
       };
     }
 
@@ -1832,10 +1851,11 @@ function createLogEntry(
 function applySquadHitsToState(state: CombatState, creature: Creature, hits: number[], source?: string): CombatState {
   const size = creature.squad?.size ?? 0;
   const result = applySquadHits(creature, hits);
+  const squad = creature.squad;
   return {
     ...state,
     creatures: state.creatures.map((c) =>
-      c.id === creature.id ? { ...c, currentHp: result.currentHp, squad: { size, bodies: result.bodies } } : c
+      c.id === creature.id ? { ...c, currentHp: result.currentHp, ...(squad && { squad: { ...squad, bodies: result.bodies } }) } : c
     ),
     actionLog: [
       ...state.actionLog,
