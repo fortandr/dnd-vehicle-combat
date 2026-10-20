@@ -205,3 +205,97 @@ describe('battle mode squads', () => {
     expect(healed.creatures[0].currentHp).toBe(5);
   });
 });
+
+describe('battle mode morale', () => {
+  const npc = (id: string, currentHp: number, maxHp = 30, over: Partial<Creature> = {}) => ({
+    id, name: id, currentHp, tempHp: 0, conditions: [], initiative: 10, initiativeModifier: 0, faction: 'enemy',
+    statblock: { type: 'humanoid', maxHp, ac: 12, abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 14, cha: 10 } },
+    ...over,
+  }) as unknown as Creature;
+  const squadOf = (id: string, bodies: number, leaderId?: string) => npc(id, 11, 11, { squad: { size: 10, bodies, leaderId } });
+  const combat = (...creatures: Creature[]) => ({ ...initialCombatState, phase: 'combat' as const, round: 1, creatures });
+
+  it('SQUAD_HITS crossing half strength queues a half-size prompt', () => {
+    const out = combatReducer(combat(squadOf('a', 6)), { type: 'SQUAD_HITS', payload: { creatureId: 'a', hits: [11] } });
+    expect(out.moralePrompts).toMatchObject([{ creatureId: 'a', trigger: 'half-size' }]);
+    expect(out.creatures[0].morale?.asked).toEqual(['half-size']);
+  });
+
+  it('DEAL_DAMAGE_TO_CREATURE dropping a leader prompts each squad it leads', () => {
+    const s = combat(npc('k', 30), squadOf('a', 10, 'k'), squadOf('b', 10, 'k'), squadOf('c', 10));
+    const out = combatReducer(s, { type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: 'k', amount: 40 } });
+    expect(out.moralePrompts.map((p) => [p.creatureId, p.trigger, p.leaderName])).toEqual([['a', 'leader-down', 'k'], ['b', 'leader-down', 'k']]);
+  });
+
+  it('UPDATE_CREATURE below half HP prompts a single NPC in combat, not in setup', () => {
+    const upd = { type: 'UPDATE_CREATURE' as const, payload: { id: 'x', updates: { currentHp: 15 } } };
+    expect(combatReducer(combat(npc('x', 30)), upd).moralePrompts).toMatchObject([{ creatureId: 'x', trigger: 'half-hp' }]);
+    expect(combatReducer({ ...combat(npc('x', 30)), phase: 'setup' as const }, upd).moralePrompts).toEqual([]);
+  });
+
+  it('an action that fires nothing leaves moralePrompts untouched', () => {
+    const s = combat(npc('x', 30));
+    const out = combatReducer(s, { type: 'UPDATE_CREATURE', payload: { id: 'x', updates: { initiative: 12 } } });
+    expect(out.moralePrompts).toBe(s.moralePrompts);
+  });
+
+  it('REQUEST_MORALE adds one manual prompt per creature', () => {
+    const once = combatReducer(combat(npc('x', 30)), { type: 'REQUEST_MORALE', payload: { creatureId: 'x' } });
+    const twice = combatReducer(once, { type: 'REQUEST_MORALE', payload: { creatureId: 'x' } });
+    expect(twice.moralePrompts).toMatchObject([{ creatureId: 'x', trigger: 'manual' }]);
+  });
+
+  it('RESOLVE_MORALE removes the prompt, logs, and marks fleeing only when fled', () => {
+    const s = combatReducer(combat(npc('x', 30), npc('y', 30)), { type: 'REQUEST_MORALE', payload: { creatureId: 'x' } });
+    const fled = combatReducer(s, { type: 'RESOLVE_MORALE', payload: { promptId: s.moralePrompts[0].id, fled: true, log: 'x flees' } });
+    expect(fled.moralePrompts).toEqual([]);
+    expect(fled.creatures[0].morale).toEqual({ asked: [], status: 'fleeing' });
+    expect(fled.actionLog.at(-1)).toMatchObject({ type: 'system', action: 'x flees' });
+    const held = combatReducer(s, { type: 'RESOLVE_MORALE', payload: { promptId: s.moralePrompts[0].id, fled: false, log: 'x holds' } });
+    expect(held.creatures[0].morale).toBeUndefined();
+    expect(held.actionLog.at(-1)?.action).toBe('x holds');
+  });
+
+  it('DISMISS_MORALE removes the prompt without logging', () => {
+    const s = combatReducer(combat(npc('x', 30)), { type: 'REQUEST_MORALE', payload: { creatureId: 'x' } });
+    const out = combatReducer(s, { type: 'DISMISS_MORALE', payload: { promptId: s.moralePrompts[0].id } });
+    expect(out.moralePrompts).toEqual([]);
+    expect(out.actionLog).toBe(s.actionLog);
+  });
+
+  it('SET_MORALE_STATUS sets, changes and clears the status with a log line', () => {
+    const s = combat(npc('x', 30));
+    const sur = combatReducer(s, { type: 'SET_MORALE_STATUS', payload: { creatureId: 'x', status: 'surrendered' } });
+    expect(sur.creatures[0].morale).toEqual({ asked: [], status: 'surrendered' });
+    expect(sur.actionLog.at(-1)?.action).toBe('x surrenders');
+    const cleared = combatReducer(sur, { type: 'SET_MORALE_STATUS', payload: { creatureId: 'x' } });
+    expect(cleared.creatures[0].morale?.status).toBeUndefined();
+    expect(cleared.actionLog.at(-1)?.action).toBe('x rallies (morale status cleared)');
+  });
+
+  it('REMOVE_CREATURE of a leader prompts its squads and drops prompts for the removed creature', () => {
+    const s = combatReducer(combat(npc('k', 30), squadOf('a', 10, 'k')), { type: 'REQUEST_MORALE', payload: { creatureId: 'k' } });
+    const out = combatReducer(s, { type: 'REMOVE_CREATURE', payload: 'k' });
+    expect(out.moralePrompts.map((p) => [p.creatureId, p.trigger])).toEqual([['a', 'leader-down']]);
+  });
+
+  it('RESET_COMBAT clears morale and prompts but keeps the DMG edition', () => {
+    const s = { ...combat(npc('x', 15, 30, { morale: { status: 'fleeing', asked: ['half-hp'] } })), dmgEdition: '2024' as const };
+    const withPrompt = combatReducer(s, { type: 'REQUEST_MORALE', payload: { creatureId: 'x' } });
+    const out = combatReducer(withPrompt, { type: 'RESET_COMBAT' });
+    expect(out.moralePrompts).toEqual([]);
+    expect(out.creatures[0].morale).toBeUndefined();
+    expect(out.dmgEdition).toBe('2024');
+  });
+
+  it('SET_DMG_EDITION sets the edition', () => {
+    expect(combatReducer(initialCombatState, { type: 'SET_DMG_EDITION', payload: { edition: '2024' } }).dmgEdition).toBe('2024');
+  });
+
+  it('LOAD_ENCOUNTER of an older save defaults moralePrompts and leaves the edition unset', () => {
+    const { moralePrompts: _m, ...old } = initialCombatState;
+    const loaded = combatReducer(initialCombatState, { type: 'LOAD_ENCOUNTER', payload: old as typeof initialCombatState });
+    expect(loaded.moralePrompts).toEqual([]);
+    expect(loaded.dmgEdition).toBeUndefined();
+  });
+});

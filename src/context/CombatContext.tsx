@@ -6,7 +6,7 @@
  */
 
 import React, { createContext, useContext, useReducer, useCallback, ReactNode, useEffect, useState, useRef } from 'react';
-import { CombatState, Vehicle, VehicleWeapon, Creature, CrewAssignment, Mishap, LogEntry, LogEntryType, ScaleName, Position, Environment, BattlefieldState, BackgroundImageConfig, ChaseComplication, ActiveBattlefieldComplication, VehicleComplicationResolution, SpeedModifier, ComplicationResolutionStatus, ElevationZone, MoveHistoryEntry } from '../types';
+import { CombatState, Vehicle, VehicleWeapon, Creature, CrewAssignment, Mishap, LogEntry, LogEntryType, ScaleName, Position, Environment, BattlefieldState, BackgroundImageConfig, ChaseComplication, ActiveBattlefieldComplication, VehicleComplicationResolution, SpeedModifier, ComplicationResolutionStatus, ElevationZone, MoveHistoryEntry, MoraleStatus, DmgEdition } from '../types';
 import { SCALES } from '../data/scaleConfig';
 import { getWeaponStationUpgrade, resolveZone } from '../data/vehicleTemplates';
 import { logAnalyticsEvent } from '../firebase';
@@ -15,6 +15,7 @@ import { loadCurrentEncounter } from '../hooks/useLocalStorage';
 import { backfillNavalMovement } from '../utils/navalBackfill';
 import { isNavalVehicle } from '../data/navalUpgrades';
 import { shipActionSummary, vehicleInitiative } from '../utils/shipTurn';
+import { detectMoraleTriggers } from '../utils/morale';
 import { applySquadHits, healSquad, normalizeSquad, formatSquadHits } from '../utils/squad';
 import { getEffectiveSpeed as computeEffectiveSpeed, speedContextFromState } from '../utils/vehicleSpeed';
 
@@ -155,13 +156,30 @@ type CombatAction =
   | { type: 'RESOLVE_VEHICLE_COMPLICATION'; payload: { vehicleId: string; status: ComplicationResolutionStatus; rollResult?: number; modifier?: number; total?: number } }
   | { type: 'APPLY_COMPLICATION_EFFECTS' }
   | { type: 'CLEAR_COMPLICATION' }
-  | { type: 'CLEAR_EXPIRED_SPEED_MODIFIERS' };
+  | { type: 'CLEAR_EXPIRED_SPEED_MODIFIERS' }
+  | { type: 'REQUEST_MORALE'; payload: { creatureId: string } }
+  | { type: 'RESOLVE_MORALE'; payload: { promptId: string; fled: boolean; log: string; details?: string } }
+  | { type: 'DISMISS_MORALE'; payload: { promptId: string } }
+  | { type: 'SET_MORALE_STATUS'; payload: { creatureId: string; status?: MoraleStatus } }
+  | { type: 'SET_DMG_EDITION'; payload: { edition: DmgEdition } };
 
 // ==========================================
 // Reducer
 // ==========================================
 
+/** Battle mode morale (DMG 2014 p. 273): queue morale prompts when an action crosses a trigger. */
+function applyMoraleDetection(prev: CombatState, next: CombatState): CombatState {
+  if (next === prev) return next;
+  const { creatures, prompts } = detectMoraleTriggers(prev, next, () => uuid());
+  if (prompts.length === 0) return next;
+  return { ...next, creatures, moralePrompts: [...(next.moralePrompts ?? []), ...prompts] };
+}
+
 export function combatReducer(state: CombatState, action: CombatAction): CombatState {
+  return applyMoraleDetection(state, baseCombatReducer(state, action));
+}
+
+function baseCombatReducer(state: CombatState, action: CombatAction): CombatState {
   switch (action.type) {
     // ========== Encounter Management ==========
     case 'LOAD_ENCOUNTER': {
@@ -292,6 +310,7 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
         movementUsed: action.payload.movementUsed || {},
         moveHistory: action.payload.moveHistory || [],
         shipActionsUsed: action.payload.shipActionsUsed || {},
+        moralePrompts: action.payload.moralePrompts || [],
       };
     }
 
@@ -583,6 +602,7 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
         initiativeOrder: state.initiativeOrder.filter(
           (id) => id !== action.payload
         ),
+        moralePrompts: state.moralePrompts.filter((p) => p.creatureId !== action.payload),
       };
 
     case 'UPDATE_CREATURE': {
@@ -964,6 +984,7 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
         initiativeOrder: [],
         movementUsed: {},
         shipActionsUsed: {},
+        moralePrompts: [],
         moveHistory: [],
         vehicles: state.vehicles.map((v) => ({
           ...v,
@@ -976,6 +997,7 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
           ...c,
           currentHp: c.statblock.maxHp,
           initiative: 0,
+          morale: undefined,
           ...(c.squad && { squad: { ...c.squad, bodies: c.squad.size } }),
         })),
         actionLog: [
@@ -1259,6 +1281,50 @@ export function combatReducer(state: CombatState, action: CombatAction): CombatS
         actionLog: [...state.actionLog, createLogEntry(state.round, 'damage', action.payload.summary, action.payload.details)],
       };
     }
+
+    // ========== Battle mode morale ==========
+    case 'REQUEST_MORALE': {
+      if (state.moralePrompts.some((p) => p.creatureId === action.payload.creatureId)) return state;
+      return {
+        ...state,
+        moralePrompts: [...state.moralePrompts, { id: uuid(), creatureId: action.payload.creatureId, trigger: 'manual' }],
+      };
+    }
+
+    case 'RESOLVE_MORALE': {
+      const prompt = state.moralePrompts.find((p) => p.id === action.payload.promptId);
+      if (!prompt) return state;
+      return {
+        ...state,
+        moralePrompts: state.moralePrompts.filter((p) => p.id !== prompt.id),
+        creatures: action.payload.fled
+          ? state.creatures.map((c) =>
+              c.id === prompt.creatureId ? { ...c, morale: { asked: c.morale?.asked ?? [], status: 'fleeing' as const } } : c
+            )
+          : state.creatures,
+        actionLog: [...state.actionLog, createLogEntry(state.round, 'system', action.payload.log, action.payload.details)],
+      };
+    }
+
+    case 'DISMISS_MORALE':
+      return { ...state, moralePrompts: state.moralePrompts.filter((p) => p.id !== action.payload.promptId) };
+
+    case 'SET_MORALE_STATUS': {
+      const creature = state.creatures.find((c) => c.id === action.payload.creatureId);
+      if (!creature) return state;
+      const status = action.payload.status;
+      const text = status === 'fleeing' ? 'is fleeing' : status === 'surrendered' ? 'surrenders' : 'rallies (morale status cleared)';
+      return {
+        ...state,
+        creatures: state.creatures.map((c) =>
+          c.id === creature.id ? { ...c, morale: { asked: c.morale?.asked ?? [], status } } : c
+        ),
+        actionLog: [...state.actionLog, createLogEntry(state.round, 'system', `${creature.name} ${text}`)],
+      };
+    }
+
+    case 'SET_DMG_EDITION':
+      return { ...state, dmgEdition: action.payload.edition };
 
     // ========== Mishaps ==========
     case 'APPLY_MISHAP': {
