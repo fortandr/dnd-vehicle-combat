@@ -16,6 +16,7 @@ import {
 import { useCombat } from '../../context/CombatContext';
 import { RollableText } from '../common/RollableText';
 import { resolveZone } from '../../data/vehicleTemplates';
+import { SquadAttackPanel } from '../squads/SquadAttackPanel';
 import { TargetCoverPanel } from '../combat/TargetCoverPanel';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
 import {
@@ -593,7 +594,9 @@ function CurrentTurnInfo() {
     <Box>
       <Typography variant="subtitle1" fontWeight={600}>{currentTurnCreature.name}</Typography>
       <Typography variant="caption" color="text.secondary">
-        HP: {currentTurnCreature.currentHp}/{currentTurnCreature.statblock.maxHp} |
+        {currentTurnCreature.squad
+          ? <>Bodies: {currentTurnCreature.squad.bodies}/{currentTurnCreature.squad.size} · front {currentTurnCreature.currentHp}/{currentTurnCreature.statblock.maxHp} HP | </>
+          : <>HP: {currentTurnCreature.currentHp}/{currentTurnCreature.statblock.maxHp} | </>}
         AC: {currentTurnCreature.statblock.ac}
       </Typography>
       {vehicle && (
@@ -614,6 +617,7 @@ function CurrentTurnInfo() {
           />
         </Box>
       )}
+      {currentTurnCreature.squad && <SquadAttackPanel key={currentTurnCreature.id} squad={currentTurnCreature} />}
     </Box>
   );
 }
