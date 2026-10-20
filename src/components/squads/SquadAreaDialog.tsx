@@ -6,20 +6,12 @@ import {
 import { useCombat } from '../../context/CombatContext';
 import type { AbilityName, Creature } from '../../types';
 import {
-  AOE_SHAPES, aoeTargetCount, resolveSquadArea, formatAreaSummary, DAMAGE_TYPES,
+  AOE_SHAPES, aoeTargetCount, resolveSquadArea, formatAreaSummary, DAMAGE_TYPES, damageNotation,
   type AoeShape, type SquadAreaResult,
 } from '../../utils/squad';
 import { rollDie, roll } from '../../utils/diceEngine';
 
 const ABILITIES: AbilityName[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
-
-/** Plain integer, or dice notation rolled once (area damage is rolled once for every creature caught). */
-function resolveDamage(text: string): number | null {
-  const t = text.trim();
-  if (/^\d+$/.test(t)) return Number(t);
-  if (/\d+\s*d\s*\d+/i.test(t)) return roll(t.replace(/\s+/g, '')).total;
-  return null;
-}
 
 export function SquadAreaDialog({ creature, open, onClose }: { creature: Creature; open: boolean; onClose: () => void }) {
   const { dispatch } = useCombat();
@@ -37,12 +29,18 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
 
   const suggested = Math.min(aoeTargetCount(shape, size), bodies);
   const caught = Math.min(caughtOverride ?? suggested, bodies);
-  const damagePreview = resolveDamage(damageText);
+  const damagePreview = damageNotation(damageText);
   const sizeLabel = AOE_SHAPES.find((s) => s.value === shape)?.sizeLabel ?? 'Size (ft)';
 
   const handleApply = () => {
-    const damage = resolveDamage(damageText);
-    if (damage === null) return;
+    const notation = damageNotation(damageText);
+    if (notation === null) return;
+    let damage: number;
+    try {
+      damage = /^\d+$/.test(notation) ? Number(notation) : roll(notation).total;
+    } catch {
+      return;
+    }
     const area = resolveSquadArea({ creature, caught, dc, ability, damage, halfOnSave, damageType, roll: rollDie });
     const details = `${damage}${damageType ? ` ${damageType}` : ''} damage, DC ${dc} ${ability.toUpperCase()} save: ` +
       area.saves.map((s) => `${s.d20} (${s.total}) ${s.success ? 'save' : 'fail'} −${s.taken}${s.fell ? ' falls' : ''}`).join('; ');

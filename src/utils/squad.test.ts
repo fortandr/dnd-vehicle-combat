@@ -3,7 +3,7 @@ import {
   parseDamage, parseActionDamage, parseMultiattackCount, rollGroupAttack,
   adjustForDefenses, formatDamageTotals, formatGroupAttack, formatAttackRolls,
   applySquadHits, aoeTargetCount, saveBonus, resolveSquadArea, healSquad, normalizeSquad,
-  nextSquadName, formatSquadHits, formatAreaSummary,
+  nextSquadName, formatSquadHits, formatAreaSummary, damageNotation,
 } from './squad';
 import type { Creature, Statblock, StatblockAction } from '../types';
 
@@ -246,5 +246,20 @@ describe('naming and log text', () => {
   it('formatAreaSummary', () => {
     const r = resolveSquadArea({ creature: squad(10, 11), caught: 4, dc: 15, ability: 'dex', damage: 28, halfOnSave: true, damageType: 'fire', roll: dice(2, 3, 4, 20) });
     expect(formatAreaSummary('Fireball', r, 10)).toBe('Fireball: 4 caught, 3 failed → 4 fall (6/10)');
+  });
+});
+
+describe('damageNotation', () => {
+  it('accepts integers and dice, normalising whitespace and case', () => {
+    expect(damageNotation('28')).toBe('28');
+    expect(damageNotation('8d6')).toBe('8d6');
+    expect(damageNotation(' 8d6 + 5 ')).toBe('8d6+5');
+    expect(damageNotation('2D6-1')).toBe('2d6-1');
+    expect(damageNotation('d20')).toBe('d20');
+  });
+  it('rejects anything roll() would throw on', () => {
+    expect(damageNotation('8d6+')).toBeNull();
+    expect(damageNotation('8d6 fire')).toBeNull();
+    expect(damageNotation('')).toBeNull();
   });
 });

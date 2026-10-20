@@ -287,3 +287,14 @@ export function formatAreaSummary(source: string, result: SquadAreaResult, size:
   const failed = result.saves.filter((s) => !s.success).length;
   return `${source}: ${result.saves.length} caught, ${failed} failed → ${fallText(result.fell)} ${formatSquadTally(result.bodies, size)}`;
 }
+
+/**
+ * Normalise a damage field: a plain integer, or dice notation in the exact grammar
+ * diceEngine.roll() accepts (NdM, dM, optional +/-N). Returns null if not usable. Pure: never rolls.
+ */
+export function damageNotation(text: string): string | null {
+  const t = text.replace(/\s+/g, '');
+  if (/^\d+$/.test(t)) return t;
+  if (/^\d*d\d+([+-]\d+)?$/i.test(t)) return t.toLowerCase();
+  return null;
+}
