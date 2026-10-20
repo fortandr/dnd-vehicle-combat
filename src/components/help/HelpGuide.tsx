@@ -250,7 +250,7 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               doesn&apos;t count). A ship&apos;s speed is worked out from its parts, so its card shows the
               current speed and why.
             </Typography>
-            <Typography variant="body2">
+            <Typography variant="body2" paragraph>
               <strong>Ship turns:</strong> ships roll their own initiative (d20 + the ship&apos;s DEX + its crew
               quality) when you press the same <strong>Roll Init</strong> buttons you use for creatures: NPC rolls
               enemy ships, PC rolls party ships. Edit a ship&apos;s <strong>Init</strong> chip in the Vehicles list
@@ -258,6 +258,22 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               ship&apos;s turn the panel shows how many ship actions it gets from the crew aboard. Moving the ship
               ticks <strong>Move</strong>, and rolling a weapon from its station ticks that Fire action. Click a
               chip to tick or untick it by hand. Going over is allowed; it just shows in red. Fallen crew don&apos;t count toward actions or rowing.
+            </Typography>
+            <Typography variant="body2" paragraph sx={{ mt: 2 }}>
+              <strong>Battle mode: squads.</strong> When adding several of the same monster, switch on
+              <strong> Add as one squad</strong> to get one row, one initiative slot and one token showing how many
+              are still standing (e.g. 8/10). On a squad&apos;s turn, the right panel&apos;s <strong>Squad attack</strong>
+              rolls every attack at once: a natural 20 is a critical hit and a natural 1 misses. Then <strong>Apply</strong>
+              sends each hit to the target. In the squad&apos;s row, <strong>Hit</strong> deals single-target hits,
+              and <strong>Area…</strong> handles spells like fireball. It suggests how many bodies are caught using the
+              DMG&apos;s Targets in Areas of Effect table (p. 249), which you can adjust, then rolls each body&apos;s
+              save. Healing restores the front body only and never brings back the fallen.
+            </Typography>
+            <Typography variant="body2">
+              <strong>VVTT rules</strong> (not in the books, to keep big fights fast): a squad acts as one creature
+              on one initiative; only its front body is tracked, so a single hit can drop at most one body and
+              overkill is lost; attackers default to every standing body; after an area effect the most wounded
+              survivor becomes the front body; squads don&apos;t use temporary HP.
             </Typography>
           </AccordionDetails>
         </Accordion>

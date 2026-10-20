@@ -14,6 +14,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.11.0',
+    date: '2026-10-19',
+    changes: [
+      { type: 'feature', description: 'Battle mode squads: add several of the same monster as one squad — one row, one initiative slot and one token with a body count (e.g. 8/10) on both the DM map and the player view.' },
+      { type: 'feature', description: 'Squad attacks: on a squad\'s turn, roll every attack in one click (natural 20 crits, natural 1 misses), see "10 attacks → 4 hits (1 crit) → 38 slashing", expand the rolls, then apply hit by hit to a creature, squad or vehicle.' },
+      { type: 'feature', description: 'Hurting squads: single-target hits drop one body at a time; Area… suggests how many are caught from the DMG Targets in Areas of Effect table (p. 249), rolls each body\'s save and removes the fallen. Healing never revives bodies.' },
+    ],
+  },
+  {
     version: '2.10.0',
     date: '2026-10-19',
     changes: [
