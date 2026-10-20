@@ -2,7 +2,7 @@
  * Battle mode squads (spec: docs/superpowers/specs/2026-10-19-battle-mode-squads-design.md).
  * Pure rules only. Dice come in through `roll` so tests are deterministic.
  */
-import type { AbilityName, Creature, Statblock, StatblockAction } from '../types';
+import type { AbilityName, Creature, DmgEdition, Statblock, StatblockAction } from '../types';
 
 export type Roller = (sides: number) => number;
 
@@ -192,9 +192,39 @@ export const AOE_SHAPES: { value: AoeShape; label: string; sizeLabel: string }[]
 
 const AOE_DIVISOR: Record<AoeShape, number> = { cone: 10, cube: 5, cylinder: 5, line: 30, sphere: 5 };
 
-/** DMG p. 249: suggested number of targets caught (round up). */
-export function aoeTargetCount(shape: AoeShape, size: number): number {
-  return size > 0 ? Math.ceil(size / AOE_DIVISOR[shape]) : 0;
+/** DMG 2024 p. 82 "Targets in Area of Effect": [smallest size for the row, targets], ascending. */
+const AOE_2024: Record<'cone' | 'cube' | 'circular', [number, number][]> = {
+  cone: [[10, 1], [15, 2], [25, 3], [30, 5], [35, 6], [40, 8], [45, 9], [50, 10], [55, 12], [60, 16]],
+  cube: [[5, 1], [15, 2], [20, 4], [25, 6], [30, 8], [35, 10], [40, 12], [45, 16], [50, 20]],
+  circular: [[5, 1], [10, 3], [15, 6], [20, 10], [25, 16], [30, 20]],
+};
+const AOE_2024_LINE: Record<5 | 10, [number, number][]> = {
+  5: [[30, 2], [60, 3], [90, 4], [120, 5]],
+  10: [[30, 3], [60, 5], [90, 8], [120, 10]],
+};
+
+/** VVTT rule: use the largest listed size at or below `size`; below the smallest row gives 1. */
+function lookup2024(rows: [number, number][], size: number): number {
+  let targets = 1;
+  for (const [min, n] of rows) if (size >= min) targets = n;
+  return targets;
+}
+
+/**
+ * Suggested number of targets caught. 2014: DMG p. 249 formula (round up).
+ * 2024: DMG p. 82 lookup table; cylinders and spheres use the circular column, lines use length and width.
+ */
+export function aoeTargetCount(shape: AoeShape, size: number, edition: DmgEdition = '2014', width = 5): number {
+  if (size <= 0) return 0;
+  if (edition === '2014') return Math.ceil(size / AOE_DIVISOR[shape]);
+  if (shape === 'line') return lookup2024(AOE_2024_LINE[width >= 10 ? 10 : 5], size);
+  return lookup2024(AOE_2024[shape === 'cylinder' || shape === 'sphere' ? 'circular' : shape], size);
+}
+
+export function aoeAdvice(edition: DmgEdition): { citation: string; advice: string } {
+  return edition === '2024'
+    ? { citation: 'DMG 2024 p. 82', advice: '−1d3 if spread out, +1d3 if bunched up' }
+    : { citation: 'DMG 2014 p. 249', advice: 'add or remove for how bunched up they are' };
 }
 
 export function saveBonus(statblock: Statblock, ability: AbilityName): number {

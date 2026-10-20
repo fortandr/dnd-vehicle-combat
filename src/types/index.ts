@@ -451,6 +451,7 @@ export interface ElevationZone {
 // Combat State
 // ==========================================
 export type CombatPhase = 'setup' | 'initiative' | 'combat' | 'resolution' | 'ended';
+export type DmgEdition = '2014' | '2024';
 
 export interface CombatState {
   id: string;
@@ -507,6 +508,9 @@ export interface CombatState {
   // Ship actions marked used this round (Fire actions and manual toggles). Move is derived
   // from movementUsed. Reset alongside movementUsed.
   shipActionsUsed: Record<string, string[]>;
+
+  // Battle mode: DMG edition for area suggestions; undefined = '2014'
+  dmgEdition?: DmgEdition;
 }
 
 export interface MoveHistoryEntry {

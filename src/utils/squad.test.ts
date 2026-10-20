@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseDamage, parseActionDamage, parseMultiattackCount, rollGroupAttack,
   adjustForDefenses, formatDamageTotals, formatGroupAttack, formatAttackRolls,
-  applySquadHits, aoeTargetCount, saveBonus, resolveSquadArea, healSquad, normalizeSquad,
+  applySquadHits, aoeTargetCount, aoeAdvice, saveBonus, resolveSquadArea, healSquad, normalizeSquad,
   nextSquadName, formatSquadHits, formatAreaSummary, damageNotation,
 } from './squad';
 import type { Creature, Statblock, StatblockAction } from '../types';
@@ -160,6 +160,32 @@ describe('aoeTargetCount (DMG p. 249)', () => {
     ['cylinder', 10, 2], ['line', 100, 4], ['line', 30, 1], ['sphere', 20, 4], ['sphere', 0, 0],
   ] as const)('%s %i ft → %i', (shape, size, expected) => {
     expect(aoeTargetCount(shape, size)).toBe(expected);
+  });
+});
+
+describe('aoeTargetCount by edition', () => {
+  it('2014 is the default and unchanged', () => {
+    expect(aoeTargetCount('sphere', 20)).toBe(4);
+    expect(aoeTargetCount('sphere', 20, '2014')).toBe(4);
+    expect(aoeTargetCount('line', 100, '2014', 10)).toBe(4);
+  });
+  it.each([
+    ['sphere', 20, 10], ['cylinder', 10, 3], ['cone', 15, 2], ['cone', 20, 2], ['cube', 15, 2],
+    ['cube', 10, 1], ['cone', 60, 16], ['cube', 50, 20], ['cone', 33, 5], ['cone', 70, 16], ['cone', 5, 1], ['sphere', 0, 0],
+  ] as const)('2024 %s %i ft → %i', (shape, size, expected) => {
+    expect(aoeTargetCount(shape, size, '2024')).toBe(expected);
+  });
+  it('2024 lines use length and width', () => {
+    expect(aoeTargetCount('line', 30, '2024', 5)).toBe(2);
+    expect(aoeTargetCount('line', 60, '2024', 10)).toBe(5);
+    expect(aoeTargetCount('line', 100, '2024', 5)).toBe(4);
+    expect(aoeTargetCount('line', 20, '2024', 5)).toBe(1);
+    expect(aoeTargetCount('line', 120, '2024', 15)).toBe(10);
+    expect(aoeTargetCount('line', 120, '2024')).toBe(5);
+  });
+  it('aoeAdvice cites each edition', () => {
+    expect(aoeAdvice('2014')).toEqual({ citation: 'DMG 2014 p. 249', advice: 'add or remove for how bunched up they are' });
+    expect(aoeAdvice('2024')).toEqual({ citation: 'DMG 2024 p. 82', advice: '−1d3 if spread out, +1d3 if bunched up' });
   });
 });
 
