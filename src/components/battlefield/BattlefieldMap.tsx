@@ -29,6 +29,7 @@ import { renderShipIcon } from './shipIcons';
 import { isWeaponDestroyed, canVehicleTurn } from '../../utils/vehicleComponents';
 import { getEffectiveSpeed, getSpeedBreakdown, speedReasonText, speedContextFromState } from '../../utils/vehicleSpeed';
 import { featureFlags } from '../../config/featureFlags';
+import { SquadTokenOverlay } from '../squads/SquadTokenOverlay';
 import {
   getBackgroundBounds,
   getPointsBounds,
@@ -3919,7 +3920,7 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
           filter: isDead ? 'grayscale(1) brightness(0.6)' : 'none',
           position: 'relative',
         }}
-        title={`${creature.name}\nHP: ${creature.currentHp}/${creature.statblock.maxHp}\nAC: ${creature.statblock.ac}${isDead ? '\n(DEAD)' : isInDeathSaves ? '\n(Death Saves)' : ''}${isCurrentTurn ? '\n(Current Turn)' : ''}`}
+        title={`${creature.name}\nHP: ${creature.currentHp}/${creature.statblock.maxHp}\nAC: ${creature.statblock.ac}${creature.squad ? `\nBodies: ${creature.squad.bodies}/${creature.squad.size}` : ''}${isDead ? '\n(DEAD)' : isInDeathSaves ? '\n(Death Saves)' : ''}${isCurrentTurn ? '\n(Current Turn)' : ''}`}
       >
         {creature.name.charAt(0).toUpperCase()}
 
@@ -3953,6 +3954,8 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
             }}
           />
         )}
+
+        {creature.squad && <SquadTokenOverlay squad={creature.squad} tokenSize={tokenSize} />}
       </div>
 
       {/* Name and HP bar below - shown when HP bars enabled or when hovered */}
