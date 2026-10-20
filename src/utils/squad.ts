@@ -2,7 +2,7 @@
  * Battle mode squads (spec: docs/superpowers/specs/2026-10-19-battle-mode-squads-design.md).
  * Pure rules only. Dice come in through `roll` so tests are deterministic.
  */
-import type { Statblock, StatblockAction } from '../types';
+import type { AbilityName, Creature, Statblock, StatblockAction } from '../types';
 
 export type Roller = (sides: number) => number;
 
@@ -149,4 +149,141 @@ export function formatAttackRolls(result: GroupAttackResult): string {
     if (r.d20 === 1) return '1 miss';
     return r.hit ? `${r.d20} (${r.total}) hit: ${dmg}` : `${r.d20} (${r.total}) miss`;
   }).join('; ');
+}
+
+// ==========================================
+// Bodies (VVTT rule: front body = currentHp)
+// ==========================================
+
+/** Single-target hits, in order: each hit damages only the front body; a body that falls loses its overkill. */
+export function applySquadHits(creature: Creature, hits: number[]): { currentHp: number; bodies: number; fell: number } {
+  const max = creature.statblock.maxHp;
+  let currentHp = creature.currentHp;
+  let bodies = creature.squad?.bodies ?? 0;
+  let fell = 0;
+  for (const hit of hits) {
+    if (bodies === 0) break;
+    if (hit <= 0) continue;
+    if (hit >= currentHp) {
+      bodies -= 1;
+      fell += 1;
+      currentHp = bodies > 0 ? max : 0;
+    } else {
+      currentHp -= hit;
+    }
+  }
+  return { currentHp, bodies, fell };
+}
+
+// ==========================================
+// Area effects (DMG p. 249, Targets in Areas of Effect)
+// ==========================================
+
+export type AoeShape = 'cone' | 'cube' | 'cylinder' | 'line' | 'sphere';
+
+export const AOE_SHAPES: { value: AoeShape; label: string; sizeLabel: string }[] = [
+  { value: 'cone', label: 'Cone', sizeLabel: 'Size (ft)' },
+  { value: 'cube', label: 'Cube or square', sizeLabel: 'Size (ft)' },
+  { value: 'cylinder', label: 'Cylinder', sizeLabel: 'Radius (ft)' },
+  { value: 'line', label: 'Line', sizeLabel: 'Length (ft)' },
+  { value: 'sphere', label: 'Sphere or circle', sizeLabel: 'Radius (ft)' },
+];
+
+const AOE_DIVISOR: Record<AoeShape, number> = { cone: 10, cube: 5, cylinder: 5, line: 30, sphere: 5 };
+
+/** DMG p. 249: suggested number of targets caught (round up). */
+export function aoeTargetCount(shape: AoeShape, size: number): number {
+  return size > 0 ? Math.ceil(size / AOE_DIVISOR[shape]) : 0;
+}
+
+export function saveBonus(statblock: Statblock, ability: AbilityName): number {
+  return statblock.savingThrows?.[ability] ?? Math.floor(((statblock.abilities?.[ability] ?? 10) - 10) / 2);
+}
+
+export interface AreaSave { d20: number; total: number; success: boolean; taken: number; fell: boolean }
+export interface SquadAreaResult { saves: AreaSave[]; currentHp: number; bodies: number; fell: number }
+
+/**
+ * Area damage is rolled once (passed in as `damage`); each caught body rolls its own save.
+ * The wounded front body is caught first, then fresh bodies. VVTT rule: of the damaged survivors,
+ * the one with the lowest HP becomes the front body; damage to other survivors is dropped.
+ */
+export function resolveSquadArea({ creature, caught, dc, ability, damage, halfOnSave, damageType, magical = false, roll }: {
+  creature: Creature; caught: number; dc: number; ability: AbilityName; damage: number;
+  halfOnSave: boolean; damageType: string; magical?: boolean; roll: Roller;
+}): SquadAreaResult {
+  const max = creature.statblock.maxHp;
+  const startBodies = creature.squad?.bodies ?? 0;
+  const n = Math.max(0, Math.min(caught, startBodies));
+  const bonus = saveBonus(creature.statblock, ability);
+  const saves: AreaSave[] = [];
+  const survivorsHp: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const hpBefore = i === 0 ? creature.currentHp : max;
+    const d20 = roll(20);
+    const total = d20 + bonus;
+    const success = total >= dc;
+    const raw = success ? (halfOnSave ? Math.floor(damage / 2) : 0) : damage;
+    const taken = adjustForDefenses(raw, damageType, creature.statblock, magical);
+    const fell = taken >= hpBefore;
+    if (!fell) survivorsHp.push(hpBefore - taken);
+    saves.push({ d20, total, success, taken, fell });
+  }
+  const fell = saves.filter((s) => s.fell).length;
+  const bodies = startBodies - fell;
+  if (n === 0) return { saves, currentHp: creature.currentHp, bodies, fell };
+  const currentHp = bodies === 0 ? 0 : survivorsHp.length > 0 ? Math.min(...survivorsHp) : max;
+  return { saves, currentHp, bodies, fell };
+}
+
+/** Healing restores the front body only and never brings back fallen bodies. */
+export function healSquad(creature: Creature, amount: number): number {
+  if ((creature.squad?.bodies ?? 0) === 0) return creature.currentHp;
+  return Math.min(creature.statblock.maxHp, creature.currentHp + Math.max(0, amount));
+}
+
+/**
+ * Keeps a squad consistent after a manual update: bodies within 0..size; 0 bodies ⇔ 0 HP;
+ * raising bodies from 0 restores a full front body; HP set to 0 with bodies left means the front body fell.
+ */
+export function normalizeSquad(prev: Creature, next: Creature): { currentHp: number; squad: Creature['squad'] } {
+  if (!next.squad) return { currentHp: next.currentHp, squad: next.squad };
+  const max = next.statblock.maxHp;
+  const size = next.squad.size;
+  let bodies = Math.max(0, Math.min(next.squad.bodies, size));
+  let currentHp = Math.min(next.currentHp, max);
+  if (bodies === 0) {
+    currentHp = 0;
+  } else if (currentHp <= 0) {
+    const wasWiped = (prev.squad?.bodies ?? 0) === 0;
+    if (!wasWiped) bodies -= 1;
+    currentHp = bodies > 0 ? max : 0;
+  }
+  return { currentHp, squad: { size, bodies } };
+}
+
+// ==========================================
+// Naming and log text
+// ==========================================
+
+/** "Hobgoblin ×10 (A)": the letter counts existing squads of the same monster. */
+export function nextSquadName(baseName: string, qty: number, creatures: Creature[]): string {
+  const existing = creatures.filter((c) => c.squad && c.name.startsWith(`${baseName} ×`)).length;
+  return `${baseName} ×${qty} (${String.fromCharCode(65 + (existing % 26))})`;
+}
+
+export function formatSquadTally(bodies: number, size: number): string {
+  return bodies === 0 ? `(0/${size}) — squad destroyed` : `(${bodies}/${size})`;
+}
+
+const fallText = (fell: number) => (fell === 0 ? 'none fall' : `${fell} fall`);
+
+export function formatSquadHits(name: string, hitCount: number, fell: number, bodies: number, size: number): string {
+  return `${name} takes ${hitCount} hit${hitCount === 1 ? '' : 's'}: ${fallText(fell)} ${formatSquadTally(bodies, size)}`;
+}
+
+/** "Fireball: 4 caught, 3 failed → 4 fall (6/10)" */
+export function formatAreaSummary(source: string, result: SquadAreaResult, size: number): string {
+  const failed = result.saves.filter((s) => !s.success).length;
+  return `${source}: ${result.saves.length} caught, ${failed} failed → ${fallText(result.fell)} ${formatSquadTally(result.bodies, size)}`;
 }

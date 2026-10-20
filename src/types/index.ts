@@ -111,6 +111,8 @@ export interface Creature {
   legendaryActionsRemaining?: number;
   concentrating?: string; // Spell name if concentrating
   notes?: string;
+  /** Battle mode: this creature stands for a squad of identical bodies. Front body HP = currentHp. */
+  squad?: { size: number; bodies: number };
 }
 
 // ==========================================
