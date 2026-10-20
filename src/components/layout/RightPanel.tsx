@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import {
+  Alert,
   Box,
   Card,
   CardContent,
@@ -16,6 +17,7 @@ import {
 import { useCombat } from '../../context/CombatContext';
 import { RollableText } from '../common/RollableText';
 import { resolveZone } from '../../data/vehicleTemplates';
+import { MoralePromptStack } from '../morale/MoralePromptStack';
 import { SquadAttackPanel } from '../squads/SquadAttackPanel';
 import { TargetCoverPanel } from '../combat/TargetCoverPanel';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
@@ -60,6 +62,8 @@ export function RightPanel() {
         p: 2,
       }}
     >
+      <MoralePromptStack />
+
       {/* Setup Phase - Show placeholder content */}
       {state.phase === 'setup' && (
         <Box sx={{ color: 'text.secondary' }}>
@@ -617,7 +621,16 @@ function CurrentTurnInfo() {
           />
         </Box>
       )}
-      {currentTurnCreature.squad && <SquadAttackPanel key={currentTurnCreature.id} squad={currentTurnCreature} />}
+      {currentTurnCreature.morale?.status && (
+        <Alert severity="warning" sx={{ mt: 1, py: 0 }}>
+          {currentTurnCreature.morale.status === 'fleeing'
+            ? 'Fleeing: moves away by the quickest route (DMG 2014 p. 273)'
+            : 'Surrendered'}
+        </Alert>
+      )}
+      {currentTurnCreature.squad && !currentTurnCreature.morale?.status && (
+        <SquadAttackPanel key={currentTurnCreature.id} squad={currentTurnCreature} />
+      )}
     </Box>
   );
 }
