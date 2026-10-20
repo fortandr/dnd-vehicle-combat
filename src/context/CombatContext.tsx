@@ -62,6 +62,7 @@ export const initialCombatState: CombatState = {
   movementUsed: {},
   moveHistory: [],
   shipActionsUsed: {},
+  moralePrompts: [],
 };
 
 // ==========================================

@@ -112,7 +112,18 @@ export interface Creature {
   concentrating?: string; // Spell name if concentrating
   notes?: string;
   /** Battle mode: this creature stands for a squad of identical bodies. Front body HP = currentHp. */
-  squad?: { size: number; bodies: number };
+  squad?: { size: number; bodies: number; leaderId?: string };
+  /** Battle mode morale (DMG 2014 p. 273). */
+  morale?: { status?: MoraleStatus; asked: MoraleTrigger[] };
+}
+
+export type MoraleStatus = 'fleeing' | 'surrendered';
+export type MoraleTrigger = 'leader-down' | 'half-size' | 'half-hp';
+export interface MoralePrompt {
+  id: string;
+  creatureId: string; // the squad or creature that may flee
+  trigger: MoraleTrigger | 'manual';
+  leaderName?: string; // for leader-down text, kept in case the leader was removed
 }
 
 // ==========================================
@@ -508,6 +519,9 @@ export interface CombatState {
   // Ship actions marked used this round (Fire actions and manual toggles). Move is derived
   // from movementUsed. Reset alongside movementUsed.
   shipActionsUsed: Record<string, string[]>;
+
+  // Battle mode: open morale checks, oldest first
+  moralePrompts: MoralePrompt[];
 
   // Battle mode: DMG edition for area suggestions; undefined = '2014'
   dmgEdition?: DmgEdition;
