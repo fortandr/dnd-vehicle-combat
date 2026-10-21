@@ -18,7 +18,8 @@ import { useCombat } from '../../context/CombatContext';
 import { RollableText } from '../common/RollableText';
 import { resolveZone } from '../../data/vehicleTemplates';
 import { MoralePromptStack } from '../morale/MoralePromptStack';
-import { SquadAttackPanel } from '../squads/SquadAttackPanel';
+import { SquadTurnPanel } from '../squads/SquadTurnPanel';
+import { squadMembers, squadStandingCount } from '../../utils/squads';
 import { TargetCoverPanel } from '../combat/TargetCoverPanel';
 import { factionColors, coverColors, withOpacity } from '../../theme/customColors';
 import {
@@ -136,7 +137,7 @@ export function RightPanel() {
 }
 
 function CurrentTurnInfo() {
-  const { state, dispatch, currentTurnCreature, currentTurnVehicle, currentTurnDriver } = useCombat();
+  const { state, dispatch, currentTurnCreature, currentTurnVehicle, currentTurnDriver, currentTurnSquad } = useCombat();
 
   // Which crew positions are expanded (click a manned station to open its weapon details).
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -579,6 +580,31 @@ function CurrentTurnInfo() {
     );
   }
 
+  // Squad turn (v2.13.0): one panel for every member
+  if (currentTurnSquad) {
+    const members = squadMembers(currentTurnSquad, state.creatures);
+    const commander = currentTurnSquad.commanderId ? state.creatures.find((c) => c.id === currentTurnSquad.commanderId) : undefined;
+    const status = currentTurnSquad.morale?.status;
+    return (
+      <Box>
+        <Typography variant="subtitle1" fontWeight={600}>⚑ {currentTurnSquad.name}</Typography>
+        <Typography variant="caption" color="text.secondary">
+          {squadStandingCount(currentTurnSquad, state.creatures)}/{currentTurnSquad.startingCount} standing
+        </Typography>
+        {commander && (
+          <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>{commander.name} directs this squad</Typography>
+        )}
+        {status ? (
+          <Alert severity="warning" sx={{ mt: 1, py: 0 }}>
+            {status === 'fleeing' ? 'Fleeing: moves away by the quickest route (DMG 2014 p. 273)' : 'Surrendered'}
+          </Alert>
+        ) : (
+          <SquadTurnPanel key={currentTurnSquad.id} attackerName={currentTurnSquad.name} members={members} excludeIds={currentTurnSquad.memberIds} />
+        )}
+      </Box>
+    );
+  }
+
   // Creature turn (independent creature not on a vehicle)
   if (!currentTurnCreature) {
     return <Typography variant="body2" color="text.secondary">No active turn</Typography>;
@@ -629,7 +655,7 @@ function CurrentTurnInfo() {
         </Alert>
       )}
       {currentTurnCreature.stack && !currentTurnCreature.morale?.status && (
-        <SquadAttackPanel key={currentTurnCreature.id} squad={currentTurnCreature} />
+        <SquadTurnPanel key={currentTurnCreature.id} attackerName={currentTurnCreature.name} members={[currentTurnCreature]} excludeIds={[currentTurnCreature.id]} />
       )}
     </Box>
   );

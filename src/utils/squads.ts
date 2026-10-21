@@ -3,8 +3,8 @@
  * Spec: docs/superpowers/specs/2026-10-20-battle-mode-squads-tab-design.md. Rules not in the books are
  * VVTT rules, numbered as in the spec.
  */
-import type { AbilityName, CrewAssignment, Creature, Squad } from '../types';
-import { adjustForDefenses, nextStackName, saveBonus, type AreaSave, type Roller } from './stack';
+import type { AbilityName, CrewAssignment, Creature, Squad, Statblock, StatblockAction } from '../types';
+import { adjustForDefenses, nextStackName, parseMultiattackCount, saveBonus, type AreaSave, type Roller } from './stack';
 
 /** A stack stands while it has bodies; an individual while above 0 HP. */
 export function standingCount(c: Creature): number {
@@ -177,4 +177,20 @@ export function formatSquadAreaSummary(
 ): string {
   const fall = totals.fell === 0 ? 'none fall' : `${totals.fell} fall`;
   return `${source} on ${squadName}: ${totals.caught} caught, ${totals.failed} failed → ${fall} (${standing}/${starting} standing)`;
+}
+
+export interface AttackOption { key: string; label: string; action: StatblockAction; attacksEach: number }
+
+/**
+ * A member's attack choices for its squad's turn. Multiattack comes first when the statblock has one; VVTT rule: it
+ * rolls its count (from "makes two … attacks") of the first attack with a to-hit bonus. Then each such attack once.
+ */
+export function attackOptions(statblock: Statblock): AttackOption[] {
+  const attacks = (statblock.actions ?? []).filter((a) => typeof a.attackBonus === 'number');
+  if (attacks.length === 0) return [];
+  const single = attacks.map((a) => ({ key: a.name, label: `${a.name} (+${a.attackBonus})`, action: a, attacksEach: 1 }));
+  const multi = statblock.actions?.find((a) => /multiattack/i.test(a.name));
+  if (!multi) return single;
+  const n = parseMultiattackCount(statblock);
+  return [{ key: 'multiattack', label: `Multiattack (${n} × ${attacks[0].name})`, action: attacks[0], attacksEach: n }, ...single];
 }

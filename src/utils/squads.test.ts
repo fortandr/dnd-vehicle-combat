@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   standingCount, isStanding, squadMembers, squadStandingCount, squadOf, isHalfStrength, defaultHitTarget,
   splitAreaCount, fallbackSaver, dexModifier, squadInitiativeBonus, placeCommandedSquads, groupBySquad,
-  staffableCreatures, toStaffMember, newSquadName, resolveIndividualArea, formatSquadAreaSummary,
+  staffableCreatures, toStaffMember, newSquadName, resolveIndividualArea, formatSquadAreaSummary, attackOptions,
 } from './squads';
-import type { Creature, Squad } from '../types';
+import type { Creature, Squad, Statblock } from '../types';
 
 const ind = (id: string, currentHp = 10, over: Partial<Creature> = {}) => ({
   id, name: id, currentHp, tempHp: 0, conditions: [], initiative: 0, initiativeModifier: 0, faction: 'enemy',
@@ -158,5 +158,24 @@ describe('formatSquadAreaSummary', () => {
       .toBe('Fireball on Tower Guard: 4 caught, 3 failed → 3 fall (11/14 standing)');
     expect(formatSquadAreaSummary('Cone of Cold', 'Tower Guard', { caught: 2, failed: 0, fell: 0 }, 14, 14))
       .toBe('Cone of Cold on Tower Guard: 2 caught, 0 failed → none fall (14/14 standing)');
+  });
+});
+
+describe('attackOptions', () => {
+  const captainSb = (actions: Statblock['actions']) => ({ name: 'Captain', actions }) as unknown as Statblock;
+  const greatsword = { name: 'Greatsword', description: 'Melee Weapon Attack: +6 to hit. Hit: 13 (2d6 + 4) slashing damage.', attackBonus: 6 };
+  const javelin = { name: 'Javelin', description: 'Ranged Weapon Attack: +6 to hit. Hit: 7 (1d6 + 4) piercing damage.', attackBonus: 6 };
+  it('defaults to Multiattack (n × the first attack, VVTT rule), then each attack', () => {
+    const opts = attackOptions(captainSb([{ name: 'Multiattack', description: 'The captain makes two greatsword attacks.' }, greatsword, javelin]));
+    expect(opts.map((o) => [o.key, o.label, o.attacksEach, o.action.name])).toEqual([
+      ['multiattack', 'Multiattack (2 × Greatsword)', 2, 'Greatsword'],
+      ['Greatsword', 'Greatsword (+6)', 1, 'Greatsword'],
+      ['Javelin', 'Javelin (+6)', 1, 'Javelin'],
+    ]);
+  });
+  it('without Multiattack, the first attack comes first; without attacks, nothing', () => {
+    expect(attackOptions(captainSb([greatsword, javelin]))[0].key).toBe('Greatsword');
+    expect(attackOptions(captainSb([{ name: 'Multiattack', description: 'Makes two attacks.' }]))).toEqual([]);
+    expect(attackOptions(captainSb(undefined))).toEqual([]);
   });
 });
