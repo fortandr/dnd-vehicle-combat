@@ -3,39 +3,55 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Stack, TextField, MenuItem,
   FormControlLabel, Switch, Typography, Table, TableBody, TableRow, TableCell, ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
-import { useCombat } from '../../context/CombatContext';
+import { useCombat, type SquadAreaMemberResult } from '../../context/CombatContext';
 import type { AbilityName, Creature, DmgEdition } from '../../types';
 import {
   AOE_SHAPES, aoeTargetCount, aoeAdvice, resolveStackArea, formatAreaSummary, DAMAGE_TYPES, damageNotation,
-  type AoeShape, type StackAreaResult,
+  type AoeShape, type AreaSave,
 } from '../../utils/stack';
+import { formatSquadAreaSummary, isStanding, resolveIndividualArea, splitAreaCount, squadStandingCount, standingCount } from '../../utils/squads';
 import { rollDie, roll } from '../../utils/diceEngine';
 
 const ABILITIES: AbilityName[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
-export function SquadAreaDialog({ creature, open, onClose }: { creature: Creature; open: boolean; onClose: () => void }) {
+interface MemberOutcome { member: Creature; saves: AreaSave[]; fell: number }
+
+/**
+ * Area effect on a squad (or a lone stack). The suggested total comes from DMG 2014 p. 249 / DMG 2024 p. 82, is capped
+ * at the standing count, and is split across members by VVTT rule 2. Every count is editable. Damage is rolled once;
+ * each caught body saves with its own member's bonus, and magical and resistances apply per member.
+ */
+export function SquadAreaDialog({ members, title, squadId, open, onClose }: {
+  members: Creature[]; title: string; squadId?: string; open: boolean; onClose: () => void;
+}) {
   const { state, dispatch } = useCombat();
   const edition: DmgEdition = state.dmgEdition ?? '2014';
   const [widthText, setWidthText] = useState('5');
   const width = Math.max(5, parseInt(widthText) || 5);
-  const bodies = creature.stack?.bodies ?? 0;
   const [source, setSource] = useState('Area effect');
   const [shape, setShape] = useState<AoeShape>('sphere');
   const [size, setSize] = useState(20);
-  const [caughtOverride, setCaughtOverride] = useState<number | null>(null);
+  const [totalOverride, setTotalOverride] = useState<number | null>(null);
+  const [memberOverrides, setMemberOverrides] = useState<Record<string, number>>({});
   const [ability, setAbility] = useState<AbilityName>('dex');
   const [dc, setDc] = useState(15);
   const [damageText, setDamageText] = useState('8d6');
   const [damageType, setDamageType] = useState('');
   const [halfOnSave, setHalfOnSave] = useState(true);
   const [magical, setMagical] = useState(false);
-  const [result, setResult] = useState<{ damage: number; area: StackAreaResult } | null>(null);
+  const [outcome, setOutcome] = useState<{ summary: string; rows: MemberOutcome[] } | null>(null);
 
-  const suggested = Math.min(aoeTargetCount(shape, size, edition, width), bodies);
+  const squad = squadId ? state.squads.find((s) => s.id === squadId) : undefined;
+  const totalStanding = members.reduce((sum, m) => sum + standingCount(m), 0);
+  const suggested = Math.min(aoeTargetCount(shape, size, edition, width), totalStanding);
   const advice = aoeAdvice(edition);
-  const caught = Math.min(caughtOverride ?? suggested, bodies);
+  const total = Math.min(totalOverride ?? suggested, totalStanding);
+  const split = new Map(splitAreaCount(total, members).map((a) => [a.memberId, a.caught]));
+  const caughtOf = (m: Creature) => Math.min(memberOverrides[m.id] ?? split.get(m.id) ?? 0, standingCount(m));
+  const caughtSum = members.reduce((sum, m) => sum + caughtOf(m), 0);
   const damagePreview = damageNotation(damageText);
   const sizeLabel = AOE_SHAPES.find((s) => s.value === shape)?.sizeLabel ?? 'Size (ft)';
+  const resetCounts = () => { setTotalOverride(null); setMemberOverrides({}); };
 
   const handleApply = () => {
     const notation = damageNotation(damageText);
@@ -46,45 +62,61 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
     } catch {
       return;
     }
-    const area = resolveStackArea({ creature, caught, dc, ability, damage, halfOnSave, damageType, magical, roll: rollDie });
+    const results: SquadAreaMemberResult[] = [];
+    const rows: MemberOutcome[] = [];
+    let stackSummary = '';
+    for (const m of members) {
+      const caught = caughtOf(m);
+      if (caught === 0) continue;
+      if (m.stack) {
+        const area = resolveStackArea({ creature: m, caught, dc, ability, damage, halfOnSave, damageType, magical, roll: rollDie });
+        results.push({ memberId: m.id, currentHp: area.currentHp, bodies: area.bodies });
+        rows.push({ member: m, saves: area.saves, fell: area.fell });
+        stackSummary = formatAreaSummary(source || 'Area effect', area, m.stack.size);
+      } else {
+        const r = resolveIndividualArea({ creature: m, dc, ability, damage, halfOnSave, damageType, magical, roll: rollDie });
+        results.push({ memberId: m.id, currentHp: r.currentHp, tempHp: r.tempHp });
+        rows.push({ member: m, saves: [r.save], fell: r.save.fell ? 1 : 0 });
+      }
+    }
+    const caught = rows.reduce((sum, r) => sum + r.saves.length, 0);
+    const failed = rows.reduce((sum, r) => sum + r.saves.filter((s) => !s.success).length, 0);
+    const fell = rows.reduce((sum, r) => sum + r.fell, 0);
+    const summary = squad
+      ? formatSquadAreaSummary(source || 'Area effect', squad.name, { caught, failed, fell }, squadStandingCount(squad, state.creatures) - fell, squad.startingCount)
+      : stackSummary || `${source || 'Area effect'}: ${caught} caught, ${failed} failed`;
+    const saveText = (s: AreaSave) => `${s.d20} (${s.total}) ${s.success ? 'save' : 'fail'} −${s.taken}${s.fell ? ' falls' : ''}`;
     const details = `${damage}${damageType ? ` ${damageType}` : ''} damage, DC ${dc} ${ability.toUpperCase()} save: ` +
-      area.saves.map((s) => `${s.d20} (${s.total}) ${s.success ? 'save' : 'fail'} −${s.taken}${s.fell ? ' falls' : ''}`).join('; ');
-    dispatch({
-      type: 'SQUAD_AREA',
-      payload: {
-        members: [{ memberId: creature.id, currentHp: area.currentHp, bodies: area.bodies }],
-        summary: formatAreaSummary(source || 'Area effect', area, creature.stack?.size ?? bodies),
-        details,
-      },
-    });
-    setResult({ damage, area });
+      (squad
+        ? rows.map((r) => `${r.member.name}: ${r.saves.map(saveText).join(', ')}`).join('; ')
+        : rows.flatMap((r) => r.saves.map(saveText)).join('; '));
+    dispatch({ type: 'SQUAD_AREA', payload: { squadId, members: results, summary, details } });
+    setOutcome({ summary, rows });
   };
 
   const handleClose = () => {
-    setResult(null);
-    setCaughtOverride(null);
+    setOutcome(null);
+    resetCounts();
     onClose();
   };
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Area effect on {creature.name}</DialogTitle>
+      <DialogTitle>{title}</DialogTitle>
       <DialogContent>
-        {result ? (
+        {outcome ? (
           <Stack spacing={1} sx={{ mt: 1 }}>
-            <Typography variant="body2" fontWeight={600}>
-              {formatAreaSummary(source || 'Area effect', result.area, creature.stack?.size ?? bodies)}
-            </Typography>
+            <Typography variant="body2" fontWeight={600}>{outcome.summary}</Typography>
             <Table size="small">
               <TableBody>
-                {result.area.saves.map((s, i) => (
-                  <TableRow key={i}>
-                    <TableCell>Body {i + 1}</TableCell>
+                {outcome.rows.flatMap((r) => r.saves.map((s, i) => (
+                  <TableRow key={`${r.member.id}-${i}`}>
+                    <TableCell>{r.member.stack ? `${r.member.name} body ${i + 1}` : r.member.name}</TableCell>
                     <TableCell>{s.d20} ({s.total}) {s.success ? 'save' : 'fail'}</TableCell>
                     <TableCell>−{s.taken}</TableCell>
                     <TableCell>{s.fell ? 'falls' : 'stands'}</TableCell>
                   </TableRow>
-                ))}
+                )))}
               </TableBody>
             </Table>
           </Stack>
@@ -97,7 +129,7 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
                 onChange={(_, value: DmgEdition | null) => {
                   if (!value) return;
                   dispatch({ type: 'SET_DMG_EDITION', payload: { edition: value } });
-                  setCaughtOverride(null);
+                  resetCounts();
                 }}
               >
                 <ToggleButton value="2014" sx={{ py: 0.25, px: 1, fontSize: '0.7rem' }}>2014</ToggleButton>
@@ -106,20 +138,33 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
             </Stack>
             <TextField size="small" label="Effect" value={source} onChange={(e) => setSource(e.target.value)} />
             <Stack direction="row" spacing={1}>
-              <TextField select size="small" label="Shape" value={shape} onChange={(e) => { setShape(e.target.value as AoeShape); setCaughtOverride(null); }} sx={{ flex: 2 }}>
+              <TextField select size="small" label="Shape" value={shape} onChange={(e) => { setShape(e.target.value as AoeShape); resetCounts(); }} sx={{ flex: 2 }}>
                 {AOE_SHAPES.map((s) => <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>)}
               </TextField>
-              <TextField size="small" type="number" label={sizeLabel} value={size} onChange={(e) => { setSize(Math.max(0, parseInt(e.target.value) || 0)); setCaughtOverride(null); }} sx={{ flex: 1 }} />
+              <TextField size="small" type="number" label={sizeLabel} value={size} onChange={(e) => { setSize(Math.max(0, parseInt(e.target.value) || 0)); resetCounts(); }} sx={{ flex: 1 }} />
             </Stack>
             {shape === 'line' && edition === '2024' && (
               <TextField size="small" type="number" label="Width (ft)" value={widthText} inputProps={{ min: 5, step: 5 }}
-                onChange={(e) => { setWidthText(e.target.value); setCaughtOverride(null); }} />
+                onChange={(e) => { setWidthText(e.target.value); resetCounts(); }} />
             )}
             <TextField
-              size="small" type="number" label="Bodies caught" value={caught}
-              onChange={(e) => setCaughtOverride(Math.max(0, parseInt(e.target.value) || 0))}
-              helperText={`${advice.citation} suggests ${suggested} — ${advice.advice} (${bodies} left)${edition === '2024' ? '. VVTT rule: sizes between rows use the row below' : ''}`}
+              size="small" type="number" label={members.length > 1 ? 'Caught in total' : 'Bodies caught'} value={total}
+              onChange={(e) => { setTotalOverride(Math.max(0, parseInt(e.target.value) || 0)); setMemberOverrides({}); }}
+              helperText={`${advice.citation} suggests ${suggested} — ${advice.advice} (${totalStanding} standing)${edition === '2024' ? '. VVTT rule: sizes between rows use the row below' : ''}`}
             />
+            {members.length > 1 && (
+              <Stack spacing={1}>
+                <Typography variant="caption" color="text.secondary">
+                  VVTT rule: the total is split by standing bodies (an individual counts 1, largest remainder). Edit any member's count.
+                </Typography>
+                {members.filter(isStanding).map((m) => (
+                  <TextField
+                    key={m.id} size="small" type="number" label={`${m.name} (of ${standingCount(m)})`} value={caughtOf(m)}
+                    onChange={(e) => setMemberOverrides((o) => ({ ...o, [m.id]: Math.max(0, parseInt(e.target.value) || 0) }))}
+                  />
+                ))}
+              </Stack>
+            )}
             <Stack direction="row" spacing={1}>
               <TextField select size="small" label="Save" value={ability} onChange={(e) => setAbility(e.target.value as AbilityName)} sx={{ flex: 1 }}>
                 {ABILITIES.map((a) => <MenuItem key={a} value={a}>{a.toUpperCase()}</MenuItem>)}
@@ -139,18 +184,18 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
             <FormControlLabel control={<Switch checked={halfOnSave} onChange={(e) => setHalfOnSave(e.target.checked)} />} label="Half damage on a successful save" />
             <FormControlLabel control={<Switch checked={magical} onChange={(e) => setMagical(e.target.checked)} />} label="Magical damage" />
             <Typography variant="caption" color="text.secondary">
-              VVTT rule: the wounded front body is caught first; of the bodies left wounded, the most hurt becomes the new front body.
+              Each caught body saves with its own member's bonus. VVTT rule: in a stack, the wounded front body is caught first; of the bodies left wounded, the most hurt becomes the new front body.
             </Typography>
           </Stack>
         )}
       </DialogContent>
       <DialogActions>
-        {result ? (
+        {outcome ? (
           <Button onClick={handleClose} variant="contained">Done</Button>
         ) : (
           <>
             <Button onClick={handleClose}>Cancel</Button>
-            <Button onClick={handleApply} variant="contained" disabled={damagePreview === null || caught === 0}>Roll saves &amp; apply</Button>
+            <Button onClick={handleApply} variant="contained" disabled={damagePreview === null || caughtSum === 0}>Roll saves &amp; apply</Button>
           </>
         )}
       </DialogActions>

@@ -61,7 +61,7 @@ export function SquadRowControls({ creature }: { creature: Creature }) {
         sx={{ minWidth: 0, px: 0.75, py: 0, fontSize: '0.65rem' }}>
         Area…
       </Button>
-      {areaOpen && <SquadAreaDialog creature={creature} open={areaOpen} onClose={() => setAreaOpen(false)} />}
+      {areaOpen && <SquadAreaDialog members={[creature]} title={`Area effect on ${creature.name}`} open={areaOpen} onClose={() => setAreaOpen(false)} />}
     </Box>
   );
 }

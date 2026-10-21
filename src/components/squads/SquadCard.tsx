@@ -17,6 +17,8 @@ import { MonsterSearchDialog } from '../creatures/MonsterSearchDialog';
 import { StatblockDialog } from '../statblocks/StatblockDialog';
 import { CustomNpcDialog } from './CustomNpcDialog';
 import { SquadMoraleControls } from './SquadMoraleControls';
+import { SquadHitDialog } from './SquadHitDialog';
+import { SquadAreaDialog } from './SquadAreaDialog';
 
 const STAFF_MAX = 50; // fits the tower's 40 hobgoblins
 
@@ -45,6 +47,8 @@ export function SquadCard({ squad, index }: { squad: Squad; index: number }) {
   const [growId, setGrowId] = useState('');
   const [growBy, setGrowBy] = useState(1);
   const [viewing, setViewing] = useState<Creature | null>(null);
+  const [hitOpen, setHitOpen] = useState(false);
+  const [areaOpen, setAreaOpen] = useState(false);
 
   const update = (updates: SquadUpdates) => dispatch({ type: 'UPDATE_SQUAD', payload: { id: squad.id, updates } });
   const staff = (base: Creature, qty: number) =>
@@ -151,6 +155,8 @@ export function SquadCard({ squad, index }: { squad: Squad; index: number }) {
           <Button size="small" variant="outlined" startIcon={<AddIcon />} endIcon={<ArrowDropDownIcon />} onClick={(e) => setStaffMenu(e.currentTarget)}>
             Staff
           </Button>
+          <Button size="small" variant="outlined" color="error" disabled={standing === 0} onClick={() => setHitOpen(true)}>Hit…</Button>
+          <Button size="small" variant="outlined" disabled={standing === 0} onClick={() => setAreaOpen(true)}>Area…</Button>
           <Box sx={{ flex: 1 }} />
           <Button
             size="small" variant="outlined"
@@ -267,6 +273,8 @@ export function SquadCard({ squad, index }: { squad: Squad; index: number }) {
           </Button>
         </DialogActions>
       </Dialog>
+      {hitOpen && <SquadHitDialog squad={squad} open onClose={() => setHitOpen(false)} />}
+      {areaOpen && <SquadAreaDialog squadId={squad.id} title={`Area effect on ${squad.name}`} members={members} open onClose={() => setAreaOpen(false)} />}
     </Card>
   );
 }

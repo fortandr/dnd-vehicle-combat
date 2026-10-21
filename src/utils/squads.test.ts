@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   standingCount, isStanding, squadMembers, squadStandingCount, squadOf, isHalfStrength, defaultHitTarget,
   splitAreaCount, fallbackSaver, dexModifier, squadInitiativeBonus, placeCommandedSquads, groupBySquad,
-  staffableCreatures, toStaffMember, newSquadName,
+  staffableCreatures, toStaffMember, newSquadName, resolveIndividualArea, formatSquadAreaSummary,
 } from './squads';
 import type { Creature, Squad } from '../types';
 
@@ -125,5 +125,38 @@ describe('grouping and staffing', () => {
     expect(newSquadName([])).toBe('Squad 1');
     expect(newSquadName([sq([], { name: 'Squad 2' }), sq([], { name: 'Tower Guard' })])).toBe('Squad 3');
     expect(newSquadName([sq([], { name: 'Squad 2' })])).toBe('Squad 3');
+  });
+});
+
+describe('resolveIndividualArea (one save per individual, own bonus, temp HP first)', () => {
+  const dice = (...values: number[]) => () => values.shift()!;
+  const captain = (over: Partial<Creature> = {}) => ind('k', 39, {
+    tempHp: 5,
+    statblock: { name: 'k', type: 'humanoid', maxHp: 39, ac: 17, abilities: { str: 10, dex: 12, con: 10, int: 10, wis: 10, cha: 10 }, savingThrows: { dex: 3 } },
+    ...over,
+  } as Partial<Creature>);
+  const base = { dc: 15, ability: 'dex' as const, damage: 28, halfOnSave: true, damageType: 'fire' };
+  it('a save halves the damage; temp HP soaks first', () => {
+    expect(resolveIndividualArea({ ...base, creature: captain(), roll: dice(12) })).toEqual({
+      save: { d20: 12, total: 15, success: true, taken: 14, fell: false }, currentHp: 30, tempHp: 0,
+    });
+  });
+  it('a failure takes full damage; resistance halves it', () => {
+    expect(resolveIndividualArea({ ...base, creature: captain(), roll: dice(2) }).currentHp).toBe(16);
+    const resistant = captain({ statblock: { ...captain().statblock, damageResistances: ['fire'] } });
+    expect(resolveIndividualArea({ ...base, creature: resistant, roll: dice(2) }).save.taken).toBe(14);
+  });
+  it('dropping to 0 counts as falling', () => {
+    const r = resolveIndividualArea({ ...base, creature: captain({ currentHp: 10, tempHp: 0 }), roll: dice(2) });
+    expect(r).toMatchObject({ currentHp: 0, save: { fell: true } });
+  });
+});
+
+describe('formatSquadAreaSummary', () => {
+  it('names the squad and the standing count after the effect', () => {
+    expect(formatSquadAreaSummary('Fireball', 'Tower Guard', { caught: 4, failed: 3, fell: 3 }, 11, 14))
+      .toBe('Fireball on Tower Guard: 4 caught, 3 failed → 3 fall (11/14 standing)');
+    expect(formatSquadAreaSummary('Cone of Cold', 'Tower Guard', { caught: 2, failed: 0, fell: 0 }, 14, 14))
+      .toBe('Cone of Cold on Tower Guard: 2 caught, 0 failed → none fall (14/14 standing)');
   });
 });

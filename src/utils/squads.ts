@@ -3,8 +3,8 @@
  * Spec: docs/superpowers/specs/2026-10-20-battle-mode-squads-tab-design.md. Rules not in the books are
  * VVTT rules, numbered as in the spec.
  */
-import type { CrewAssignment, Creature, Squad } from '../types';
-import { nextStackName } from './stack';
+import type { AbilityName, CrewAssignment, Creature, Squad } from '../types';
+import { adjustForDefenses, nextStackName, saveBonus, type AreaSave, type Roller } from './stack';
 
 /** A stack stands while it has bodies; an individual while above 0 HP. */
 export function standingCount(c: Creature): number {
@@ -149,4 +149,32 @@ export function newSquadName(squads: Squad[]): string {
   let n = squads.length + 1;
   while (squads.some((s) => s.name === `Squad ${n}`)) n += 1;
   return `Squad ${n}`;
+}
+
+export interface IndividualAreaResult { save: AreaSave; currentHp: number; tempHp: number }
+
+/** An individual caught in an area: its own save (PHB), resistances, temporary HP first. Damage is rolled once by the caller. */
+export function resolveIndividualArea({ creature, dc, ability, damage, halfOnSave, damageType, magical = false, roll }: {
+  creature: Creature; dc: number; ability: AbilityName; damage: number; halfOnSave: boolean; damageType: string; magical?: boolean; roll: Roller;
+}): IndividualAreaResult {
+  const d20 = roll(20);
+  const total = d20 + saveBonus(creature.statblock, ability);
+  const success = total >= dc;
+  const raw = success ? (halfOnSave ? Math.floor(damage / 2) : 0) : damage;
+  const taken = adjustForDefenses(raw, damageType, creature.statblock, magical);
+  const fromTemp = Math.min(creature.tempHp, taken);
+  const currentHp = Math.max(0, creature.currentHp - (taken - fromTemp));
+  return {
+    save: { d20, total, success, taken, fell: currentHp === 0 && creature.currentHp > 0 },
+    currentHp,
+    tempHp: creature.tempHp - fromTemp,
+  };
+}
+
+/** "Fireball on Tower Guard: 4 caught, 3 failed → 3 fall (11/14 standing)" */
+export function formatSquadAreaSummary(
+  source: string, squadName: string, totals: { caught: number; failed: number; fell: number }, standing: number, starting: number,
+): string {
+  const fall = totals.fell === 0 ? 'none fall' : `${totals.fell} fall`;
+  return `${source} on ${squadName}: ${totals.caught} caught, ${totals.failed} failed → ${fall} (${standing}/${starting} standing)`;
 }
