@@ -172,10 +172,11 @@ type CombatAction =
   | { type: 'APPLY_COMPLICATION_EFFECTS' }
   | { type: 'CLEAR_COMPLICATION' }
   | { type: 'CLEAR_EXPIRED_SPEED_MODIFIERS' }
-  | { type: 'REQUEST_MORALE'; payload: { creatureId: string } }
+  | { type: 'REQUEST_MORALE'; payload: { creatureId?: string; squadId?: string } }
+  | { type: 'SET_MORALE_STATUS'; payload: { creatureId?: string; squadId?: string; status?: MoraleStatus } }
+  | { type: 'RESET_SQUAD_MORALE'; payload: { squadId: string } }
   | { type: 'RESOLVE_MORALE'; payload: { promptId: string; fled: boolean; log: string; details?: string } }
   | { type: 'DISMISS_MORALE'; payload: { promptId: string } }
-  | { type: 'SET_MORALE_STATUS'; payload: { creatureId: string; status?: MoraleStatus } }
   | { type: 'SET_DMG_EDITION'; payload: { edition: DmgEdition } };
 
 // ==========================================
@@ -185,9 +186,9 @@ type CombatAction =
 /** Battle mode morale (DMG 2014 p. 273): queue morale prompts when an action crosses a trigger. */
 function applyMoraleDetection(prev: CombatState, next: CombatState): CombatState {
   if (next === prev) return next;
-  const { creatures, prompts } = detectMoraleTriggers(prev, next, () => uuid());
+  const { creatures, squads, prompts } = detectMoraleTriggers(prev, next, () => uuid());
   if (prompts.length === 0) return next;
-  return { ...next, creatures, moralePrompts: [...(next.moralePrompts ?? []), ...prompts] };
+  return { ...next, creatures, squads, moralePrompts: [...(next.moralePrompts ?? []), ...prompts] };
 }
 
 export function combatReducer(state: CombatState, action: CombatAction): CombatState {
@@ -1484,24 +1485,32 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
 
     // ========== Battle mode morale ==========
     case 'REQUEST_MORALE': {
-      if (state.moralePrompts.some((p) => p.creatureId === action.payload.creatureId)) return state;
+      const { creatureId, squadId } = action.payload;
+      if (!creatureId && !squadId) return state;
+      if (state.moralePrompts.some((p) => (squadId ? p.squadId === squadId : p.creatureId === creatureId))) return state;
       return {
         ...state,
-        moralePrompts: [...state.moralePrompts, { id: uuid(), creatureId: action.payload.creatureId, trigger: 'manual' }],
+        moralePrompts: [...state.moralePrompts, { id: uuid(), ...(squadId ? { squadId } : { creatureId }), trigger: 'manual' }],
       };
     }
 
     case 'RESOLVE_MORALE': {
       const prompt = state.moralePrompts.find((p) => p.id === action.payload.promptId);
       if (!prompt) return state;
+      const fled = action.payload.fled;
       return {
         ...state,
         moralePrompts: state.moralePrompts.filter((p) => p.id !== prompt.id),
-        creatures: action.payload.fled
+        creatures: fled && prompt.creatureId
           ? state.creatures.map((c) =>
               c.id === prompt.creatureId ? { ...c, morale: { asked: c.morale?.asked ?? [], status: 'fleeing' as const } } : c
             )
           : state.creatures,
+        squads: fled && prompt.squadId
+          ? state.squads.map((s) =>
+              s.id === prompt.squadId ? { ...s, morale: { asked: s.morale?.asked ?? [], status: 'fleeing' as const } } : s
+            )
+          : state.squads,
         actionLog: [...state.actionLog, createLogEntry(state.round, 'system', action.payload.log, action.payload.details)],
       };
     }
@@ -1510,16 +1519,32 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
       return { ...state, moralePrompts: state.moralePrompts.filter((p) => p.id !== action.payload.promptId) };
 
     case 'SET_MORALE_STATUS': {
-      const creature = state.creatures.find((c) => c.id === action.payload.creatureId);
-      if (!creature) return state;
-      const status = action.payload.status;
+      const { creatureId, squadId, status } = action.payload;
+      const squad = squadId ? state.squads.find((s) => s.id === squadId) : undefined;
+      const creature = !squadId && creatureId ? state.creatures.find((c) => c.id === creatureId) : undefined;
+      const name = squad?.name ?? creature?.name;
+      if (!name) return state;
       const text = status === 'fleeing' ? 'is fleeing' : status === 'surrendered' ? 'surrenders' : 'rallies (morale status cleared)';
       return {
         ...state,
-        creatures: state.creatures.map((c) =>
-          c.id === creature.id ? { ...c, morale: { asked: c.morale?.asked ?? [], status } } : c
-        ),
-        actionLog: [...state.actionLog, createLogEntry(state.round, 'system', `${creature.name} ${text}`)],
+        creatures: creature
+          ? state.creatures.map((c) => (c.id === creature.id ? { ...c, morale: { asked: c.morale?.asked ?? [], status } } : c))
+          : state.creatures,
+        squads: squad
+          ? state.squads.map((s) => (s.id === squad.id ? { ...s, morale: { asked: s.morale?.asked ?? [], status } } : s))
+          : state.squads,
+        actionLog: [...state.actionLog, createLogEntry(state.round, 'system', `${name} ${text}`)],
+      };
+    }
+
+    case 'RESET_SQUAD_MORALE': {
+      const squad = state.squads.find((s) => s.id === action.payload.squadId);
+      if (!squad) return state;
+      return {
+        ...state,
+        squads: state.squads.map((s) => (s.id === squad.id ? { ...s, morale: undefined } : s)),
+        moralePrompts: state.moralePrompts.filter((p) => p.squadId !== squad.id),
+        actionLog: [...state.actionLog, createLogEntry(state.round, 'system', `${squad.name}: morale reset`)],
       };
     }
 

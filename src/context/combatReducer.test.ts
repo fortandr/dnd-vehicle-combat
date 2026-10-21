@@ -212,19 +212,21 @@ describe('battle mode morale', () => {
     statblock: { type: 'humanoid', maxHp, ac: 12, abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 14, cha: 10 } },
     ...over,
   }) as unknown as Creature;
-  const squadOf = (id: string, bodies: number, leaderId?: string) => npc(id, 11, 11, { stack: { size: 10, bodies, leaderId } });
+  const stackOf = (id: string, bodies: number) => npc(id, 11, 11, { stack: { size: 10, bodies } });
+  const guardOf = (memberIds: string[], over: Partial<Squad> = {}): Squad => ({ id: 'S', name: 'Guard', faction: 'enemy', memberIds, startingCount: 11, ...over });
   const combat = (...creatures: Creature[]) => ({ ...initialCombatState, phase: 'combat' as const, round: 1, creatures });
 
   it('SQUAD_HITS crossing half strength queues a half-size prompt', () => {
-    const out = combatReducer(combat(squadOf('a', 6)), { type: 'SQUAD_HIT', payload: { memberId: 'a', hits: [11] } });
+    const out = combatReducer(combat(stackOf('a', 6)), { type: 'SQUAD_HIT', payload: { memberId: 'a', hits: [11] } });
     expect(out.moralePrompts).toMatchObject([{ creatureId: 'a', trigger: 'half-size' }]);
     expect(out.creatures[0].morale?.asked).toEqual(['half-size']);
   });
 
-  it('DEAL_DAMAGE_TO_CREATURE dropping a leader prompts each squad it leads', () => {
-    const s = combat(npc('k', 30), squadOf('a', 10, 'k'), squadOf('b', 10, 'k'), squadOf('c', 10));
+  it('DEAL_DAMAGE_TO_CREATURE dropping a squad leader queues a leader-down prompt for the squad', () => {
+    const s = { ...combat(npc('k', 30), stackOf('a', 10)), squads: [guardOf(['k', 'a'], { leaderId: 'k' })] };
     const out = combatReducer(s, { type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: 'k', amount: 40 } });
-    expect(out.moralePrompts.map((p) => [p.creatureId, p.trigger, p.leaderName])).toEqual([['a', 'leader-down', 'k'], ['b', 'leader-down', 'k']]);
+    expect(out.moralePrompts.map((p) => [p.squadId, p.trigger, p.leaderName])).toEqual([['S', 'leader-down', 'k']]);
+    expect(out.squads[0].morale?.asked).toEqual(['leader-down']);
   });
 
   it('UPDATE_CREATURE below half HP prompts a single NPC in combat, not in setup', () => {
@@ -273,10 +275,11 @@ describe('battle mode morale', () => {
     expect(cleared.actionLog.at(-1)?.action).toBe('x rallies (morale status cleared)');
   });
 
-  it('REMOVE_CREATURE of a leader prompts its squads and drops prompts for the removed creature', () => {
-    const s = combatReducer(combat(npc('k', 30), squadOf('a', 10, 'k')), { type: 'REQUEST_MORALE', payload: { creatureId: 'k' } });
-    const out = combatReducer(s, { type: 'REMOVE_CREATURE', payload: 'k' });
-    expect(out.moralePrompts.map((p) => [p.creatureId, p.trigger])).toEqual([['a', 'leader-down']]);
+  it('REMOVE_CREATURE of a squad leader raises no prompt; removing a creature drops its prompts', () => {
+    const base = { ...combat(npc('k', 30), stackOf('a', 10), npc('x', 30)), squads: [guardOf(['k', 'a'], { leaderId: 'k' })] };
+    const s = combatReducer(base, { type: 'REQUEST_MORALE', payload: { creatureId: 'x' } });
+    expect(combatReducer(s, { type: 'REMOVE_CREATURE', payload: 'k' }).moralePrompts.map((p) => p.creatureId)).toEqual(['x']);
+    expect(combatReducer(s, { type: 'REMOVE_CREATURE', payload: 'x' }).moralePrompts).toEqual([]);
   });
 
   it('RESET_COMBAT clears morale and prompts but keeps the DMG edition', () => {
@@ -299,27 +302,33 @@ describe('battle mode morale', () => {
     expect(loaded.dmgEdition).toBeUndefined();
   });
 
-  describe('leaderId survives squad rebuilds', () => {
-    const led = () => combat(npc('k', 30), { ...squadOf('a', 10, 'k'), id: 'a' });
-    it('UPDATE_CREATURE setting squad with leaderId on a leaderless squad', () => {
-      const out = combatReducer(combat(npc('k', 30), squadOf('a', 10)), { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { stack: { size: 10, bodies: 10, leaderId: 'k' } } } });
-      expect(out.creatures[1].stack?.leaderId).toBe('k');
+  describe('squad morale actions', () => {
+    const withGuard = (over: Partial<Squad> = {}) => ({ ...combat(stackOf('a', 6)), squads: [guardOf(['a'], { startingCount: 10, ...over })] });
+
+    it('SQUAD_HIT taking a squad to half strength queues one squad prompt (VVTT rule 4); members raise none', () => {
+      const out = combatReducer(withGuard(), { type: 'SQUAD_HIT', payload: { squadId: 'S', memberId: 'a', hits: [11] } });
+      expect(out.moralePrompts).toMatchObject([{ squadId: 'S', trigger: 'half-size' }]);
+      expect(out.moralePrompts[0].creatureId).toBeUndefined();
+      expect(out.squads[0].morale?.asked).toEqual(['half-size']);
+      expect(out.creatures[0].morale).toBeUndefined();
     });
-    it('unrelated UPDATE_CREATURE', () => {
-      const out = combatReducer(led(), { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { initiative: 5 } } });
-      expect(out.creatures[1].stack?.leaderId).toBe('k');
+
+    it('REQUEST_MORALE, RESOLVE_MORALE and SET_MORALE_STATUS work on a squad', () => {
+      const asked = combatReducer(withGuard(), { type: 'REQUEST_MORALE', payload: { squadId: 'S' } });
+      const twice = combatReducer(asked, { type: 'REQUEST_MORALE', payload: { squadId: 'S' } });
+      expect(twice.moralePrompts).toMatchObject([{ squadId: 'S', trigger: 'manual' }]);
+      const fled = combatReducer(asked, { type: 'RESOLVE_MORALE', payload: { promptId: asked.moralePrompts[0].id, fled: true, log: 'Guard flees' } });
+      expect(fled.squads[0].morale).toEqual({ asked: [], status: 'fleeing' });
+      const sur = combatReducer(fled, { type: 'SET_MORALE_STATUS', payload: { squadId: 'S', status: 'surrendered' } });
+      expect(sur.squads[0].morale?.status).toBe('surrendered');
+      expect(sur.actionLog.at(-1)?.action).toBe('Guard surrenders');
     });
-    it('SQUAD_HITS', () => {
-      const out = combatReducer(led(), { type: 'SQUAD_HIT', payload: { memberId: 'a', hits: [11] } });
-      expect(out.creatures[1].stack).toMatchObject({ bodies: 9, leaderId: 'k' });
-    });
-    it('SQUAD_AREA', () => {
-      const out = combatReducer(led(), { type: 'SQUAD_AREA', payload: { members: [{ memberId: 'a', currentHp: 11, bodies: 8 }], summary: 's' } });
-      expect(out.creatures[1].stack).toMatchObject({ bodies: 8, leaderId: 'k' });
-    });
-    it('DEAL_DAMAGE_TO_CREATURE', () => {
-      const out = combatReducer(led(), { type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: 'a', amount: 11 } });
-      expect(out.creatures[1].stack).toMatchObject({ bodies: 9, leaderId: 'k' });
+
+    it('RESET_SQUAD_MORALE clears the status, the asked list and open prompts', () => {
+      const s = combatReducer(withGuard({ morale: { status: 'fleeing', asked: ['half-size'] } }), { type: 'REQUEST_MORALE', payload: { squadId: 'S' } });
+      const out = combatReducer(s, { type: 'RESET_SQUAD_MORALE', payload: { squadId: 'S' } });
+      expect(out.squads[0].morale).toBeUndefined();
+      expect(out.moralePrompts).toEqual([]);
     });
   });
 

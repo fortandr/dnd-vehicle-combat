@@ -112,7 +112,7 @@ export interface Creature {
   concentrating?: string; // Spell name if concentrating
   notes?: string;
   /** Battle mode: a stack of identical bodies (e.g. "Hobgoblin ×8"). Front body HP = currentHp. */
-  stack?: { size: number; bodies: number; leaderId?: string };
+  stack?: { size: number; bodies: number };
   /** Battle mode morale (DMG 2014 p. 273). */
   morale?: { status?: MoraleStatus; asked: MoraleTrigger[] };
 }

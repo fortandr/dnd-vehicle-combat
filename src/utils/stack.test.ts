@@ -312,11 +312,3 @@ describe('damageNotation', () => {
     expect(damageNotation('')).toBeNull();
   });
 });
-
-describe('normalizeStack leaderId', () => {
-  it('keeps leaderId', () => {
-    const prev = squad(10, 11);
-    const next = { ...prev, stack: { size: 10, bodies: 10, leaderId: 'k' } } as Creature;
-    expect(normalizeStack(prev, next).stack).toEqual({ size: 10, bodies: 10, leaderId: 'k' });
-  });
-});
