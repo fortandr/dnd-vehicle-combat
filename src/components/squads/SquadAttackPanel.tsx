@@ -84,7 +84,7 @@ export function SquadAttackPanel({ squad }: { squad: Creature }) {
       if (!victim) return;
       const perHit = hitRolls.map((r) => r.damage.reduce((sum, d) => sum + adjustForDefenses(d.amount, d.type, victim.statblock), 0));
       if (victim.stack) {
-        dispatch({ type: 'SQUAD_HITS', payload: { creatureId: id, hits: perHit, source } });
+        dispatch({ type: 'SQUAD_HIT', payload: { memberId: id, hits: perHit, source } });
       } else {
         perHit.filter((a) => a > 0).forEach((amount) => dispatch({ type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: id, amount, source } }));
       }

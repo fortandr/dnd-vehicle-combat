@@ -22,7 +22,7 @@ export function SquadRowControls({ creature }: { creature: Creature }) {
   const handleHit = () => {
     if (!valid) return;
     const each = adjustForDefenses(value, type, creature.statblock, magical);
-    dispatch({ type: 'SQUAD_HITS', payload: { creatureId: creature.id, hits: Array(n).fill(each), source: type ? `${value} ${type} × ${n}` : undefined } });
+    dispatch({ type: 'SQUAD_HIT', payload: { memberId: creature.id, hits: Array(n).fill(each), source: type ? `${value} ${type} × ${n}` : undefined } });
     setAmount('');
     setCount('1');
   };

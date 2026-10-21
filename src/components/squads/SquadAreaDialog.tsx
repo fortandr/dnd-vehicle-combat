@@ -52,9 +52,7 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
     dispatch({
       type: 'SQUAD_AREA',
       payload: {
-        creatureId: creature.id,
-        currentHp: area.currentHp,
-        bodies: area.bodies,
+        members: [{ memberId: creature.id, currentHp: area.currentHp, bodies: area.bodies }],
         summary: formatAreaSummary(source || 'Area effect', area, creature.stack?.size ?? bodies),
         details,
       },

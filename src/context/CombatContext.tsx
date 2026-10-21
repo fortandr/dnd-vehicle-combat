@@ -6,12 +6,13 @@
  */
 
 import React, { createContext, useContext, useReducer, useCallback, ReactNode, useEffect, useState, useRef } from 'react';
-import { CombatState, Vehicle, VehicleWeapon, Creature, CrewAssignment, Mishap, LogEntry, LogEntryType, ScaleName, Position, Environment, BattlefieldState, BackgroundImageConfig, ChaseComplication, ActiveBattlefieldComplication, VehicleComplicationResolution, SpeedModifier, ComplicationResolutionStatus, ElevationZone, MoveHistoryEntry, MoraleStatus, DmgEdition } from '../types';
+import { CombatState, Vehicle, VehicleWeapon, Creature, CrewAssignment, Mishap, LogEntry, LogEntryType, ScaleName, Position, Environment, BattlefieldState, BackgroundImageConfig, ChaseComplication, ActiveBattlefieldComplication, VehicleComplicationResolution, SpeedModifier, ComplicationResolutionStatus, ElevationZone, MoveHistoryEntry, MoraleStatus, DmgEdition, Squad, SquadUpdates } from '../types';
 import { SCALES } from '../data/scaleConfig';
 import { getWeaponStationUpgrade, resolveZone } from '../data/vehicleTemplates';
 import { logAnalyticsEvent } from '../firebase';
 import { v4 as uuid } from 'uuid';
-import { migrateSquads, type SquadMigratable } from '../utils/migrateSquads';
+import { migrateSquads, type SquadMigratable, type LegacyCreature } from '../utils/migrateSquads';
+import { placeCommandedSquads, squadOf, squadStandingCount, standingCount, defaultHitTarget } from '../utils/squads';
 import { loadCurrentEncounter } from '../hooks/useLocalStorage';
 import { backfillNavalMovement } from '../utils/navalBackfill';
 import { isNavalVehicle } from '../data/navalUpgrades';
@@ -72,6 +73,9 @@ export const initialCombatState: CombatState = {
 // Action Types
 // ==========================================
 
+/** One member's result from an area effect (computed and rolled in the UI). */
+export interface SquadAreaMemberResult { memberId: string; currentHp: number; bodies?: number; tempHp?: number }
+
 type CombatAction =
   | { type: 'LOAD_ENCOUNTER'; payload: CombatState }
   | { type: 'LOAD_PARTY_PRESET'; payload: { vehicles: Vehicle[]; creatures: Creature[]; crewAssignments: CrewAssignment[] } }
@@ -117,8 +121,17 @@ type CombatAction =
   | { type: 'SET_VEHICLE_COMPONENT_HP'; payload: { vehicleId: string; componentId: string; hp: number } }
   | { type: 'HEAL_VEHICLE'; payload: { vehicleId: string; amount: number } }
   | { type: 'DEAL_DAMAGE_TO_CREATURE'; payload: { creatureId: string; amount: number; source?: string } }
-  | { type: 'SQUAD_HITS'; payload: { creatureId: string; hits: number[]; source?: string } }
-  | { type: 'SQUAD_AREA'; payload: { creatureId: string; currentHp: number; bodies: number; summary: string; details?: string } }
+  | { type: 'SQUAD_HIT'; payload: { squadId?: string; memberId?: string; hits: number[]; source?: string } }
+  | { type: 'SQUAD_AREA'; payload: { squadId?: string; members: SquadAreaMemberResult[]; summary: string; details?: string } }
+
+  // Battle mode squads (v2.13.0)
+  | { type: 'ADD_SQUAD'; payload: Squad }
+  | { type: 'UPDATE_SQUAD'; payload: { id: string; updates: SquadUpdates } }
+  | { type: 'REMOVE_SQUAD'; payload: { id: string; deleteMembers: boolean } }
+  | { type: 'ADD_SQUAD_MEMBER'; payload: { squadId: string; creatureId?: string; creature?: Creature } }
+  | { type: 'REMOVE_SQUAD_MEMBER'; payload: { squadId: string; creatureId: string } }
+  | { type: 'SPLIT_STACK'; payload: { creatureId: string } }
+  | { type: 'GROW_STACK'; payload: { creatureId: string; amount: number } }
   | { type: 'HEAL_CREATURE'; payload: { creatureId: string; amount: number } }
 
   // Mishaps
@@ -367,22 +380,17 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
       const newCreatures = presetCreatures.map((c) => {
         const newId = uuid();
         creatureIdMap.set(c.id, newId);
-        const { morale: _morale, ...rest } = c;
+        // Presets carry no squads; a v2.11/v2.12 `squad` field becomes a plain stack (leader dropped)
+        const { morale: _morale, squad: legacy, stack, ...rest } = c as LegacyCreature;
+        const body = legacy ?? stack;
         return {
           ...rest,
+          ...(body ? { stack: { size: body.size, bodies: body.bodies } } : {}),
           id: newId,
           // Update vehicleId reference if assigned
           vehicleId: c.vehicleId ? vehicleIdMap.get(c.vehicleId) : undefined,
         };
       });
-      // Remap squad leaders now that every creature has its new id (drop leaders not in the preset)
-      const remappedCreatures = newCreatures.map((c) => {
-        if (!c.stack?.leaderId) return c;
-        const { leaderId, ...squadRest } = c.stack;
-        const mapped = creatureIdMap.get(leaderId);
-        return { ...c, stack: mapped ? { ...squadRest, leaderId: mapped } : squadRest };
-      });
-
       // Update crew assignments with new IDs
       const newAssignments = presetAssignments
         .filter((a) => vehicleIdMap.has(a.vehicleId) && creatureIdMap.has(a.creatureId))
@@ -398,9 +406,11 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
       return {
         ...state,
         vehicles: [...enemyVehicles, ...newVehicles],
-        creatures: remappedCreatures,
+        creatures: newCreatures,
+        squads: [],
+        initiativeOrder: state.initiativeOrder.filter((id) => !state.squads.some((s) => s.id === id)),
         crewAssignments: newAssignments,
-        moralePrompts: (state.moralePrompts ?? []).filter((p) => remappedCreatures.some((c) => c.id === p.creatureId)),
+        moralePrompts: (state.moralePrompts ?? []).filter((p) => newCreatures.some((c) => c.id === p.creatureId)),
       };
     }
 
@@ -617,18 +627,25 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
         creatures: [...state.creatures, action.payload],
       };
 
-    case 'REMOVE_CREATURE':
+    case 'REMOVE_CREATURE': {
+      const id = action.payload;
+      const removed = state.creatures.find((c) => c.id === id);
+      const creatures = state.creatures.filter((c) => c.id !== id);
+      const squads = state.squads.map((s) => {
+        let next = s.commanderId === id ? { ...s, commanderId: undefined } : s;
+        if (!s.memberIds.includes(id)) return next;
+        next = { ...next, memberIds: s.memberIds.filter((m) => m !== id), leaderId: s.leaderId === id ? undefined : s.leaderId };
+        return withStartingCount(state, next, creatures, -(removed ? standingCount(removed) : 0));
+      });
       return {
         ...state,
-        creatures: state.creatures.filter((c) => c.id !== action.payload),
-        crewAssignments: state.crewAssignments.filter(
-          (a) => a.creatureId !== action.payload
-        ),
-        initiativeOrder: state.initiativeOrder.filter(
-          (id) => id !== action.payload
-        ),
-        moralePrompts: state.moralePrompts.filter((p) => p.creatureId !== action.payload),
+        creatures,
+        squads,
+        crewAssignments: state.crewAssignments.filter((a) => a.creatureId !== id),
+        initiativeOrder: state.initiativeOrder.filter((x) => x !== id),
+        moralePrompts: state.moralePrompts.filter((p) => p.creatureId !== id),
       };
+    }
 
     case 'UPDATE_CREATURE': {
       const creature = state.creatures.find((c) => c.id === action.payload.id);
@@ -673,6 +690,8 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
 
     // ========== Crew Assignments ==========
     case 'ASSIGN_CREW': {
+      // A squad member cannot be crew (spec "Membership and assignments")
+      if (state.squads.some((s) => s.memberIds.includes(action.payload.creatureId))) return state;
       // Remove existing assignment for this creature
       const filteredAssignments = state.crewAssignments.filter(
         (a) => a.creatureId !== action.payload.creatureId
@@ -800,7 +819,7 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
     case 'SET_INITIATIVE_ORDER':
       return {
         ...state,
-        initiativeOrder: action.payload,
+        initiativeOrder: placeCommandedSquads(action.payload, state.squads, state.crewAssignments),
       };
 
     case 'START_COMBAT': {
@@ -811,11 +830,12 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
       // - Ships (Saltmarsh) use their own initiative, not a driver's
       // - Only creatures NOT assigned to any vehicle act separately
 
-      type InitiativeEntry = { id: string; type: 'creature' | 'vehicle'; initiative: number; name: string };
+      type InitiativeEntry = { id: string; type: 'creature' | 'vehicle' | 'squad'; initiative: number; name: string };
       const initiativeEntries: InitiativeEntry[] = [];
 
       // Get all creature IDs that are assigned to ANY vehicle
       const crewCreatureIds = new Set(state.crewAssignments.map((a) => a.creatureId));
+      const squadMemberIds = new Set(state.squads.flatMap((s) => s.memberIds));
 
       // Add ALL vehicles to initiative
       state.vehicles.forEach((vehicle) => {
@@ -833,7 +853,7 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
 
       // Add creatures that are NOT assigned to any vehicle (they act independently)
       state.creatures.forEach((creature) => {
-        if (!crewCreatureIds.has(creature.id)) {
+        if (!crewCreatureIds.has(creature.id) && !squadMemberIds.has(creature.id)) {
           initiativeEntries.push({
             id: creature.id,
             type: 'creature',
@@ -841,6 +861,13 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
             name: creature.name,
           });
         }
+      });
+
+      // Battle mode squads: one slot each; a squad with no one standing gets none (VVTT rule 5)
+      const squads = state.squads.map((s) => ({ ...s, startingCount: squadStandingCount(s, state.creatures) }));
+      squads.forEach((squad) => {
+        if (squad.startingCount === 0) return;
+        initiativeEntries.push({ id: squad.id, type: 'squad', initiative: squad.initiative ?? 0, name: squad.name });
       });
 
       // Sort by initiative (descending), then alphabetically for ties
@@ -853,9 +880,10 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
 
       return {
         ...state,
+        squads,
         phase: 'combat',
         round: 1,
-        initiativeOrder: initiativeEntries.map((e) => e.id),
+        initiativeOrder: placeCommandedSquads(initiativeEntries.map((e) => e.id), squads, state.crewAssignments),
         currentTurnIndex: 0,
         movementUsed: {},
         shipActionsUsed: {},
@@ -889,6 +917,13 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
           continue;
         }
 
+        // Skip squads with no one standing
+        const candidateSquad = state.squads.find((s) => s.id === candidateId);
+        if (candidateSquad && squadStandingCount(candidateSquad, state.creatures) === 0) {
+          nextIndex++;
+          continue;
+        }
+
         // Found a valid turn
         break;
       }
@@ -901,6 +936,7 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
       const nextId = state.initiativeOrder[nextIndex];
       const nextVehicle = state.vehicles.find((v) => v.id === nextId);
       const nextCreature = state.creatures.find((c) => c.id === nextId);
+      const nextSquad = state.squads.find((s) => s.id === nextId);
 
       let turnName = 'Unknown';
       if (nextVehicle) {
@@ -908,6 +944,8 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
         turnName = driver ? `${nextVehicle.name} (${driver.name})` : nextVehicle.name;
       } else if (nextCreature) {
         turnName = nextCreature.name;
+      } else if (nextSquad) {
+        turnName = nextSquad.name;
       }
 
       return {
@@ -970,7 +1008,8 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
         state.initiativeOrder,
         state.vehicles,
         state.creatures,
-        state.crewAssignments
+        state.crewAssignments,
+        state.squads
       );
 
       return {
@@ -1011,6 +1050,7 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
         shipActionsUsed: {},
         moralePrompts: [],
         moveHistory: [],
+        squads: state.squads.map(({ morale: _morale, initiative: _initiative, ...s }) => s),
         vehicles: state.vehicles.map((v) => ({
           ...v,
           currentHp: v.template.maxHp,
@@ -1286,24 +1326,160 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
       };
     }
 
-    case 'SQUAD_HITS': {
-      const creature = state.creatures.find((c) => c.id === action.payload.creatureId);
-      if (!creature?.stack) return state;
-      return applyStackHitsToState(state, creature, action.payload.hits, action.payload.source);
+    case 'SQUAD_HIT': {
+      const squadForHit = action.payload.squadId ? state.squads.find((x) => x.id === action.payload.squadId) : undefined;
+      const member = action.payload.memberId
+        ? state.creatures.find((c) => c.id === action.payload.memberId)
+        : squadForHit && defaultHitTarget(squadForHit, state.creatures);
+      if (!member) return state;
+      if (member.stack) return applyStackHitsToState(state, member, action.payload.hits, action.payload.source);
+      return action.payload.hits
+        .filter((h) => h > 0)
+        .reduce(
+          (s, amount) => baseCombatReducer(s, { type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: member.id, amount, source: action.payload.source } }),
+          state,
+        );
     }
 
     case 'SQUAD_AREA': {
-      const creature = state.creatures.find((c) => c.id === action.payload.creatureId);
-      if (!creature?.stack) return state;
-      const next = normalizeStack(creature, {
-        ...creature,
-        currentHp: action.payload.currentHp,
-        stack: { ...creature.stack, bodies: action.payload.bodies },
+      const results = new Map(action.payload.members.map((m) => [m.memberId, m]));
+      const creatures = state.creatures.map((c) => {
+        const r = results.get(c.id);
+        if (!r) return c;
+        if (c.stack) {
+          return { ...c, ...normalizeStack(c, { ...c, currentHp: r.currentHp, stack: { ...c.stack, bodies: r.bodies ?? c.stack.bodies } }) };
+        }
+        return { ...c, currentHp: Math.max(0, Math.min(c.statblock.maxHp, r.currentHp)), tempHp: r.tempHp ?? c.tempHp };
       });
       return {
         ...state,
-        creatures: state.creatures.map((c) => (c.id === creature.id ? { ...c, ...next } : c)),
+        creatures,
         actionLog: [...state.actionLog, createLogEntry(state.round, 'damage', action.payload.summary, action.payload.details)],
+      };
+    }
+
+    // ========== Battle mode squads ==========
+    case 'ADD_SQUAD': {
+      const squads = [...state.squads, action.payload];
+      // A squad created with standing members during combat needs a turn slot (controller ruling P4)
+      const standing = state.phase === 'combat' && squadStandingCount(action.payload, state.creatures) > 0;
+      const slot = standing && !state.initiativeOrder.includes(action.payload.id)
+        ? giveSquadSlot(state, action.payload.id, action.payload.memberIds)
+        : {};
+      const merged = { ...state, ...slot, squads };
+      return { ...merged, initiativeOrder: placeCommandedSquads(merged.initiativeOrder, squads, state.crewAssignments) };
+    }
+
+    case 'UPDATE_SQUAD': {
+      const squad = state.squads.find((s) => s.id === action.payload.id);
+      if (!squad) return state;
+      const updates = { ...action.payload.updates };
+      if (updates.leaderId && !squad.memberIds.includes(updates.leaderId)) delete updates.leaderId;
+      if (updates.commanderId) {
+        const pc = state.creatures.find((c) => c.id === updates.commanderId);
+        const taken = state.squads.some((s) => s.id !== squad.id && s.commanderId === updates.commanderId);
+        if (!pc || pc.statblock.type !== 'pc' || squad.memberIds.includes(pc.id) || taken) delete updates.commanderId;
+      }
+      const squads = state.squads.map((s) => (s.id === squad.id ? { ...s, ...updates } : s));
+      return { ...state, squads, initiativeOrder: placeCommandedSquads(state.initiativeOrder, squads, state.crewAssignments) };
+    }
+
+    case 'REMOVE_SQUAD': {
+      const squad = state.squads.find((s) => s.id === action.payload.id);
+      if (!squad) return state;
+      const base: CombatState = {
+        ...state,
+        ...removeFromOrder(state, squad.id),
+        moralePrompts: state.moralePrompts.filter((p) => p.squadId !== squad.id),
+      };
+      if (action.payload.deleteMembers) {
+        const gone = new Set(squad.memberIds);
+        let next = base;
+        for (const id of squad.memberIds) next = { ...next, ...removeFromOrder(next, id) };
+        return {
+          ...next,
+          squads: next.squads.filter((s) => s.id !== squad.id),
+          creatures: next.creatures.filter((c) => !gone.has(c.id)),
+          moralePrompts: next.moralePrompts.filter((p) => !p.creatureId || !gone.has(p.creatureId)),
+        };
+      }
+      const released = releaseMembers(base, squad, squad.memberIds);
+      return { ...released, squads: released.squads.filter((s) => s.id !== squad.id) };
+    }
+
+    case 'ADD_SQUAD_MEMBER': {
+      const squad = state.squads.find((s) => s.id === action.payload.squadId);
+      if (!squad) return state;
+      const incoming = action.payload.creature;
+      const creatures = incoming ? [...state.creatures, { ...incoming, faction: squad.faction }] : state.creatures;
+      const member = creatures.find((c) => c.id === (incoming?.id ?? action.payload.creatureId));
+      if (
+        !member
+        || squadOf(member.id, state.squads)
+        || state.squads.some((s) => s.commanderId === member.id)
+        || state.crewAssignments.some((a) => a.creatureId === member.id)
+      ) return state;
+      const joined: Squad = { ...squad, memberIds: [...squad.memberIds, member.id] };
+      const squads = state.squads.map((s) => (s.id === squad.id ? withStartingCount(state, joined, creatures, standingCount(member)) : s));
+      // Controller ruling P4: a squad with no slot gets one on gaining its first standing member
+      const needsSlot = state.phase === 'combat' && !state.initiativeOrder.includes(squad.id) && standingCount(member) > 0;
+      const order = needsSlot ? giveSquadSlot(state, squad.id, [member.id]) : removeFromOrder(state, member.id);
+      return {
+        ...state,
+        ...order,
+        initiativeOrder: placeCommandedSquads(order.initiativeOrder, squads, state.crewAssignments),
+        creatures,
+        squads,
+        moralePrompts: state.moralePrompts.filter((p) => p.creatureId !== member.id),
+      };
+    }
+
+    case 'REMOVE_SQUAD_MEMBER': {
+      const squad = state.squads.find((s) => s.id === action.payload.squadId);
+      if (!squad || !squad.memberIds.includes(action.payload.creatureId)) return state;
+      return releaseMembers(state, squad, [action.payload.creatureId]);
+    }
+
+    case 'SPLIT_STACK': {
+      const source = state.creatures.find((c) => c.id === action.payload.creatureId);
+      const stack = source?.stack;
+      if (!source || !stack || stack.bodies < 2) return state;
+      const squad = squadOf(source.id, state.squads);
+      const { stack: _stack, morale: _morale, ...rest } = source;
+      const single: Creature = {
+        ...rest,
+        id: uuid(),
+        name: source.statblock.name,
+        currentHp: source.statblock.maxHp,
+        tempHp: 0,
+        conditions: [],
+        position: squad ? squad.position : source.position,
+      };
+      const creatures = [
+        ...state.creatures.map((c) => (c.id === source.id ? { ...c, stack: { ...stack, size: stack.size - 1, bodies: stack.bodies - 1 } } : c)),
+        single,
+      ];
+      return {
+        ...state,
+        creatures,
+        initiativeOrder: insertAfterCurrent(state, [single.id]),
+        squads: squad ? state.squads.map((s) => (s.id === squad.id ? withStartingCount(state, s, creatures, -1) : s)) : state.squads,
+      };
+    }
+
+    case 'GROW_STACK': {
+      const source = state.creatures.find((c) => c.id === action.payload.creatureId);
+      const stack = source?.stack;
+      const n = Math.max(0, Math.floor(action.payload.amount));
+      if (!source || !stack || n === 0) return state;
+      const grown: Creature = { ...source, stack: { ...stack, size: stack.size + n, bodies: stack.bodies + n } };
+      const updated = { ...grown, ...normalizeStack(source, grown) };
+      const creatures = state.creatures.map((c) => (c.id === source.id ? updated : c));
+      const squad = squadOf(source.id, state.squads);
+      return {
+        ...state,
+        creatures,
+        squads: squad ? state.squads.map((s) => (s.id === squad.id ? withStartingCount(state, s, creatures, n) : s)) : state.squads,
       };
     }
 
@@ -1785,7 +1961,8 @@ function rebuildInitiativeOrder(
   currentOrder: string[],
   vehicles: Vehicle[],
   creatures: Creature[],
-  crewAssignments: CrewAssignment[]
+  crewAssignments: CrewAssignment[],
+  squads: Squad[]
 ): string[] {
   type InitiativeEntry = { id: string; initiative: number; name: string };
   const initiativeEntries: InitiativeEntry[] = [];
@@ -1826,6 +2003,13 @@ function rebuildInitiativeOrder(
     });
   }
 
+  // Battle mode squads in the current order (skip squads with no one standing)
+  for (const squad of squads) {
+    if (!currentOrderSet.has(squad.id)) continue;
+    if (squadStandingCount(squad, creatures) === 0) continue;
+    initiativeEntries.push({ id: squad.id, initiative: squad.initiative ?? 0, name: squad.name });
+  }
+
   // Sort by initiative (descending), then alphabetically for ties
   initiativeEntries.sort((a, b) => {
     if (b.initiative !== a.initiative) {
@@ -1834,7 +2018,7 @@ function rebuildInitiativeOrder(
     return a.name.localeCompare(b.name);
   });
 
-  return initiativeEntries.map((e) => e.id);
+  return placeCommandedSquads(initiativeEntries.map((e) => e.id), squads, crewAssignments);
 }
 
 function createLogEntry(
@@ -1868,6 +2052,67 @@ function applyStackHitsToState(state: CombatState, creature: Creature, hits: num
       createLogEntry(state.round, 'damage', formatStackHits(creature.name, hits.length, result.fell, result.bodies, size), source),
     ],
   };
+}
+
+/** Battle mode: drop an id from the turn order, keeping the current turn on the same entry. */
+function removeFromOrder(state: CombatState, id: string): Pick<CombatState, 'initiativeOrder' | 'currentTurnIndex'> {
+  const at = state.initiativeOrder.indexOf(id);
+  if (at === -1) return { initiativeOrder: state.initiativeOrder, currentTurnIndex: state.currentTurnIndex };
+  const initiativeOrder = state.initiativeOrder.filter((x) => x !== id);
+  const shifted = at < state.currentTurnIndex ? state.currentTurnIndex - 1 : state.currentTurnIndex;
+  return { initiativeOrder, currentTurnIndex: Math.min(shifted, Math.max(0, initiativeOrder.length - 1)) };
+}
+
+/** During combat, creatures leaving a squad act right after the current turn (as UNASSIGN_CREW does). */
+function insertAfterCurrent(state: CombatState, ids: string[]): string[] {
+  const toInsert = state.phase === 'combat' ? ids.filter((id) => !state.initiativeOrder.includes(id)) : [];
+  if (toInsert.length === 0) return state.initiativeOrder;
+  const at = state.currentTurnIndex + 1;
+  return [...state.initiativeOrder.slice(0, at), ...toInsert, ...state.initiativeOrder.slice(at)];
+}
+
+/** VVTT rule 4 bookkeeping: setup recomputes the starting count; combat adjusts it by `delta`. */
+function withStartingCount(state: CombatState, squad: Squad, creatures: Creature[], delta: number): Squad {
+  return state.phase === 'combat'
+    ? { ...squad, startingCount: Math.max(0, squad.startingCount + delta) }
+    : { ...squad, startingCount: squadStandingCount(squad, creatures) };
+}
+
+/** Members leave a squad and become standalone at the squad's position (or unplaced). */
+function releaseMembers(state: CombatState, squad: Squad, memberIds: string[]): CombatState {
+  const leaving = new Set(memberIds);
+  const leavers = state.creatures.filter((c) => leaving.has(c.id));
+  const creatures = state.creatures.map((c) => (leaving.has(c.id) ? { ...c, position: squad.position } : c));
+  const remaining: Squad = {
+    ...squad,
+    memberIds: squad.memberIds.filter((id) => !leaving.has(id)),
+    leaderId: squad.leaderId && leaving.has(squad.leaderId) ? undefined : squad.leaderId,
+  };
+  const delta = -leavers.reduce((sum, c) => sum + standingCount(c), 0);
+  const names = leavers.map((c) => c.name).join(', ');
+  return {
+    ...state,
+    creatures,
+    squads: state.squads.map((s) => (s.id === squad.id ? withStartingCount(state, remaining, creatures, delta) : s)),
+    initiativeOrder: insertAfterCurrent(state, memberIds),
+    actionLog: state.phase === 'combat' && names
+      ? [...state.actionLog, createLogEntry(state.round, 'movement', `${names} ${leavers.length === 1 ? 'leaves' : 'leave'} ${squad.name}`, 'Acts immediately after current turn, then normal initiative next round')]
+      : state.actionLog,
+  };
+}
+
+/**
+ * During combat, a squad with no turn slot gets one when it gains a standing member: it takes the slot of the
+ * first member that had one (other members' slots are dropped), else it acts right after the current turn.
+ */
+function giveSquadSlot(state: CombatState, squadId: string, memberIds: string[]): Pick<CombatState, 'initiativeOrder' | 'currentTurnIndex'> {
+  let order = state.initiativeOrder;
+  const holder = memberIds.find((id) => order.includes(id));
+  if (holder) order = order.map((id) => (id === holder ? squadId : id));
+  else order = [...order.slice(0, state.currentTurnIndex + 1), squadId, ...order.slice(state.currentTurnIndex + 1)];
+  let next: CombatState = { ...state, initiativeOrder: order };
+  for (const id of memberIds) next = { ...next, ...removeFromOrder(next, id) };
+  return { initiativeOrder: next.initiativeOrder, currentTurnIndex: next.currentTurnIndex };
 }
 
 /**
@@ -1962,6 +2207,7 @@ interface CombatContextValue {
 
   // Computed values
   currentTurnCreature: Creature | undefined;
+  currentTurnSquad: Squad | undefined;
   currentTurnVehicle: Vehicle | undefined;
   currentTurnDriver: Creature | undefined;
   isSetupPhase: boolean;
@@ -2463,6 +2709,7 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
   const currentTurnCreature = currentTurnVehicle
     ? undefined
     : state.creatures.find((c) => c.id === currentTurnId);
+  const currentTurnSquad = state.squads.find((s) => s.id === currentTurnId);
 
   const isSetupPhase = state.phase === 'setup';
   const isCombatActive = state.phase === 'combat';
@@ -2509,6 +2756,7 @@ export function CombatProvider({ children, initialState }: CombatProviderProps) 
     getDriverDexSave,
     getEffectiveSpeed,
     currentTurnCreature,
+    currentTurnSquad,
     currentTurnVehicle,
     currentTurnDriver,
     isSetupPhase,
