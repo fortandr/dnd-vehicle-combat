@@ -160,8 +160,11 @@ function CurrentTurnInfo() {
     // Collect all enemy targets: vehicles and unassigned creatures
     const enemyVehicles = state.vehicles.filter(v => v.type !== attackerFaction);
     const assignedCreatureIds = new Set(state.crewAssignments.map(a => a.creatureId));
+    // Squad members have no tokens of their own, so their stored positions are stale: skip them
+    const squadMemberIds = new Set(state.squads.flatMap(s => s.memberIds));
     const enemyCreatures = state.creatures.filter(c =>
       !assignedCreatureIds.has(c.id) &&
+      !squadMemberIds.has(c.id) &&
       c.position &&
       (attackerFaction === 'party' ? c.statblock.type !== 'pc' : c.statblock.type === 'pc')
     );

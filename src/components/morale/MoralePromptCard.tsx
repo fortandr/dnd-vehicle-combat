@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Box, Button, FormControlLabel, Stack, Switch, Typography } from '@mui/material';
 import { useCombat } from '../../context/CombatContext';
 import type { MoralePrompt } from '../../types';
-import { moraleSaver, squadMoraleSaver, rollMorale, formatMoraleLog, moraleTriggerText, MORALE_DC, type MoraleOutcome } from '../../utils/morale';
+import { isLeaderDown, moraleSaver, squadMoraleSaver, rollMorale, formatMoraleLog, moraleTriggerText, MORALE_DC, type MoraleOutcome } from '../../utils/morale';
 import { squadStandingCount } from '../../utils/squads';
 import { rollDie } from '../../utils/diceEngine';
 
@@ -15,6 +15,9 @@ export function MoralePromptCard({ prompt, onResolved }: { prompt: MoralePrompt;
   if (!squad && !creature) return null;
 
   const squadSaver = squad ? squadMoraleSaver(squad, state.creatures) : undefined;
+  const leader = squad?.leaderId ? state.creatures.find((c) => c.id === squad.leaderId) : undefined;
+  // A standing PC leader never saves (spec: PCs never make morale saves); the save falls to VVTT rule 3.
+  const pcLeaderStanding = leader !== undefined && leader.statblock.type === 'pc' && !isLeaderDown(leader);
   const saverInfo = squad ? squadSaver : creature ? moraleSaver(creature) : undefined;
   const strength = squad
     ? { standing: squadStandingCount(squad, state.creatures), starting: squad.startingCount }
@@ -27,6 +30,8 @@ export function MoralePromptCard({ prompt, onResolved }: { prompt: MoralePrompt;
     ? 'No one standing can save: dismiss it, or mark it as failing'
     : squadSaver?.usingLeader
       ? `${saverInfo.saver.name} (leader) saves for the squad: ${bonusText}`
+      : squad && pcLeaderStanding
+        ? `${leader?.name} (PC) doesn't make morale saves: ${saverInfo.saver.name} saves for the squad (VVTT rule: largest standing stack): ${bonusText}`
       : squad
         ? `Leader down: ${saverInfo.saver.name} saves (VVTT rule: largest standing stack): ${bonusText}`
         : `${bonusText} save`;

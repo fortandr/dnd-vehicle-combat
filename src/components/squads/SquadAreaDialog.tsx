@@ -148,7 +148,8 @@ export function SquadAreaDialog({ members, title, squadId, open, onClose }: {
                 onChange={(e) => { setWidthText(e.target.value); resetCounts(); }} />
             )}
             <TextField
-              size="small" type="number" label={members.length > 1 ? 'Caught in total' : 'Bodies caught'} value={total}
+              size="small" type="number" label={members.length > 1 ? 'Caught in total' : 'Bodies caught'}
+              value={Object.keys(memberOverrides).length > 0 ? caughtSum : total}
               onChange={(e) => { setTotalOverride(Math.max(0, parseInt(e.target.value) || 0)); setMemberOverrides({}); }}
               helperText={`${advice.citation} suggests ${suggested} — ${advice.advice} (${totalStanding} standing)${edition === '2024' ? '. VVTT rule: sizes between rows use the row below' : ''}`}
             />

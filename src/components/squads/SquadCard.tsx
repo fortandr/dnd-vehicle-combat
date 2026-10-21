@@ -190,7 +190,7 @@ export function SquadCard({ squad, index }: { squad: Squad; index: number }) {
 
       {/* Staff menu */}
       <Menu anchorEl={staffMenu} open={Boolean(staffMenu)} onClose={() => setStaffMenu(null)}>
-        <MenuItem disabled={existing.length === 0} onClick={(e) => { setExistingMenu(e.currentTarget); setStaffMenu(null); }}>
+        <MenuItem disabled={existing.length === 0} onClick={() => { setExistingMenu(staffMenu); setStaffMenu(null); }}>
           Existing creature…
         </MenuItem>
         <MenuItem onClick={() => { setStaffMenu(null); setSearchOpen(true); }}>Monster search…</MenuItem>
