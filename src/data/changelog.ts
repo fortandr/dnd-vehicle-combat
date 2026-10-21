@@ -14,6 +14,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '2.13.0',
+    date: '2026-10-21',
+    changes: [
+      { type: 'feature', description: 'Squads tab: next to Map and Vehicles. Create a squad, name it, pick Enemy or Party, then staff it like a vehicle — an existing creature, an Open5e monster or a custom NPC (quantity 2 or more adds one stack such as "Hobgoblin ×8", up to 50), or more bodies for a stack.' },
+      { type: 'feature', description: 'Mixed squads: one squad can hold different creatures (e.g. a captain, Hobgoblin ×8, archers ×4 and Karkajuk). It takes one initiative slot and one map token showing how many still stand (e.g. 13/14) on the DM map and the player view, and its turn resolves in one panel that rolls every member\'s attacks and applies the hits.' },
+      { type: 'feature', description: 'PC commanders: make a PC a squad\'s commander. The PC keeps their own turn and the squad acts right after them (VVTT rule).' },
+      { type: 'feature', description: 'Morale on squads: the leader (★) and morale now belong to the squad. A morale card comes up when the leader goes down or the squad drops to half its starting strength (VVTT rule); with the leader down, the largest stack saves (VVTT rule).' },
+      { type: 'improvement', description: 'Hit… and Area… on the squad card and token: hits default to the largest stack (VVTT rule); area effects split the DMG 2014 p. 249 / DMG 2024 p. 82 count across members by standing bodies (VVTT rule), and every count can be edited.' },
+      { type: 'improvement', description: 'Saved squads migrate automatically: each v2.11/v2.12 squad opens as a squad holding a stack, with its leader as a member. A leader shared by several squads joins only the first; the others migrate without a leader.' },
+      { type: 'improvement', description: 'The "Add as one squad" switch is replaced by staffing from the Squads tab: adding several monsters from the sidebar now always adds separate numbered creatures.' },
+      { type: 'improvement', description: 'A standalone stack\'s turn panel no longer has an editable "attacks each" count: the new squad turn panel replaces the old one and rolls every body\'s attacks.' },
+    ],
+  },
+  {
     version: '2.12.0',
     date: '2026-10-20',
     changes: [

@@ -367,36 +367,72 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" paragraph>
-              <strong>Squads.</strong> When adding several of the same monster from <strong>Search Open5e</strong>, switch
-              on <strong>Add as one squad</strong> to get one row, one initiative slot and one token showing how many are
-              still standing (e.g. 8/10). On a squad&apos;s turn, the right panel&apos;s <strong>Squad attack</strong> rolls
-              every attack at once: a natural 20 is a critical hit and a natural 1 misses. Then <strong>Apply</strong>
-              sends each hit to the target. In the squad&apos;s row, <strong>Hit</strong> deals single-target hits, and
-              <strong> Area…</strong> handles spells like fireball. It suggests how many bodies are caught using the
-              DMG&apos;s area-of-effect guidance — 2014 (p. 249) or 2024 (p. 82); pick the edition with the
-              <strong> DMG rules</strong> toggle at the top of the dialog (the 2024 table catches more creatures) — which
-              you can adjust, then rolls each body&apos;s save. Healing restores the front body only and never brings
-              back the fallen. Tick <strong>Magical</strong> when the damage comes from a magic weapon or spell, so
+              <strong>The Squads tab</strong> sits next to Map and Vehicles. Click <strong>+ New squad</strong>, name it,
+              pick <strong>Enemy</strong> or <strong>Party</strong>, then use <strong>Staff</strong> the way you crew a
+              vehicle: <strong>Existing creature…</strong> (one not already in a squad or on a vehicle),
+              <strong> Monster search…</strong> or <strong>Custom NPC…</strong> (quantity 1 adds one creature; 2 or more
+              adds one <em>stack</em> such as &quot;Hobgoblin ×8&quot;, up to 50), or <strong>Add bodies…</strong> to a
+              stack. Squads can mix creature types, for example a captain, Hobgoblin ×8, archers ×4 and Karkajuk. Adding
+              several monsters from the sidebar&apos;s Open5e search always adds separate numbered creatures.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              Each member&apos;s menu has <strong>Make leader ★</strong> (or <strong>Clear leader</strong>),
+              <strong> Remove from squad</strong> (it becomes a standalone creature where the squad stands; in combat it
+              acts right after the current turn), <strong>Split off 1</strong> (stacks only) and
+              <strong> View statblock</strong>. The squad menu has <strong>Disband</strong> (members stay as standalone
+              creatures), <strong>Delete squad and members</strong> and <strong>Reset morale</strong>. Members at 0 HP or
+              0 bodies stay on the card, greyed out. In the sidebar, members are listed under their squad.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>In combat</strong> a squad takes one initiative slot and one map token (<strong>Place on map</strong>
+              on its card). The token shows the squad&apos;s name, how many still stand against how many started (e.g.
+              13/14), the leader&apos;s ★ and its morale. The player view shows the same token, never the members. On the
+              squad&apos;s turn the right panel lists every standing member with an attack and a target:
+              <strong> Roll all</strong> rolls every attack of every body (natural 20 crits, natural 1 misses; not the
+              DMG 2014 p. 250 mob shortcut), then <strong>Apply hits</strong> sends each hit to its target.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>PC commanders:</strong> pick a PC in the card&apos;s <strong>Commander</strong> menu. The PC keeps
+              their own turn; the squad acts right after them and follows them if their initiative changes. A PC can
+              command one squad and is never a member.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Hurting squads:</strong> <strong>Hit…</strong> and <strong>Area…</strong> are on the squad card and
+              on the token&apos;s right-click menu. A hit on a stack damages its front body only and overkill is lost.
+              Area… suggests how many are caught from the DMG area-of-effect table (DMG 2014 p. 249 or DMG 2024 p. 82, pick
+              the edition with the <strong>DMG rules</strong> toggle at the top of the dialog), caps it at the number standing, and splits it across members; every count
+              can be edited. Each caught body saves with its own member&apos;s bonus. Healing works per member and never
+              revives a fallen body. Switch on <strong>Magical damage</strong> when the damage comes from a magic weapon or spell, so
               resistances to nonmagical attacks don&apos;t apply.
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Morale (DMG 2014 p. 273, optional rule; the 2024 DMG has none).</strong> Give a squad a
-              <strong> Leader</strong> in its edit form. The app shows a morale card at the top of the right panel when
-              a squad&apos;s leader drops to 0 HP, is incapacitated or is removed; when a squad first falls to half
-              strength (the DMG only counts this if the other side has had no losses, so dismiss it otherwise); or when
-              a single monster first drops to half its HP. The leader, or the squad itself if no leader is standing,
-              makes a DC 10 Wisdom save. Tick disadvantage for overwhelming odds, or mark it as failing automatically.
-              A failure marks the creature <strong>Fleeing</strong>; click the chip in its row to change it to
-              <strong> Surrendered</strong> or clear it. Use the row&apos;s <strong>Morale</strong> button for surprise
-              or any other reason.
+              <strong>Morale (DMG 2014 p. 273, optional rule; the 2024 DMG has none):</strong> a morale card appears when
+              a squad&apos;s leader goes down (0 HP, dead or incapacitated) or the squad drops to half strength, and when
+              a lone monster drops to half its HP. The leader makes the DC 10 Wisdom save. A failed save marks the squad
+              <strong> Fleeing</strong> on its card, its turn and its token on both maps; click the chip on the card to
+              change it to <strong>Surrendered</strong> or clear it. PCs never make morale saves.
+            </Typography>
+            <Typography variant="body2" component="div" sx={{ mb: 1 }}>
+              <strong>VVTT rules</strong> (not in the books, to keep big fights fast):
+            </Typography>
+            <Typography variant="body2" component="div" sx={{ pl: 2, mb: 1 }}>
+              • <strong>VVTT rule 1 — default hit target:</strong> in 5e the attacker picks; Hit… defaults to the largest
+              stack (the front rank), never the leader.<br />
+              • <strong>VVTT rule 2 — area split:</strong> the area&apos;s total is split by standing bodies (an individual
+              counts 1), largest remainder first, never more than a member has standing.<br />
+              • <strong>VVTT rule 3 — morale without a leader:</strong> the largest standing stack saves; with no stacks,
+              the first standing member.<br />
+              • <strong>VVTT rule 4 — half strength:</strong> standing members (each stack body and each individual counts
+              1) at or below half of the count when combat started.<br />
+              • <strong>VVTT rule 5 — squad initiative:</strong> a commanded squad acts right after its commander; otherwise
+              d20 + the leader&apos;s DEX modifier (else the first member&apos;s), rolled with the PC button for party
+              squads and the NPC button for enemy squads.<br />
+              • Each morale trigger is asked once per battle; fleeing and surrendered squads keep their initiative slot;
+              squad tokens move freely (no movement budget); Multiattack rolls its count of the first attack.
             </Typography>
             <Typography variant="body2">
-              <strong>VVTT rules</strong> (not in the books, to keep big fights fast): a squad acts as one creature
-              on one initiative; only its front body is tracked, so a single hit can drop at most one body and
-              overkill is lost; attackers default to every standing body; after an area effect the most wounded
-              survivor becomes the front body; squads don&apos;t use temporary HP; each morale trigger is asked only
-              once per battle; a squad with no leader standing saves with its own statblock; fleeing and surrendered
-              creatures keep their place in initiative; with the 2024 area table, sizes between rows use the row below.
+              <strong>Older saves:</strong> squads from v2.11–v2.12 open as a squad holding a stack, with their old leader
+              as a member. A leader shared by several squads joins only the first.
             </Typography>
           </AccordionDetails>
         </Accordion>
