@@ -1367,7 +1367,7 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
         ? giveSquadSlot(state, action.payload.id, action.payload.memberIds)
         : {};
       const merged = { ...state, ...slot, squads };
-      return { ...merged, initiativeOrder: placeCommandedSquads(merged.initiativeOrder, squads, state.crewAssignments) };
+      return { ...merged, ...placeKeepingTurn(merged.initiativeOrder, merged.currentTurnIndex, squads, state.crewAssignments) };
     }
 
     case 'UPDATE_SQUAD': {
@@ -1381,7 +1381,7 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
         if (!pc || pc.statblock.type !== 'pc' || squad.memberIds.includes(pc.id) || taken) delete updates.commanderId;
       }
       const squads = state.squads.map((s) => (s.id === squad.id ? { ...s, ...updates } : s));
-      return { ...state, squads, initiativeOrder: placeCommandedSquads(state.initiativeOrder, squads, state.crewAssignments) };
+      return { ...state, squads, ...placeKeepingTurn(state.initiativeOrder, state.currentTurnIndex, squads, state.crewAssignments) };
     }
 
     case 'REMOVE_SQUAD': {
@@ -1426,8 +1426,7 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
       const order = needsSlot ? giveSquadSlot(state, squad.id, [member.id]) : removeFromOrder(state, member.id);
       return {
         ...state,
-        ...order,
-        initiativeOrder: placeCommandedSquads(order.initiativeOrder, squads, state.crewAssignments),
+        ...placeKeepingTurn(order.initiativeOrder, order.currentTurnIndex, squads, state.crewAssignments),
         creatures,
         squads,
         moralePrompts: state.moralePrompts.filter((p) => p.creatureId !== member.id),
@@ -2099,6 +2098,14 @@ function releaseMembers(state: CombatState, squad: Squad, memberIds: string[]): 
       ? [...state.actionLog, createLogEntry(state.round, 'movement', `${names} ${leavers.length === 1 ? 'leaves' : 'leave'} ${squad.name}`, 'Acts immediately after current turn, then normal initiative next round')]
       : state.actionLog,
   };
+}
+
+/** placeCommandedSquads, keeping the current turn on the same combatant. */
+function placeKeepingTurn(order: string[], turnIndex: number, squads: Squad[], crewAssignments: CrewAssignment[]): Pick<CombatState, 'initiativeOrder' | 'currentTurnIndex'> {
+  const currentId = order[turnIndex];
+  const initiativeOrder = placeCommandedSquads(order, squads, crewAssignments);
+  const at = initiativeOrder.indexOf(currentId);
+  return { initiativeOrder, currentTurnIndex: at === -1 ? turnIndex : at };
 }
 
 /**

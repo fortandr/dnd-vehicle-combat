@@ -571,4 +571,11 @@ describe('battle mode squads tab', () => {
     const second = combatReducer(first, { type: 'SQUAD_HIT', payload: { squadId: 'S', hits: [11] } });
     expect(second.creatures[1].stack?.bodies).toBe(1);
   });
+
+  it('commanding a squad mid-combat keeps the current turn on the same combatant', () => {
+    const s = fight([pc('p'), ind('x'), stk('h', 8)], [sq('S', ['h'], { startingCount: 8 })], ['S', 'x', 'p'], 1);
+    const out = combatReducer(s, { type: 'UPDATE_SQUAD', payload: { id: 'S', updates: { commanderId: 'p' } } });
+    expect(out.initiativeOrder).toEqual(['x', 'p', 'S']);
+    expect(out.initiativeOrder[out.currentTurnIndex]).toBe('x');
+  });
 });
