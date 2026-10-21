@@ -47,6 +47,9 @@ import { Creature, Statblock } from '../../types';
 import { resolveZone } from '../../data/vehicleTemplates';
 import { factionColors, withOpacity } from '../../theme/customColors';
 import { isNavalVehicle } from '../../data/navalUpgrades';
+import { groupBySquad, squadInitiativeBonus } from '../../utils/squads';
+import { SquadListGroup } from '../squads/SquadListGroup';
+import { SquadInitiativeRow } from '../squads/SquadInitiativeRow';
 import { rollShipInitiative, formatShipInitiativeLog, vehicleInitiative } from '../../utils/shipTurn';
 
 // Quick presets for NPCs/Enemies
@@ -261,6 +264,23 @@ export function Sidebar() {
       });
   };
 
+  // VVTT rule 5: uncommanded squads roll d20 + the leader's DEX modifier (else the first member's).
+  // Party squads roll with the PC button, enemy squads with the NPC button. Commanded squads follow their PC.
+  const rollSquadsInit = (faction: 'party' | 'enemy') => {
+    state.squads
+      .filter((s) => s.faction === faction && !s.commanderId && s.memberIds.length > 0)
+      .forEach((squad) => {
+        const d20 = Math.floor(Math.random() * 20) + 1;
+        const bonus = squadInitiativeBonus(squad, state.creatures);
+        const total = d20 + bonus;
+        dispatch({ type: 'UPDATE_SQUAD', payload: { id: squad.id, updates: { initiative: total } } });
+        dispatch({
+          type: 'LOG_ACTION',
+          payload: { type: 'system', action: `${squad.name} initiative: ${d20} ${bonus < 0 ? '−' : '+'} ${Math.abs(bonus)} = ${total} (VVTT rule: leader's DEX)` },
+        });
+      });
+  };
+
   // Roll initiative for all NPCs/Enemies
   const handleRollAllNpcInit = () => {
     const npcs = state.creatures.filter(c => c.statblock.type !== 'pc');
@@ -279,6 +299,7 @@ export function Sidebar() {
         },
       });
     });
+    rollSquadsInit('enemy');
     rollShipsInit('enemy');
   };
 
@@ -300,6 +321,7 @@ export function Sidebar() {
         },
       });
     });
+    rollSquadsInit('party');
     rollShipsInit('party');
   };
 
@@ -323,6 +345,66 @@ export function Sidebar() {
       isDriver,
     };
   };
+
+  const editState = { editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave, editFaction, setEditFaction, editBodies, setEditBodies };
+
+  const renderPc = (creature: Creature, inSquad: boolean) => (
+    <CreatureEntry
+      key={creature.id}
+      creature={creature}
+      isPC={true}
+      inSquad={inSquad}
+      isEditing={editingCreatureId === creature.id}
+      editState={editState}
+      onStartEdit={() => startEdit(creature)}
+      onSaveEdit={saveEdit}
+      onCancelEdit={cancelEdit}
+      onRemove={() => removeCreature(creature.id)}
+      onToggleMap={() => {
+        if (creature.position) {
+          dispatch({ type: 'UPDATE_CREATURE', payload: { id: creature.id, updates: { position: undefined } } });
+        } else {
+          const pcCount = state.creatures.filter(c => c.statblock.type === 'pc' && c.position).length;
+          dispatch({
+            type: 'UPDATE_CREATURE',
+            payload: { id: creature.id, updates: { position: { x: (pcCount % 5) * 30 - 60, y: Math.floor(pcCount / 5) * 30 - 50 } } },
+          });
+        }
+      }}
+      assignment={getCreatureAssignment(creature.id)}
+    />
+  );
+
+  const renderNpc = (creature: Creature, inSquad: boolean) => (
+    <CreatureEntry
+      key={creature.id}
+      creature={creature}
+      isPC={false}
+      inSquad={inSquad}
+      isEditing={editingCreatureId === creature.id}
+      editState={editState}
+      onStartEdit={() => startEdit(creature)}
+      onSaveEdit={saveEdit}
+      onCancelEdit={cancelEdit}
+      onRemove={() => removeCreature(creature.id)}
+      onViewStatblock={() => setViewingCreature(creature)}
+      onHpChange={(newHp) => {
+        dispatch({ type: 'UPDATE_CREATURE', payload: { id: creature.id, updates: { currentHp: newHp } } });
+      }}
+      onToggleMap={() => {
+        if (creature.position) {
+          dispatch({ type: 'UPDATE_CREATURE', payload: { id: creature.id, updates: { position: undefined } } });
+        } else {
+          const npcCount = state.creatures.filter(c => c.statblock.type !== 'pc' && c.position).length;
+          dispatch({
+            type: 'UPDATE_CREATURE',
+            payload: { id: creature.id, updates: { position: { x: (npcCount % 5) * 30 - 60, y: Math.floor(npcCount / 5) * 30 + 50 } } },
+          });
+        }
+      }}
+      assignment={getCreatureAssignment(creature.id)}
+    />
+  );
 
   return (
     <Box
@@ -442,6 +524,9 @@ export function Sidebar() {
                   );
                 }
 
+                const squad = state.squads.find((s) => s.id === entryId);
+                if (squad) return <SquadInitiativeRow key={entryId} squad={squad} isActive={isActive} />;
+
                 const creature = state.creatures.find((c) => c.id === entryId);
                 if (!creature) return null;
 
@@ -523,8 +608,8 @@ export function Sidebar() {
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="subtitle2" sx={{ color: 'success.main' }}>Player Characters</Typography>
-              {(pcs.length > 0 || state.vehicles.some((v) => v.type === 'party' && isNavalVehicle(v.template))) && (
-                <Tooltip title="Roll initiative for all PCs (1d20 + DEX Save) and party ships (1d20 + DEX + crew quality)" arrow>
+              {(pcs.length > 0 || state.vehicles.some((v) => v.type === 'party' && isNavalVehicle(v.template)) || state.squads.some((s) => s.faction === 'party')) && (
+                <Tooltip title="Roll initiative for all PCs (1d20 + DEX Save) and party ships (1d20 + DEX + crew quality) and squads (d20 + leader's DEX, VVTT rule)" arrow>
                   <IconButton
                     size="small"
                     onClick={handleRollAllPcInit}
@@ -588,34 +673,15 @@ export function Sidebar() {
             <Typography variant="body2" color="text.secondary">No player characters</Typography>
           ) : (
             <Stack spacing={0.5}>
-              {pcs.map((creature) => (
-                <CreatureEntry
-                  key={creature.id}
-                  creature={creature}
-                  isPC={true}
-                  isEditing={editingCreatureId === creature.id}
-                  editState={{ editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave, editFaction, setEditFaction, editBodies, setEditBodies }}
-                  onStartEdit={() => startEdit(creature)}
-                  onSaveEdit={saveEdit}
-                  onCancelEdit={cancelEdit}
-                  onRemove={() => removeCreature(creature.id)}
-                  onToggleMap={() => {
-                    if (creature.position) {
-                      dispatch({ type: 'UPDATE_CREATURE', payload: { id: creature.id, updates: { position: undefined } } });
-                    } else {
-                      const pcCount = state.creatures.filter(c => c.statblock.type === 'pc' && c.position).length;
-                      dispatch({
-                        type: 'UPDATE_CREATURE',
-                        payload: {
-                          id: creature.id,
-                          updates: { position: { x: (pcCount % 5) * 30 - 60, y: Math.floor(pcCount / 5) * 30 - 50 } },
-                        },
-                      });
-                    }
-                  }}
-                  assignment={getCreatureAssignment(creature.id)}
-                />
-              ))}
+              {groupBySquad(pcs, state.squads).map((group) =>
+                group.squad ? (
+                  <SquadListGroup key={group.squad.id} squad={group.squad}>
+                    {group.members.map((creature) => renderPc(creature, true))}
+                  </SquadListGroup>
+                ) : (
+                  group.members.map((creature) => renderPc(creature, false))
+                ),
+              )}
             </Stack>
           )}
         </CardContent>
@@ -627,8 +693,8 @@ export function Sidebar() {
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="subtitle2" sx={{ color: 'primary.main' }}>NPCs / Enemies</Typography>
-              {(npcs.length > 0 || state.vehicles.some((v) => v.type === 'enemy' && isNavalVehicle(v.template))) && (
-                <Tooltip title="Roll initiative for all NPCs (1d20 + DEX Save) and enemy ships (1d20 + DEX + crew quality)" arrow>
+              {(npcs.length > 0 || state.vehicles.some((v) => v.type === 'enemy' && isNavalVehicle(v.template)) || state.squads.some((s) => s.faction === 'enemy')) && (
+                <Tooltip title="Roll initiative for all NPCs (1d20 + DEX Save) and enemy ships (1d20 + DEX + crew quality) and squads (d20 + leader's DEX, VVTT rule)" arrow>
                   <IconButton
                     size="small"
                     onClick={handleRollAllNpcInit}
@@ -702,41 +768,15 @@ export function Sidebar() {
             <Typography variant="body2" color="text.secondary">No NPCs or enemies</Typography>
           ) : (
             <Stack spacing={0.5}>
-              {npcs.map((creature) => (
-                <CreatureEntry
-                  key={creature.id}
-                  creature={creature}
-                  isPC={false}
-                  isEditing={editingCreatureId === creature.id}
-                  editState={{ editName, setEditName, editHp, setEditHp, editMaxHp, setEditMaxHp, editAc, setEditAc, editInit, setEditInit, editSpeed, setEditSpeed, editDexSave, setEditDexSave, editFaction, setEditFaction, editBodies, setEditBodies }}
-                  onStartEdit={() => startEdit(creature)}
-                  onSaveEdit={saveEdit}
-                  onCancelEdit={cancelEdit}
-                  onRemove={() => removeCreature(creature.id)}
-                  onViewStatblock={() => setViewingCreature(creature)}
-                  onHpChange={(newHp) => {
-                    dispatch({
-                      type: 'UPDATE_CREATURE',
-                      payload: { id: creature.id, updates: { currentHp: newHp } },
-                    });
-                  }}
-                  onToggleMap={() => {
-                    if (creature.position) {
-                      dispatch({ type: 'UPDATE_CREATURE', payload: { id: creature.id, updates: { position: undefined } } });
-                    } else {
-                      const npcCount = state.creatures.filter(c => c.statblock.type !== 'pc' && c.position).length;
-                      dispatch({
-                        type: 'UPDATE_CREATURE',
-                        payload: {
-                          id: creature.id,
-                          updates: { position: { x: (npcCount % 5) * 30 - 60, y: Math.floor(npcCount / 5) * 30 + 50 } },
-                        },
-                      });
-                    }
-                  }}
-                  assignment={getCreatureAssignment(creature.id)}
-                />
-              ))}
+              {groupBySquad(npcs, state.squads).map((group) =>
+                group.squad ? (
+                  <SquadListGroup key={group.squad.id} squad={group.squad}>
+                    {group.members.map((creature) => renderNpc(creature, true))}
+                  </SquadListGroup>
+                ) : (
+                  group.members.map((creature) => renderNpc(creature, false))
+                ),
+              )}
             </Stack>
           )}
         </CardContent>
@@ -839,6 +879,7 @@ export function Sidebar() {
 interface CreatureEntryProps {
   creature: Creature;
   isPC: boolean;
+  inSquad?: boolean; // member of a squad: managed in the Squads tab, no own token or morale
   isEditing: boolean;
   editState: {
     editName: string; setEditName: (v: string) => void;
@@ -866,7 +907,7 @@ interface CreatureEntryProps {
   };
 }
 
-function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSaveEdit, onCancelEdit, onRemove, onToggleMap, onViewStatblock, onHpChange, assignment }: CreatureEntryProps) {
+function CreatureEntry({ creature, isPC, inSquad = false, isEditing, editState, onStartEdit, onSaveEdit, onCancelEdit, onRemove, onToggleMap, onViewStatblock, onHpChange, assignment }: CreatureEntryProps) {
   // Use faction to determine color - party faction is blue/green, enemy is red
   const borderColor = creature.faction === 'party' ? factionColors.party : factionColors.enemy;
   const hasStatblock = !isPC && (creature.statblock.actions?.length || creature.statblock.traits?.length || creature.statblock.source === 'srd');
@@ -1064,28 +1105,30 @@ function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSa
       </Stack>
 
       {/* Map button in lower right corner */}
-      <Tooltip title={isAssignedToVehicle ? 'Remove from vehicle first' : (creature.position ? 'Remove from map' : 'Place on map')} arrow>
-        <span
-          style={{
-            position: 'absolute',
-            bottom: 4,
-            right: 4,
-          }}
-        >
-          <IconButton
-            size="small"
-            onClick={onToggleMap}
-            disabled={isAssignedToVehicle}
-            sx={{
-              padding: '3px',
-              bgcolor: creature.position && !isAssignedToVehicle ? withOpacity(borderColor, 0.2) : 'transparent',
-              '&:hover': { bgcolor: withOpacity(borderColor, 0.3) },
+      {!inSquad && (
+        <Tooltip title={isAssignedToVehicle ? 'Remove from vehicle first' : (creature.position ? 'Remove from map' : 'Place on map')} arrow>
+          <span
+            style={{
+              position: 'absolute',
+              bottom: 4,
+              right: 4,
             }}
           >
-            <MapIcon sx={{ fontSize: 16, color: creature.position && !isAssignedToVehicle ? borderColor : 'text.secondary' }} />
-          </IconButton>
-        </span>
-      </Tooltip>
+            <IconButton
+              size="small"
+              onClick={onToggleMap}
+              disabled={isAssignedToVehicle}
+              sx={{
+                padding: '3px',
+                bgcolor: creature.position && !isAssignedToVehicle ? withOpacity(borderColor, 0.2) : 'transparent',
+                '&:hover': { bgcolor: withOpacity(borderColor, 0.3) },
+              }}
+            >
+              <MapIcon sx={{ fontSize: 16, color: creature.position && !isAssignedToVehicle ? borderColor : 'text.secondary' }} />
+            </IconButton>
+          </span>
+        </Tooltip>
+      )}
 
       <Box>
         <Typography variant="body2" fontWeight={600} component="div" sx={{ pr: 1 }}>
@@ -1142,8 +1185,8 @@ function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSa
           </Typography>
         )}
         {/* Damage/Heal controls for non-PCs */}
-        {!isPC && creature.stack && <SquadRowControls creature={creature} />}
-        {!isPC && <MoraleRowControls creature={creature} />}
+        {!isPC && !inSquad && creature.stack && <SquadRowControls creature={creature} />}
+        {!isPC && !inSquad && <MoraleRowControls creature={creature} />}
         {!isPC && !creature.stack && onHpChange && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
             <TextField
