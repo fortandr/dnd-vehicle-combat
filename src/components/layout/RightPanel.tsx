@@ -598,8 +598,8 @@ function CurrentTurnInfo() {
     <Box>
       <Typography variant="subtitle1" fontWeight={600}>{currentTurnCreature.name}</Typography>
       <Typography variant="caption" color="text.secondary">
-        {currentTurnCreature.squad
-          ? <>Bodies: {currentTurnCreature.squad.bodies}/{currentTurnCreature.squad.size} · front {currentTurnCreature.currentHp}/{currentTurnCreature.statblock.maxHp} HP | </>
+        {currentTurnCreature.stack
+          ? <>Bodies: {currentTurnCreature.stack.bodies}/{currentTurnCreature.stack.size} · front {currentTurnCreature.currentHp}/{currentTurnCreature.statblock.maxHp} HP | </>
           : <>HP: {currentTurnCreature.currentHp}/{currentTurnCreature.statblock.maxHp} | </>}
         AC: {currentTurnCreature.statblock.ac}
       </Typography>
@@ -628,7 +628,7 @@ function CurrentTurnInfo() {
             : 'Surrendered'}
         </Alert>
       )}
-      {currentTurnCreature.squad && !currentTurnCreature.morale?.status && (
+      {currentTurnCreature.stack && !currentTurnCreature.morale?.status && (
         <SquadAttackPanel key={currentTurnCreature.id} squad={currentTurnCreature} />
       )}
     </Box>

@@ -6,9 +6,9 @@ import {
 import { useCombat } from '../../context/CombatContext';
 import type { AbilityName, Creature, DmgEdition } from '../../types';
 import {
-  AOE_SHAPES, aoeTargetCount, aoeAdvice, resolveSquadArea, formatAreaSummary, DAMAGE_TYPES, damageNotation,
-  type AoeShape, type SquadAreaResult,
-} from '../../utils/squad';
+  AOE_SHAPES, aoeTargetCount, aoeAdvice, resolveStackArea, formatAreaSummary, DAMAGE_TYPES, damageNotation,
+  type AoeShape, type StackAreaResult,
+} from '../../utils/stack';
 import { rollDie, roll } from '../../utils/diceEngine';
 
 const ABILITIES: AbilityName[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
@@ -18,7 +18,7 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
   const edition: DmgEdition = state.dmgEdition ?? '2014';
   const [widthText, setWidthText] = useState('5');
   const width = Math.max(5, parseInt(widthText) || 5);
-  const bodies = creature.squad?.bodies ?? 0;
+  const bodies = creature.stack?.bodies ?? 0;
   const [source, setSource] = useState('Area effect');
   const [shape, setShape] = useState<AoeShape>('sphere');
   const [size, setSize] = useState(20);
@@ -29,7 +29,7 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
   const [damageType, setDamageType] = useState('');
   const [halfOnSave, setHalfOnSave] = useState(true);
   const [magical, setMagical] = useState(false);
-  const [result, setResult] = useState<{ damage: number; area: SquadAreaResult } | null>(null);
+  const [result, setResult] = useState<{ damage: number; area: StackAreaResult } | null>(null);
 
   const suggested = Math.min(aoeTargetCount(shape, size, edition, width), bodies);
   const advice = aoeAdvice(edition);
@@ -46,7 +46,7 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
     } catch {
       return;
     }
-    const area = resolveSquadArea({ creature, caught, dc, ability, damage, halfOnSave, damageType, magical, roll: rollDie });
+    const area = resolveStackArea({ creature, caught, dc, ability, damage, halfOnSave, damageType, magical, roll: rollDie });
     const details = `${damage}${damageType ? ` ${damageType}` : ''} damage, DC ${dc} ${ability.toUpperCase()} save: ` +
       area.saves.map((s) => `${s.d20} (${s.total}) ${s.success ? 'save' : 'fail'} −${s.taken}${s.fell ? ' falls' : ''}`).join('; ');
     dispatch({
@@ -55,7 +55,7 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
         creatureId: creature.id,
         currentHp: area.currentHp,
         bodies: area.bodies,
-        summary: formatAreaSummary(source || 'Area effect', area, creature.squad?.size ?? bodies),
+        summary: formatAreaSummary(source || 'Area effect', area, creature.stack?.size ?? bodies),
         details,
       },
     });
@@ -75,7 +75,7 @@ export function SquadAreaDialog({ creature, open, onClose }: { creature: Creatur
         {result ? (
           <Stack spacing={1} sx={{ mt: 1 }}>
             <Typography variant="body2" fontWeight={600}>
-              {formatAreaSummary(source || 'Area effect', result.area, creature.squad?.size ?? bodies)}
+              {formatAreaSummary(source || 'Area effect', result.area, creature.stack?.size ?? bodies)}
             </Typography>
             <Table size="small">
               <TableBody>

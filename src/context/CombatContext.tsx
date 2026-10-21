@@ -16,7 +16,7 @@ import { backfillNavalMovement } from '../utils/navalBackfill';
 import { isNavalVehicle } from '../data/navalUpgrades';
 import { shipActionSummary, vehicleInitiative } from '../utils/shipTurn';
 import { detectMoraleTriggers } from '../utils/morale';
-import { applySquadHits, healSquad, normalizeSquad, formatSquadHits } from '../utils/squad';
+import { applyStackHits, healStack, normalizeStack, formatStackHits } from '../utils/stack';
 import { getEffectiveSpeed as computeEffectiveSpeed, speedContextFromState } from '../utils/vehicleSpeed';
 
 const AUTO_SAVE_KEY = 'avernus-current-encounter';
@@ -48,6 +48,7 @@ export const initialCombatState: CombatState = {
   vehicles: [],
   creatures: [],
   crewAssignments: [],
+  squads: [],
   initiativeOrder: [],
   currentTurnIndex: 0,
   isChase: false,
@@ -315,6 +316,7 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
         vehicles: migratedVehicles,
         creatures: migratedCreatures,
         crewAssignments: migratedCrewAssignments,
+        squads: action.payload.squads || [],
         initiativeOrder: migratedInitiativeOrder,
         actionLog: action.payload.actionLog || [],
         movementUsed: action.payload.movementUsed || {},
@@ -371,10 +373,10 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
       });
       // Remap squad leaders now that every creature has its new id (drop leaders not in the preset)
       const remappedCreatures = newCreatures.map((c) => {
-        if (!c.squad?.leaderId) return c;
-        const { leaderId, ...squadRest } = c.squad;
+        if (!c.stack?.leaderId) return c;
+        const { leaderId, ...squadRest } = c.stack;
         const mapped = creatureIdMap.get(leaderId);
-        return { ...c, squad: mapped ? { ...squadRest, leaderId: mapped } : squadRest };
+        return { ...c, stack: mapped ? { ...squadRest, leaderId: mapped } : squadRest };
       });
 
       // Update crew assignments with new IDs
@@ -629,8 +631,8 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
       if (!creature) return state;
 
       let updates = action.payload.updates;
-      if (creature.squad || updates.squad) {
-        updates = { ...updates, ...normalizeSquad(creature, { ...creature, ...updates }) };
+      if (creature.stack || updates.stack) {
+        updates = { ...updates, ...normalizeStack(creature, { ...creature, ...updates }) };
       }
       const newHp = updates.currentHp !== undefined ? updates.currentHp : creature.currentHp;
 
@@ -1017,7 +1019,7 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
           currentHp: c.statblock.maxHp,
           initiative: 0,
           morale: undefined,
-          ...(c.squad && { squad: { ...c.squad, bodies: c.squad.size } }),
+          ...(c.stack && { stack: { ...c.stack, bodies: c.stack.size } }),
         })),
         actionLog: [
           createLogEntry(0, 'system', 'Encounter reset - HP and mishaps restored'),
@@ -1201,8 +1203,8 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
     case 'DEAL_DAMAGE_TO_CREATURE': {
       const creature = state.creatures.find((c) => c.id === action.payload.creatureId);
       if (!creature) return state;
-      if (creature.squad) {
-        return applySquadHitsToState(state, creature, [action.payload.amount], action.payload.source);
+      if (creature.stack) {
+        return applyStackHitsToState(state, creature, [action.payload.amount], action.payload.source);
       }
 
       let remaining = action.payload.amount;
@@ -1261,8 +1263,8 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
       const creature = state.creatures.find((c) => c.id === action.payload.creatureId);
       if (!creature) return state;
 
-      const newHp = creature.squad
-        ? healSquad(creature, action.payload.amount)
+      const newHp = creature.stack
+        ? healStack(creature, action.payload.amount)
         : Math.min(creature.statblock.maxHp, creature.currentHp + action.payload.amount);
       return {
         ...state,
@@ -1282,17 +1284,17 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
 
     case 'SQUAD_HITS': {
       const creature = state.creatures.find((c) => c.id === action.payload.creatureId);
-      if (!creature?.squad) return state;
-      return applySquadHitsToState(state, creature, action.payload.hits, action.payload.source);
+      if (!creature?.stack) return state;
+      return applyStackHitsToState(state, creature, action.payload.hits, action.payload.source);
     }
 
     case 'SQUAD_AREA': {
       const creature = state.creatures.find((c) => c.id === action.payload.creatureId);
-      if (!creature?.squad) return state;
-      const next = normalizeSquad(creature, {
+      if (!creature?.stack) return state;
+      const next = normalizeStack(creature, {
         ...creature,
         currentHp: action.payload.currentHp,
-        squad: { ...creature.squad, bodies: action.payload.bodies },
+        stack: { ...creature.stack, bodies: action.payload.bodies },
       });
       return {
         ...state,
@@ -1848,18 +1850,18 @@ function createLogEntry(
 }
 
 /** Battle mode: single-target hits on a squad (front body only; overkill lost). */
-function applySquadHitsToState(state: CombatState, creature: Creature, hits: number[], source?: string): CombatState {
-  const size = creature.squad?.size ?? 0;
-  const result = applySquadHits(creature, hits);
-  const squad = creature.squad;
+function applyStackHitsToState(state: CombatState, creature: Creature, hits: number[], source?: string): CombatState {
+  const size = creature.stack?.size ?? 0;
+  const result = applyStackHits(creature, hits);
+  const stack = creature.stack;
   return {
     ...state,
     creatures: state.creatures.map((c) =>
-      c.id === creature.id ? { ...c, currentHp: result.currentHp, ...(squad && { squad: { ...squad, bodies: result.bodies } }) } : c
+      c.id === creature.id ? { ...c, currentHp: result.currentHp, ...(stack && { stack: { ...stack, bodies: result.bodies } }) } : c
     ),
     actionLog: [
       ...state.actionLog,
-      createLogEntry(state.round, 'damage', formatSquadHits(creature.name, hits.length, result.fell, result.bodies, size), source),
+      createLogEntry(state.round, 'damage', formatStackHits(creature.name, hits.length, result.fell, result.bodies, size), source),
     ],
   };
 }

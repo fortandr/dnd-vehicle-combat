@@ -138,7 +138,7 @@ describe('ship turns', () => {
 describe('battle mode squads', () => {
   const hob = (id: string, bodies: number, currentHp: number, size = 10) => ({
     id, name: `Hob ${id}`, currentHp, tempHp: 0, conditions: [], initiative: 10, initiativeModifier: 1, faction: 'enemy',
-    statblock: { type: 'humanoid', maxHp: 11, ac: 18 }, squad: { size, bodies },
+    statblock: { type: 'humanoid', maxHp: 11, ac: 18 }, stack: { size, bodies },
   }) as unknown as Creature;
   const solo = (id: string, currentHp: number) => ({
     id, name: id, currentHp, tempHp: 2, conditions: [], initiative: 5, initiativeModifier: 0, faction: 'enemy',
@@ -151,14 +151,14 @@ describe('battle mode squads', () => {
       { ...withCreatures(hob('a', 0, 0), solo('b', 3)), phase: 'combat' as const },
       { type: 'RESET_COMBAT' },
     );
-    expect(out.creatures[0]).toMatchObject({ currentHp: 11, squad: { size: 10, bodies: 10 } });
+    expect(out.creatures[0]).toMatchObject({ currentHp: 11, stack: { size: 10, bodies: 10 } });
     expect(out.creatures[1].currentHp).toBe(20);
-    expect('squad' in out.creatures[1]).toBe(false);
+    expect('stack' in out.creatures[1]).toBe(false);
   });
 
   it('SQUAD_HITS drops bodies and logs', () => {
     const out = combatReducer(withCreatures(hob('a', 10, 11)), { type: 'SQUAD_HITS', payload: { creatureId: 'a', hits: [11, 4], source: 'Bitter Breath' } });
-    expect(out.creatures[0]).toMatchObject({ currentHp: 7, squad: { size: 10, bodies: 9 } });
+    expect(out.creatures[0]).toMatchObject({ currentHp: 7, stack: { size: 10, bodies: 9 } });
     expect(out.actionLog.at(-1)).toMatchObject({ type: 'damage', action: 'Hob a takes 2 hits: 1 fall (9/10)', details: 'Bitter Breath' });
   });
 
@@ -166,29 +166,29 @@ describe('battle mode squads', () => {
     const out = combatReducer(withCreatures(hob('a', 10, 11)), {
       type: 'SQUAD_AREA', payload: { creatureId: 'a', currentHp: 1, bodies: 6, summary: 'Fireball: 4 caught, 3 failed → 4 fall (6/10)', details: 'saves…' },
     });
-    expect(out.creatures[0]).toMatchObject({ currentHp: 1, squad: { bodies: 6 } });
+    expect(out.creatures[0]).toMatchObject({ currentHp: 1, stack: { bodies: 6 } });
     expect(out.actionLog.at(-1)).toMatchObject({ action: 'Fireball: 4 caught, 3 failed → 4 fall (6/10)', details: 'saves…' });
   });
 
   it('DEAL_DAMAGE_TO_CREATURE on a squad is one hit (overkill lost)', () => {
     const out = combatReducer(withCreatures(hob('a', 3, 11)), { type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: 'a', amount: 50 } });
-    expect(out.creatures[0]).toMatchObject({ currentHp: 11, squad: { bodies: 2 } });
+    expect(out.creatures[0]).toMatchObject({ currentHp: 11, stack: { bodies: 2 } });
   });
 
   it('HEAL_CREATURE heals the front body and never revives', () => {
     const healed = combatReducer(withCreatures(hob('a', 3, 4)), { type: 'HEAL_CREATURE', payload: { creatureId: 'a', amount: 50 } });
-    expect(healed.creatures[0]).toMatchObject({ currentHp: 11, squad: { bodies: 3 } });
+    expect(healed.creatures[0]).toMatchObject({ currentHp: 11, stack: { bodies: 3 } });
     const wiped = combatReducer(withCreatures(hob('a', 0, 0)), { type: 'HEAL_CREATURE', payload: { creatureId: 'a', amount: 5 } });
-    expect(wiped.creatures[0]).toMatchObject({ currentHp: 0, squad: { bodies: 0 } });
+    expect(wiped.creatures[0]).toMatchObject({ currentHp: 0, stack: { bodies: 0 } });
   });
 
   it('UPDATE_CREATURE keeps the bodies/HP invariant', () => {
-    const zero = combatReducer(withCreatures(hob('a', 3, 4)), { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { squad: { size: 10, bodies: 0 } } } });
+    const zero = combatReducer(withCreatures(hob('a', 3, 4)), { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { stack: { size: 10, bodies: 0 } } } });
     expect(zero.creatures[0].currentHp).toBe(0);
-    const back = combatReducer(zero, { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { squad: { size: 10, bodies: 5 } } } });
-    expect(back.creatures[0]).toMatchObject({ currentHp: 11, squad: { bodies: 5 } });
+    const back = combatReducer(zero, { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { stack: { size: 10, bodies: 5 } } } });
+    expect(back.creatures[0]).toMatchObject({ currentHp: 11, stack: { bodies: 5 } });
     const init = combatReducer(back, { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { initiative: 17 } } });
-    expect(init.creatures[0]).toMatchObject({ initiative: 17, currentHp: 11, squad: { bodies: 5 } });
+    expect(init.creatures[0]).toMatchObject({ initiative: 17, currentHp: 11, stack: { bodies: 5 } });
   });
 
   it('a wiped squad is skipped in turn order like a dead NPC', () => {
@@ -200,7 +200,7 @@ describe('battle mode squads', () => {
   it('creatures without squad behave as before (temp HP absorbs first; HP clamps to 0)', () => {
     const out = combatReducer(withCreatures(solo('x', 20)), { type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: 'x', amount: 25 } });
     expect(out.creatures[0]).toMatchObject({ currentHp: 0, tempHp: 0 });
-    expect(out.creatures[0].squad).toBeUndefined();
+    expect(out.creatures[0].stack).toBeUndefined();
     const healed = combatReducer(out, { type: 'HEAL_CREATURE', payload: { creatureId: 'x', amount: 5 } });
     expect(healed.creatures[0].currentHp).toBe(5);
   });
@@ -212,7 +212,7 @@ describe('battle mode morale', () => {
     statblock: { type: 'humanoid', maxHp, ac: 12, abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 14, cha: 10 } },
     ...over,
   }) as unknown as Creature;
-  const squadOf = (id: string, bodies: number, leaderId?: string) => npc(id, 11, 11, { squad: { size: 10, bodies, leaderId } });
+  const squadOf = (id: string, bodies: number, leaderId?: string) => npc(id, 11, 11, { stack: { size: 10, bodies, leaderId } });
   const combat = (...creatures: Creature[]) => ({ ...initialCombatState, phase: 'combat' as const, round: 1, creatures });
 
   it('SQUAD_HITS crossing half strength queues a half-size prompt', () => {
@@ -302,24 +302,24 @@ describe('battle mode morale', () => {
   describe('leaderId survives squad rebuilds', () => {
     const led = () => combat(npc('k', 30), { ...squadOf('a', 10, 'k'), id: 'a' });
     it('UPDATE_CREATURE setting squad with leaderId on a leaderless squad', () => {
-      const out = combatReducer(combat(npc('k', 30), squadOf('a', 10)), { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { squad: { size: 10, bodies: 10, leaderId: 'k' } } } });
-      expect(out.creatures[1].squad?.leaderId).toBe('k');
+      const out = combatReducer(combat(npc('k', 30), squadOf('a', 10)), { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { stack: { size: 10, bodies: 10, leaderId: 'k' } } } });
+      expect(out.creatures[1].stack?.leaderId).toBe('k');
     });
     it('unrelated UPDATE_CREATURE', () => {
       const out = combatReducer(led(), { type: 'UPDATE_CREATURE', payload: { id: 'a', updates: { initiative: 5 } } });
-      expect(out.creatures[1].squad?.leaderId).toBe('k');
+      expect(out.creatures[1].stack?.leaderId).toBe('k');
     });
     it('SQUAD_HITS', () => {
       const out = combatReducer(led(), { type: 'SQUAD_HITS', payload: { creatureId: 'a', hits: [11] } });
-      expect(out.creatures[1].squad).toMatchObject({ bodies: 9, leaderId: 'k' });
+      expect(out.creatures[1].stack).toMatchObject({ bodies: 9, leaderId: 'k' });
     });
     it('SQUAD_AREA', () => {
       const out = combatReducer(led(), { type: 'SQUAD_AREA', payload: { creatureId: 'a', currentHp: 11, bodies: 8, summary: 's' } });
-      expect(out.creatures[1].squad).toMatchObject({ bodies: 8, leaderId: 'k' });
+      expect(out.creatures[1].stack).toMatchObject({ bodies: 8, leaderId: 'k' });
     });
     it('DEAL_DAMAGE_TO_CREATURE', () => {
       const out = combatReducer(led(), { type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: 'a', amount: 11 } });
-      expect(out.creatures[1].squad).toMatchObject({ bodies: 9, leaderId: 'k' });
+      expect(out.creatures[1].stack).toMatchObject({ bodies: 9, leaderId: 'k' });
     });
   });
 
@@ -340,9 +340,9 @@ describe('battle mode morale', () => {
       const out = combatReducer(combat(), { type: 'LOAD_PARTY_PRESET', payload: { vehicles: [], creatures: [leader, squadOf('a', 10, 'k'), squadOf('b', 10, 'gone')], crewAssignments: [] } });
       const [k, a, b] = out.creatures;
       expect(k.morale).toBeUndefined();
-      expect(a.squad?.leaderId).toBe(k.id);
+      expect(a.stack?.leaderId).toBe(k.id);
       expect(k.id).not.toBe('k');
-      expect(b.squad?.leaderId).toBeUndefined();
+      expect(b.stack?.leaderId).toBeUndefined();
     });
   });
 });

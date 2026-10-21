@@ -1,6 +1,6 @@
 /**
- * Battle mode squads (spec: docs/superpowers/specs/2026-10-19-battle-mode-squads-design.md).
- * Pure rules only. Dice come in through `roll` so tests are deterministic.
+ * Battle mode stacks: one creature row standing for N identical bodies (v2.11.0 "squads", renamed in v2.13.0
+ * when "squad" became the container; see src/utils/squads.ts). Pure rules only. Dice come in through `roll`.
  */
 import type { AbilityName, Creature, DmgEdition, Statblock, StatblockAction } from '../types';
 
@@ -157,10 +157,10 @@ export function formatAttackRolls(result: GroupAttackResult): string {
 // ==========================================
 
 /** Single-target hits, in order: each hit damages only the front body; a body that falls loses its overkill. */
-export function applySquadHits(creature: Creature, hits: number[]): { currentHp: number; bodies: number; fell: number } {
+export function applyStackHits(creature: Creature, hits: number[]): { currentHp: number; bodies: number; fell: number } {
   const max = creature.statblock.maxHp;
   let currentHp = creature.currentHp;
-  let bodies = creature.squad?.bodies ?? 0;
+  let bodies = creature.stack?.bodies ?? 0;
   let fell = 0;
   for (const hit of hits) {
     if (bodies === 0) break;
@@ -232,19 +232,19 @@ export function saveBonus(statblock: Statblock, ability: AbilityName): number {
 }
 
 export interface AreaSave { d20: number; total: number; success: boolean; taken: number; fell: boolean }
-export interface SquadAreaResult { saves: AreaSave[]; currentHp: number; bodies: number; fell: number }
+export interface StackAreaResult { saves: AreaSave[]; currentHp: number; bodies: number; fell: number }
 
 /**
  * Area damage is rolled once (passed in as `damage`); each caught body rolls its own save.
  * The wounded front body is caught first, then fresh bodies. VVTT rule: of the damaged survivors,
  * the one with the lowest HP becomes the front body; damage to other survivors is dropped.
  */
-export function resolveSquadArea({ creature, caught, dc, ability, damage, halfOnSave, damageType, magical = false, roll }: {
+export function resolveStackArea({ creature, caught, dc, ability, damage, halfOnSave, damageType, magical = false, roll }: {
   creature: Creature; caught: number; dc: number; ability: AbilityName; damage: number;
   halfOnSave: boolean; damageType: string; magical?: boolean; roll: Roller;
-}): SquadAreaResult {
+}): StackAreaResult {
   const max = creature.statblock.maxHp;
-  const startBodies = creature.squad?.bodies ?? 0;
+  const startBodies = creature.stack?.bodies ?? 0;
   const n = Math.max(0, Math.min(caught, startBodies));
   const bonus = saveBonus(creature.statblock, ability);
   const saves: AreaSave[] = [];
@@ -268,8 +268,8 @@ export function resolveSquadArea({ creature, caught, dc, ability, damage, halfOn
 }
 
 /** Healing restores the front body only and never brings back fallen bodies. */
-export function healSquad(creature: Creature, amount: number): number {
-  if ((creature.squad?.bodies ?? 0) === 0) return creature.currentHp;
+export function healStack(creature: Creature, amount: number): number {
+  if ((creature.stack?.bodies ?? 0) === 0) return creature.currentHp;
   return Math.min(creature.statblock.maxHp, creature.currentHp + Math.max(0, amount));
 }
 
@@ -277,20 +277,20 @@ export function healSquad(creature: Creature, amount: number): number {
  * Keeps a squad consistent after a manual update: bodies within 0..size; 0 bodies ⇔ 0 HP;
  * raising bodies from 0 restores a full front body; HP set to 0 with bodies left means the front body fell.
  */
-export function normalizeSquad(prev: Creature, next: Creature): { currentHp: number; squad: Creature['squad'] } {
-  if (!next.squad) return { currentHp: next.currentHp, squad: next.squad };
+export function normalizeStack(prev: Creature, next: Creature): { currentHp: number; stack: Creature['stack'] } {
+  if (!next.stack) return { currentHp: next.currentHp, stack: next.stack };
   const max = next.statblock.maxHp;
-  const size = next.squad.size;
-  let bodies = Math.max(0, Math.min(next.squad.bodies, size));
+  const size = next.stack.size;
+  let bodies = Math.max(0, Math.min(next.stack.bodies, size));
   let currentHp = Math.min(next.currentHp, max);
   if (bodies === 0) {
     currentHp = 0;
   } else if (currentHp <= 0) {
-    const wasWiped = (prev.squad?.bodies ?? 0) === 0;
+    const wasWiped = (prev.stack?.bodies ?? 0) === 0;
     if (!wasWiped) bodies -= 1;
     currentHp = bodies > 0 ? max : 0;
   }
-  return { currentHp, squad: { ...next.squad, size, bodies } };
+  return { currentHp, stack: { ...next.stack, size, bodies } };
 }
 
 // ==========================================
@@ -298,25 +298,25 @@ export function normalizeSquad(prev: Creature, next: Creature): { currentHp: num
 // ==========================================
 
 /** "Hobgoblin ×10 (A)": the letter counts existing squads of the same monster. */
-export function nextSquadName(baseName: string, qty: number, creatures: Creature[]): string {
-  const existing = creatures.filter((c) => c.squad && c.name.startsWith(`${baseName} ×`)).length;
+export function nextStackName(baseName: string, qty: number, creatures: Creature[]): string {
+  const existing = creatures.filter((c) => c.stack && c.name.startsWith(`${baseName} ×`)).length;
   return `${baseName} ×${qty} (${String.fromCharCode(65 + (existing % 26))})`;
 }
 
-export function formatSquadTally(bodies: number, size: number): string {
+export function formatStackTally(bodies: number, size: number): string {
   return bodies === 0 ? `(0/${size}) — squad destroyed` : `(${bodies}/${size})`;
 }
 
 const fallText = (fell: number) => (fell === 0 ? 'none fall' : `${fell} fall`);
 
-export function formatSquadHits(name: string, hitCount: number, fell: number, bodies: number, size: number): string {
-  return `${name} takes ${hitCount} hit${hitCount === 1 ? '' : 's'}: ${fallText(fell)} ${formatSquadTally(bodies, size)}`;
+export function formatStackHits(name: string, hitCount: number, fell: number, bodies: number, size: number): string {
+  return `${name} takes ${hitCount} hit${hitCount === 1 ? '' : 's'}: ${fallText(fell)} ${formatStackTally(bodies, size)}`;
 }
 
 /** "Fireball: 4 caught, 3 failed → 4 fall (6/10)" */
-export function formatAreaSummary(source: string, result: SquadAreaResult, size: number): string {
+export function formatAreaSummary(source: string, result: StackAreaResult, size: number): string {
   const failed = result.saves.filter((s) => !s.success).length;
-  return `${source}: ${result.saves.length} caught, ${failed} failed → ${fallText(result.fell)} ${formatSquadTally(result.bodies, size)}`;
+  return `${source}: ${result.saves.length} caught, ${failed} failed → ${fallText(result.fell)} ${formatStackTally(result.bodies, size)}`;
 }
 
 /**

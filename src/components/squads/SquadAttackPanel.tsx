@@ -5,7 +5,7 @@ import type { Creature } from '../../types';
 import {
   parseActionDamage, parseMultiattackCount, rollGroupAttack, adjustForDefenses,
   formatGroupAttack, formatAttackRolls, type DamagePart, type GroupAttackResult,
-} from '../../utils/squad';
+} from '../../utils/stack';
 import { rollDie } from '../../utils/diceEngine';
 
 type TargetKey = `c:${string}` | `v:${string}`;
@@ -14,7 +14,7 @@ type TargetKey = `c:${string}` | `v:${string}`;
 export function SquadAttackPanel({ squad }: { squad: Creature }) {
   const { state, dispatch } = useCombat();
   const attacks = useMemo(() => (squad.statblock.actions ?? []).filter((a) => typeof a.attackBonus === 'number'), [squad.statblock.actions]);
-  const bodies = squad.squad?.bodies ?? 0;
+  const bodies = squad.stack?.bodies ?? 0;
 
   const targets = useMemo(() => [
     ...state.creatures
@@ -83,7 +83,7 @@ export function SquadAttackPanel({ squad }: { squad: Creature }) {
       const victim = state.creatures.find((c) => c.id === id);
       if (!victim) return;
       const perHit = hitRolls.map((r) => r.damage.reduce((sum, d) => sum + adjustForDefenses(d.amount, d.type, victim.statblock), 0));
-      if (victim.squad) {
+      if (victim.stack) {
         dispatch({ type: 'SQUAD_HITS', payload: { creatureId: id, hits: perHit, source } });
       } else {
         perHit.filter((a) => a > 0).forEach((amount) => dispatch({ type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: id, amount, source } }));

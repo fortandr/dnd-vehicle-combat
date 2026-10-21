@@ -3,7 +3,7 @@
  * Spec: docs/superpowers/specs/2026-10-20-battle-mode-morale-design.md. Pure; dice are injected.
  */
 import type { CombatState, ConditionName, Creature, MoralePrompt, MoraleTrigger } from '../types';
-import { saveBonus, type Roller } from './squad';
+import { saveBonus, type Roller } from './stack';
 
 export const MORALE_DC = 10;
 export const INCAPACITATING: ConditionName[] = ['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious'];
@@ -15,7 +15,7 @@ export function isLeaderDown(leader?: Creature): boolean {
   return leader.conditions.some((c) => INCAPACITATING.includes(c.name));
 }
 
-const isOut = (c: Creature) => c.currentHp <= 0 || (c.squad !== undefined && c.squad.bodies === 0);
+const isOut = (c: Creature) => c.currentHp <= 0 || (c.stack !== undefined && c.stack.bodies === 0);
 const hasAsked = (c: Creature, t: MoraleTrigger) => c.morale?.asked.includes(t) ?? false;
 
 /**
@@ -37,7 +37,7 @@ export function detectMoraleTriggers(prev: CombatState, next: CombatState, newId
     const fired: MoraleTrigger[] = [];
     let leaderName: string | undefined;
 
-    const leaderId = c.squad?.leaderId;
+    const leaderId = c.stack?.leaderId;
     if (leaderId && !hasAsked(c, 'leader-down')) {
       const leaderWas = before.get(leaderId);
       const leaderNow = now.get(leaderId);
@@ -46,11 +46,11 @@ export function detectMoraleTriggers(prev: CombatState, next: CombatState, newId
         leaderName = (leaderNow ?? leaderWas)?.name;
       }
     }
-    if (c.squad && was.squad && !hasAsked(c, 'half-size')) {
-      const half = c.squad.size / 2;
-      if (was.squad.bodies > half && c.squad.bodies <= half) fired.push('half-size');
+    if (c.stack && was.stack && !hasAsked(c, 'half-size')) {
+      const half = c.stack.size / 2;
+      if (was.stack.bodies > half && c.stack.bodies <= half) fired.push('half-size');
     }
-    if (!c.squad && !hasAsked(c, 'half-hp')) {
+    if (!c.stack && !hasAsked(c, 'half-hp')) {
       const half = c.statblock.maxHp / 2;
       if (was.currentHp > half && c.currentHp <= half) fired.push('half-hp');
     }
@@ -68,7 +68,7 @@ export function detectMoraleTriggers(prev: CombatState, next: CombatState, newId
 
 /** Who makes the save: the squad's leader if standing, else the creature itself (VVTT rule for leaderless squads). */
 export function moraleSaver(creature: Creature, creatures: Creature[]): { saver: Creature; bonus: number; usingLeader: boolean } {
-  const leaderId = creature.squad?.leaderId;
+  const leaderId = creature.stack?.leaderId;
   const leader = leaderId ? creatures.find((c) => c.id === leaderId) : undefined;
   if (leader && !isLeaderDown(leader)) {
     return { saver: leader, bonus: saveBonus(leader.statblock, 'wis'), usingLeader: true };
@@ -101,7 +101,7 @@ export function formatMoraleLog(creatureName: string, reason: string, outcome: M
 export function moraleTriggerText(prompt: MoralePrompt, creature: Creature): string {
   switch (prompt.trigger) {
     case 'leader-down': return `${prompt.leaderName ?? 'Leader'} is down`;
-    case 'half-size': return `Down to half strength (${creature.squad?.bodies ?? 0}/${creature.squad?.size ?? 0})`;
+    case 'half-size': return `Down to half strength (${creature.stack?.bodies ?? 0}/${creature.stack?.size ?? 0})`;
     case 'half-hp': return 'Below half HP';
     default: return 'Morale check';
   }

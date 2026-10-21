@@ -17,7 +17,7 @@ export function MoralePromptCard({ prompt, onResolved }: { prompt: MoralePrompt;
   const bonusText = `WIS ${bonus < 0 ? '−' : '+'}${Math.abs(bonus)}`;
   const who = usingLeader
     ? `${saver.name} saves for the squad: ${bonusText}`
-    : creature.squad
+    : creature.stack
       ? `No leader standing — the squad saves (VVTT rule): ${bonusText}`
       : `${bonusText} save`;
 

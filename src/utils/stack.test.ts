@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   parseDamage, parseActionDamage, parseMultiattackCount, rollGroupAttack,
   adjustForDefenses, formatDamageTotals, formatGroupAttack, formatAttackRolls,
-  applySquadHits, aoeTargetCount, aoeAdvice, saveBonus, resolveSquadArea, healSquad, normalizeSquad,
-  nextSquadName, formatSquadHits, formatAreaSummary, damageNotation,
-} from './squad';
+  applyStackHits, aoeTargetCount, aoeAdvice, saveBonus, resolveStackArea, healStack, normalizeStack,
+  nextStackName, formatStackHits, formatAreaSummary, damageNotation,
+} from './stack';
 import type { Creature, Statblock, StatblockAction } from '../types';
 
 /** Scripted dice: returns the given values in order and throws if it runs out. */
@@ -133,24 +133,24 @@ describe('log text', () => {
   });
 });
 const squad = (bodies: number, currentHp: number, size = 10, over: Partial<Statblock> = {}) =>
-  ({ id: 's', name: 'Hobgoblin ×10 (A)', currentHp, statblock: statblock(over), squad: { size, bodies } }) as unknown as Creature;
+  ({ id: 's', name: 'Hobgoblin ×10 (A)', currentHp, statblock: statblock(over), stack: { size, bodies } }) as unknown as Creature;
 
-describe('applySquadHits (front body only; overkill lost)', () => {
+describe('applyStackHits (front body only; overkill lost)', () => {
   it('a non-lethal hit wounds the front body', () => {
-    expect(applySquadHits(squad(10, 11), [4])).toEqual({ currentHp: 7, bodies: 10, fell: 0 });
+    expect(applyStackHits(squad(10, 11), [4])).toEqual({ currentHp: 7, bodies: 10, fell: 0 });
   });
   it('an exactly lethal hit drops one body; the next steps up at full HP', () => {
-    expect(applySquadHits(squad(10, 7), [7])).toEqual({ currentHp: 11, bodies: 9, fell: 1 });
+    expect(applyStackHits(squad(10, 7), [7])).toEqual({ currentHp: 11, bodies: 9, fell: 1 });
   });
   it('overkill is lost: a 100-damage hit drops one body', () => {
-    expect(applySquadHits(squad(10, 11), [100])).toEqual({ currentHp: 11, bodies: 9, fell: 1 });
+    expect(applyStackHits(squad(10, 11), [100])).toEqual({ currentHp: 11, bodies: 9, fell: 1 });
   });
   it('several hits walk through bodies in order; zero hits are ignored', () => {
     // 5 drops body 1 (next at 11); 0 ignored; 4 → 7; 11 drops body 2 (next at 11); 3 → 8
-    expect(applySquadHits(squad(3, 5), [5, 0, 4, 11, 3])).toEqual({ currentHp: 8, bodies: 1, fell: 2 });
+    expect(applyStackHits(squad(3, 5), [5, 0, 4, 11, 3])).toEqual({ currentHp: 8, bodies: 1, fell: 2 });
   });
   it('the last body falls → bodies 0, currentHp 0; extra hits do nothing', () => {
-    expect(applySquadHits(squad(1, 3), [3, 9])).toEqual({ currentHp: 0, bodies: 0, fell: 1 });
+    expect(applyStackHits(squad(1, 3), [3, 9])).toEqual({ currentHp: 0, bodies: 0, fell: 1 });
   });
 });
 
@@ -212,13 +212,13 @@ describe('adjustForDefenses with comma-split nonmagical lists', () => {
   });
 });
 
-describe('resolveSquadArea', () => {
+describe('resolveStackArea', () => {
   // DEX 12 → +1. DC 15. 20 damage, half on save.
   const base = { dc: 15, ability: 'dex' as const, damage: 20, halfOnSave: true, damageType: 'fire' };
   it('front body is caught first; failures fall; the lowest damaged survivor becomes the front', () => {
     // 3 caught: front (7 HP) saves 14+1=15 → takes 10 → falls; body 2 rolls 2 → fails, 20 → falls;
     // body 3 rolls 19 → saves, takes 10 → survives at 1.
-    const r = resolveSquadArea({ ...base, creature: squad(10, 7), caught: 3, roll: dice(14, 2, 19) });
+    const r = resolveStackArea({ ...base, creature: squad(10, 7), caught: 3, roll: dice(14, 2, 19) });
     expect(r.saves.map((s) => [s.success, s.taken, s.fell])).toEqual([[true, 10, true], [false, 20, true], [true, 10, false]]);
     expect(r).toMatchObject({ bodies: 8, fell: 2, currentHp: 1 });
   });
@@ -226,74 +226,74 @@ describe('resolveSquadArea', () => {
     // 6 damage, half on save. Front at 10 HP rolls 14 (+1 = 15, saves) → takes 3 → 7.
     // Body 2 rolls 1 (+1 = 2, fails) → takes 6 from 11 → 5. Body 3 rolls 19 (saves) → takes 3 from 11 → 8.
     // Lowest survivor = 5, nobody falls.
-    const r = resolveSquadArea({ ...base, damage: 6, creature: squad(10, 10), caught: 3, roll: dice(14, 1, 19) });
+    const r = resolveStackArea({ ...base, damage: 6, creature: squad(10, 10), caught: 3, roll: dice(14, 1, 19) });
     expect(r.saves.map((s) => s.taken)).toEqual([3, 6, 3]);
     expect(r).toMatchObject({ bodies: 10, fell: 0, currentHp: 5 });
   });
   it('when every caught body falls, the next uncaught body is at full HP', () => {
-    const r = resolveSquadArea({ ...base, creature: squad(5, 11), caught: 2, roll: dice(3, 4) });
+    const r = resolveStackArea({ ...base, creature: squad(5, 11), caught: 2, roll: dice(3, 4) });
     expect(r).toMatchObject({ bodies: 3, fell: 2, currentHp: 11 });
   });
   it('resistance applies to each body, after halving', () => {
-    const r = resolveSquadArea({ ...base, creature: squad(2, 11, 10, { damageResistances: ['fire'] }), caught: 1, roll: dice(20) });
+    const r = resolveStackArea({ ...base, creature: squad(2, 11, 10, { damageResistances: ['fire'] }), caught: 1, roll: dice(20) });
     expect(r.saves[0].taken).toBe(5); // 20 → 10 (save) → 5 (resist)
     expect(r.currentHp).toBe(6);
   });
   it('caught is capped at the bodies left', () => {
-    const r = resolveSquadArea({ ...base, creature: squad(2, 11), caught: 6, roll: dice(1, 1) });
+    const r = resolveStackArea({ ...base, creature: squad(2, 11), caught: 6, roll: dice(1, 1) });
     expect(r.saves).toHaveLength(2);
     expect(r).toMatchObject({ bodies: 0, currentHp: 0, fell: 2 });
   });
   it('no damage on a save when halfOnSave is off', () => {
-    const r = resolveSquadArea({ ...base, halfOnSave: false, creature: squad(2, 11), caught: 1, roll: dice(20) });
+    const r = resolveStackArea({ ...base, halfOnSave: false, creature: squad(2, 11), caught: 1, roll: dice(20) });
     expect(r.saves[0].taken).toBe(0);
     expect(r.currentHp).toBe(11);
   });
 });
 
-describe('healSquad (never revives)', () => {
+describe('healStack (never revives)', () => {
   it('caps the front body at max HP', () => {
-    expect(healSquad(squad(4, 6), 20)).toBe(11);
+    expect(healStack(squad(4, 6), 20)).toBe(11);
   });
   it('does nothing at 0 bodies', () => {
-    expect(healSquad(squad(0, 0), 5)).toBe(0);
+    expect(healStack(squad(0, 0), 5)).toBe(0);
   });
 });
 
-describe('normalizeSquad', () => {
+describe('normalizeStack', () => {
   it('0 bodies forces 0 HP', () => {
-    expect(normalizeSquad(squad(3, 5), squad(0, 5))).toEqual({ currentHp: 0, squad: { size: 10, bodies: 0 } });
+    expect(normalizeStack(squad(3, 5), squad(0, 5))).toEqual({ currentHp: 0, stack: { size: 10, bodies: 0 } });
   });
   it('raising bodies from 0 restores the front body to full HP', () => {
-    expect(normalizeSquad(squad(0, 0), squad(4, 0))).toEqual({ currentHp: 11, squad: { size: 10, bodies: 4 } });
+    expect(normalizeStack(squad(0, 0), squad(4, 0))).toEqual({ currentHp: 11, stack: { size: 10, bodies: 4 } });
   });
   it('HP set to 0 with bodies left means the front body fell', () => {
-    expect(normalizeSquad(squad(4, 6), squad(4, 0))).toEqual({ currentHp: 11, squad: { size: 10, bodies: 3 } });
-    expect(normalizeSquad(squad(1, 6), squad(1, 0))).toEqual({ currentHp: 0, squad: { size: 10, bodies: 0 } });
+    expect(normalizeStack(squad(4, 6), squad(4, 0))).toEqual({ currentHp: 11, stack: { size: 10, bodies: 3 } });
+    expect(normalizeStack(squad(1, 6), squad(1, 0))).toEqual({ currentHp: 0, stack: { size: 10, bodies: 0 } });
   });
   it('clamps bodies to 0..size and HP to max', () => {
-    expect(normalizeSquad(squad(4, 6), squad(14, 40))).toEqual({ currentHp: 11, squad: { size: 10, bodies: 10 } });
+    expect(normalizeStack(squad(4, 6), squad(14, 40))).toEqual({ currentHp: 11, stack: { size: 10, bodies: 10 } });
   });
   it('leaves a consistent squad unchanged, and passes non-squads through', () => {
-    expect(normalizeSquad(squad(4, 6), squad(4, 6))).toEqual({ currentHp: 6, squad: { size: 10, bodies: 4 } });
+    expect(normalizeStack(squad(4, 6), squad(4, 6))).toEqual({ currentHp: 6, stack: { size: 10, bodies: 4 } });
     const solo = { currentHp: 3, statblock: statblock() } as unknown as Creature;
-    expect(normalizeSquad(solo, solo)).toEqual({ currentHp: 3, squad: undefined });
+    expect(normalizeStack(solo, solo)).toEqual({ currentHp: 3, stack: undefined });
   });
 });
 
 describe('naming and log text', () => {
-  it('nextSquadName lettering counts existing squads of the same monster', () => {
-    const existing = [squad(10, 11), { name: 'Hobgoblin 3' } as Creature, { name: 'Hobgoblin ×5 (B)', squad: { size: 5, bodies: 5 } } as Creature];
-    expect(nextSquadName('Hobgoblin', 8, [])).toBe('Hobgoblin ×8 (A)');
-    expect(nextSquadName('Hobgoblin', 8, existing)).toBe('Hobgoblin ×8 (C)');
+  it('nextStackName lettering counts existing squads of the same monster', () => {
+    const existing = [squad(10, 11), { name: 'Hobgoblin 3' } as Creature, { name: 'Hobgoblin ×5 (B)', stack: { size: 5, bodies: 5 } } as Creature];
+    expect(nextStackName('Hobgoblin', 8, [])).toBe('Hobgoblin ×8 (A)');
+    expect(nextStackName('Hobgoblin', 8, existing)).toBe('Hobgoblin ×8 (C)');
   });
-  it('formatSquadHits', () => {
-    expect(formatSquadHits('Hob (A)', 3, 2, 8, 10)).toBe('Hob (A) takes 3 hits: 2 fall (8/10)');
-    expect(formatSquadHits('Hob (A)', 1, 0, 8, 10)).toBe('Hob (A) takes 1 hit: none fall (8/10)');
-    expect(formatSquadHits('Hob (A)', 2, 1, 0, 10)).toBe('Hob (A) takes 2 hits: 1 fall (0/10) — squad destroyed');
+  it('formatStackHits', () => {
+    expect(formatStackHits('Hob (A)', 3, 2, 8, 10)).toBe('Hob (A) takes 3 hits: 2 fall (8/10)');
+    expect(formatStackHits('Hob (A)', 1, 0, 8, 10)).toBe('Hob (A) takes 1 hit: none fall (8/10)');
+    expect(formatStackHits('Hob (A)', 2, 1, 0, 10)).toBe('Hob (A) takes 2 hits: 1 fall (0/10) — squad destroyed');
   });
   it('formatAreaSummary', () => {
-    const r = resolveSquadArea({ creature: squad(10, 11), caught: 4, dc: 15, ability: 'dex', damage: 28, halfOnSave: true, damageType: 'fire', roll: dice(2, 3, 4, 20) });
+    const r = resolveStackArea({ creature: squad(10, 11), caught: 4, dc: 15, ability: 'dex', damage: 28, halfOnSave: true, damageType: 'fire', roll: dice(2, 3, 4, 20) });
     expect(formatAreaSummary('Fireball', r, 10)).toBe('Fireball: 4 caught, 3 failed → 4 fall (6/10)');
   });
 });
@@ -313,10 +313,10 @@ describe('damageNotation', () => {
   });
 });
 
-describe('normalizeSquad leaderId', () => {
+describe('normalizeStack leaderId', () => {
   it('keeps leaderId', () => {
     const prev = squad(10, 11);
-    const next = { ...prev, squad: { size: 10, bodies: 10, leaderId: 'k' } } as Creature;
-    expect(normalizeSquad(prev, next).squad).toEqual({ size: 10, bodies: 10, leaderId: 'k' });
+    const next = { ...prev, stack: { size: 10, bodies: 10, leaderId: 'k' } } as Creature;
+    expect(normalizeStack(prev, next).stack).toEqual({ size: 10, bodies: 10, leaderId: 'k' });
   });
 });

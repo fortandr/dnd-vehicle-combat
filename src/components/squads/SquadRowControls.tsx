@@ -3,7 +3,7 @@ import { Box, Button, Checkbox, FormControlLabel, IconButton, MenuItem, TextFiel
 import AddIcon from '@mui/icons-material/Add';
 import { useCombat } from '../../context/CombatContext';
 import type { Creature } from '../../types';
-import { adjustForDefenses, DAMAGE_TYPES } from '../../utils/squad';
+import { adjustForDefenses, DAMAGE_TYPES } from '../../utils/stack';
 import { SquadAreaDialog } from './SquadAreaDialog';
 
 /** Sidebar row controls for a squad: Hit [dmg] × [n] (single-target hits), Heal (front body), Area… */
@@ -17,7 +17,7 @@ export function SquadRowControls({ creature }: { creature: Creature }) {
   const value = parseInt(amount, 10);
   const n = Math.max(1, parseInt(count, 10) || 1);
   const valid = !isNaN(value) && value > 0;
-  const wiped = (creature.squad?.bodies ?? 0) === 0;
+  const wiped = (creature.stack?.bodies ?? 0) === 0;
 
   const handleHit = () => {
     if (!valid) return;

@@ -36,7 +36,7 @@ import {
   FormControlLabel,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import { nextSquadName } from '../../utils/squad';
+import { nextStackName } from '../../utils/stack';
 import { SquadRowControls } from '../squads/SquadRowControls';
 import { SquadLeaderSelect } from '../morale/SquadLeaderSelect';
 import { MoraleRowControls } from '../morale/MoraleRowControls';
@@ -368,8 +368,8 @@ export function Sidebar() {
       const offsetX = (existingNpcCount % 5) * 30 - 60;
       const offsetY = Math.floor(existingNpcCount / 5) * 30 + 50;
       const creature = convertOpen5eToCreature(monster, { x: offsetX, y: offsetY });
-      creature.name = nextSquadName(monster.name, qty, state.creatures);
-      creature.squad = { size: qty, bodies: qty };
+      creature.name = nextStackName(monster.name, qty, state.creatures);
+      creature.stack = { size: qty, bodies: qty };
       addCreature(creature);
       setShowOpen5eSearch(false);
       setSearchQuery('');
@@ -504,8 +504,8 @@ export function Sidebar() {
       ?? Math.floor(((creature.statblock.abilities?.dex || 10) - 10) / 2);
     setEditDexSave(dexSave);
     setEditFaction(creature.faction || 'enemy');
-    setEditBodies(creature.squad?.bodies ?? 0);
-    setEditLeaderId(creature.squad?.leaderId ?? '');
+    setEditBodies(creature.stack?.bodies ?? 0);
+    setEditLeaderId(creature.stack?.leaderId ?? '');
   };
 
   const saveEdit = () => {
@@ -522,7 +522,7 @@ export function Sidebar() {
           initiative: editInit,
           initiativeModifier: editDexSave,
           faction: editFaction,
-          ...(existing.squad && { squad: { ...existing.squad, bodies: editBodies, leaderId: editLeaderId || undefined } }),
+          ...(existing.stack && { stack: { ...existing.stack, bodies: editBodies, leaderId: editLeaderId || undefined } }),
           statblock: {
             ...existingStatblock,
             name: editName,
@@ -1413,14 +1413,14 @@ function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSa
         <Stack spacing={1}>
           <TextField fullWidth size="small" value={editState.editName} onChange={(e) => editState.setEditName(e.target.value)} placeholder="Name" />
           <Stack direction="row" spacing={1}>
-            {creature.squad && (
-              <TextField size="small" label={`Bodies (of ${creature.squad.size})`} type="number" value={editState.editBodies}
+            {creature.stack && (
+              <TextField size="small" label={`Bodies (of ${creature.stack.size})`} type="number" value={editState.editBodies}
                 onChange={(e) => editState.setEditBodies(parseInt(e.target.value) || 0)} sx={{ flex: 1 }} />
             )}
-            <TextField size="small" label={creature.squad ? 'Front HP' : 'HP'} type="number" value={editState.editHp} onChange={(e) => editState.setEditHp(parseInt(e.target.value) || 0)} sx={{ flex: 1 }} />
+            <TextField size="small" label={creature.stack ? 'Front HP' : 'HP'} type="number" value={editState.editHp} onChange={(e) => editState.setEditHp(parseInt(e.target.value) || 0)} sx={{ flex: 1 }} />
             <TextField size="small" label="Max" type="number" value={editState.editMaxHp} onChange={(e) => editState.setEditMaxHp(parseInt(e.target.value) || 1)} sx={{ flex: 1 }} />
           </Stack>
-          {creature.squad && (
+          {creature.stack && (
             <SquadLeaderSelect squad={creature} value={editState.editLeaderId} onChange={editState.setEditLeaderId} />
           )}
           <Stack direction="row" spacing={1}>
@@ -1587,8 +1587,8 @@ function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSa
           </Typography>
         ) : (
           <Typography variant="caption" color="text.secondary">
-            {creature.squad
-              ? <>Bodies {creature.squad.bodies}/{creature.squad.size} · front {creature.currentHp}/{creature.statblock.maxHp} HP</>
+            {creature.stack
+              ? <>Bodies {creature.stack.bodies}/{creature.stack.size} · front {creature.currentHp}/{creature.statblock.maxHp} HP</>
               : <>HP: {creature.currentHp}/{creature.statblock.maxHp}</>} | AC: {creature.statblock.ac} | Init: {creature.initiative} | DEX Save: {
               creature.statblock.savingThrows?.dex !== undefined
                 ? (creature.statblock.savingThrows.dex >= 0 ? '+' : '') + creature.statblock.savingThrows.dex
@@ -1599,9 +1599,9 @@ function CreatureEntry({ creature, isPC, isEditing, editState, onStartEdit, onSa
           </Typography>
         )}
         {/* Damage/Heal controls for non-PCs */}
-        {!isPC && creature.squad && <SquadRowControls creature={creature} />}
+        {!isPC && creature.stack && <SquadRowControls creature={creature} />}
         {!isPC && <MoraleRowControls creature={creature} />}
-        {!isPC && !creature.squad && onHpChange && (
+        {!isPC && !creature.stack && onHpChange && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
             <TextField
               type="number"

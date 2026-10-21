@@ -398,7 +398,7 @@ export function PlayerViewMap() {
                     />
                   )}
 
-                  {creature.squad && <SquadTokenOverlay squad={creature.squad} tokenSize={tokenSize} />}
+                  {creature.stack && <SquadTokenOverlay squad={creature.stack} tokenSize={tokenSize} />}
                   {creature.morale?.status && <MoraleTokenMarker status={creature.morale.status} tokenSize={tokenSize} />}
                 </div>
                 {state.showHpBars !== false && (

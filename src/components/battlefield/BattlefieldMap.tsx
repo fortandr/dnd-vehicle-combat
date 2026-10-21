@@ -3921,7 +3921,7 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
           filter: isDead ? 'grayscale(1) brightness(0.6)' : 'none',
           position: 'relative',
         }}
-        title={`${creature.name}\nHP: ${creature.currentHp}/${creature.statblock.maxHp}\nAC: ${creature.statblock.ac}${creature.squad ? `\nBodies: ${creature.squad.bodies}/${creature.squad.size}` : ''}${isDead ? '\n(DEAD)' : isInDeathSaves ? '\n(Death Saves)' : ''}${isCurrentTurn ? '\n(Current Turn)' : ''}`}
+        title={`${creature.name}\nHP: ${creature.currentHp}/${creature.statblock.maxHp}\nAC: ${creature.statblock.ac}${creature.stack ? `\nBodies: ${creature.stack.bodies}/${creature.stack.size}` : ''}${isDead ? '\n(DEAD)' : isInDeathSaves ? '\n(Death Saves)' : ''}${isCurrentTurn ? '\n(Current Turn)' : ''}`}
       >
         {creature.name.charAt(0).toUpperCase()}
 
@@ -3956,7 +3956,7 @@ function CreatureToken({ creature, screenPosition, pixelsPerFoot, remainingMovem
           />
         )}
 
-        {creature.squad && <SquadTokenOverlay squad={creature.squad} tokenSize={tokenSize} />}
+        {creature.stack && <SquadTokenOverlay squad={creature.stack} tokenSize={tokenSize} />}
         {creature.morale?.status && <MoraleTokenMarker status={creature.morale.status} tokenSize={tokenSize} />}
       </div>
 

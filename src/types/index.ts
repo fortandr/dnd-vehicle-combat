@@ -111,8 +111,8 @@ export interface Creature {
   legendaryActionsRemaining?: number;
   concentrating?: string; // Spell name if concentrating
   notes?: string;
-  /** Battle mode: this creature stands for a squad of identical bodies. Front body HP = currentHp. */
-  squad?: { size: number; bodies: number; leaderId?: string };
+  /** Battle mode: a stack of identical bodies (e.g. "Hobgoblin ×8"). Front body HP = currentHp. */
+  stack?: { size: number; bodies: number; leaderId?: string };
   /** Battle mode morale (DMG 2014 p. 273). */
   morale?: { status?: MoraleStatus; asked: MoraleTrigger[] };
 }
@@ -121,10 +121,27 @@ export type MoraleStatus = 'fleeing' | 'surrendered';
 export type MoraleTrigger = 'leader-down' | 'half-size' | 'half-hp';
 export interface MoralePrompt {
   id: string;
-  creatureId: string; // the squad or creature that may flee
+  creatureId?: string; // a standalone creature that may flee
+  squadId?: string; // a squad that may flee (v2.13.0)
   trigger: MoraleTrigger | 'manual';
   leaderName?: string; // for leader-down text, kept in case the leader was removed
 }
+
+/** Battle mode squad container (v2.13.0). Members are creature ids; each member is an individual or a stack. */
+export interface Squad {
+  id: string;
+  name: string;
+  faction: 'party' | 'enemy'; // same values as Creature.faction
+  memberIds: string[]; // creature ids in display order; the only record of membership
+  leaderId?: string; // must be in memberIds
+  commanderId?: string; // a PC creature id; not a member
+  position?: Position;
+  initiative?: number; // rolled value when not commanded
+  startingCount: number; // standing count (bodies + individuals) when combat starts; drives VVTT rule 4
+  morale?: { status?: MoraleStatus; asked: MoraleTrigger[] };
+}
+
+export type SquadUpdates = Partial<Pick<Squad, 'name' | 'faction' | 'leaderId' | 'commanderId' | 'position' | 'initiative'>>;
 
 // ==========================================
 // Conditions
@@ -475,6 +492,8 @@ export interface CombatState {
   vehicles: Vehicle[];
   creatures: Creature[];
   crewAssignments: CrewAssignment[];
+  // Battle mode: squad containers (v2.13.0)
+  squads: Squad[];
 
   // Turn order
   initiativeOrder: string[]; // creature/vehicle IDs

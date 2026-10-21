@@ -18,7 +18,7 @@ const npc = (id: string, currentHp: number, over: Partial<Creature> = {}, maxHp 
   ...over,
 }) as unknown as Creature;
 const squadOf = (id: string, bodies: number, leaderId?: string, over: Partial<Creature> = {}) =>
-  npc(id, 11, { squad: { size: 10, bodies, leaderId }, ...over }, 11);
+  npc(id, 11, { stack: { size: 10, bodies, leaderId }, ...over }, 11);
 const pcOf = (id: string, currentHp: number) => {
   const base = npc(id, currentHp);
   return { ...base, statblock: { ...base.statblock, type: 'pc' } } as Creature;
@@ -59,7 +59,7 @@ describe('detectMoraleTriggers: half size and half HP', () => {
     const r = detect([squadOf('a', 6)], [squadOf('a', 5)]);
     expect(triggers(r)).toEqual([['a', 'half-size']]);
     const asked = r.creatures[0];
-    expect(detect([{ ...asked, squad: { size: 10, bodies: 6 } }], [asked]).prompts).toEqual([]);
+    expect(detect([{ ...asked, stack: { size: 10, bodies: 6 } }], [asked]).prompts).toEqual([]);
     expect(detect([squadOf('b', 6)], [{ ...squadOf('b', 0), currentHp: 0 }]).prompts).toEqual([]);
   });
   it('a single NPC crossing half HP is prompted; not PCs, squads, or a drop to 0', () => {

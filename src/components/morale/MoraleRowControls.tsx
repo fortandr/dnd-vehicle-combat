@@ -8,7 +8,7 @@ const NEXT_STATUS: Record<MoraleStatus, MoraleStatus | undefined> = { fleeing: '
 export function MoraleRowControls({ creature }: { creature: Creature }) {
   const { state, dispatch } = useCombat();
   const status = creature.morale?.status;
-  const leaderId = creature.squad?.leaderId;
+  const leaderId = creature.stack?.leaderId;
   const leader = leaderId ? state.creatures.find((c) => c.id === leaderId) : undefined;
   const pending = (state.moralePrompts ?? []).some((p) => p.creatureId === creature.id);
   const canCheck = state.phase === 'combat' && creature.currentHp > 0;
