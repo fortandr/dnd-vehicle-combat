@@ -3,6 +3,8 @@
  * Central area for battlefield map and vehicle cards
  */
 
+import GroupsIcon from '@mui/icons-material/Groups';
+import { SquadsView } from '../squads/SquadsView';
 import { useState, useEffect } from 'react';
 import { v4 as uuid } from 'uuid';
 import {
@@ -50,7 +52,7 @@ import { Vehicle, VehicleWeapon, VehicleTemplate, Creature, CrewAssignment } fro
 import { factionColors, scaleColors, withOpacity } from '../../theme/customColors';
 import { storageService, PartyPreset } from '../../services/storageService';
 
-type ViewMode = 'battlefield' | 'cards';
+type ViewMode = 'battlefield' | 'cards' | 'squads';
 
 export function MainPanel() {
   const { state, addVehicle, loadPartyPreset } = useCombat();
@@ -324,6 +326,10 @@ export function MainPanel() {
               <ViewModuleIcon sx={{ mr: 1, fontSize: 18 }} />
               Vehicles
             </ToggleButton>
+            <ToggleButton value="squads">
+              <GroupsIcon sx={{ mr: 1, fontSize: 18 }} />
+              Squads
+            </ToggleButton>
           </ToggleButtonGroup>
 
           <Stack direction="row" spacing={1} alignItems="center">
@@ -469,6 +475,16 @@ export function MainPanel() {
           <Box sx={{ mt: 3 }}>
             <CombatLog />
           </Box>
+        )}
+
+        {/* Squads View */}
+        {viewMode === 'squads' && (
+          <>
+            <SquadsView />
+            <Box sx={{ mt: 3 }}>
+              <CombatLog />
+            </Box>
+          </>
         )}
       </Box>
 

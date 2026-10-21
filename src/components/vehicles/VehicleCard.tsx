@@ -1250,8 +1250,10 @@ function CrewZone({ zone, vehicleId, assignments }: CrewZoneProps) {
   const vehicle = state.vehicles.find((v) => v.id === vehicleId);
 
   const assignedCreatureIds = state.crewAssignments.map((a) => a.creatureId);
+  // Squad members can't be crew (spec "Membership and assignments")
+  const squadMemberIds = new Set(state.squads.flatMap((s) => s.memberIds));
   const unassignedCreatures = state.creatures.filter(
-    (c) => !assignedCreatureIds.includes(c.id)
+    (c) => !assignedCreatureIds.includes(c.id) && !squadMemberIds.has(c.id)
   );
 
   // Get other zones on this vehicle that the selected creature could move to
