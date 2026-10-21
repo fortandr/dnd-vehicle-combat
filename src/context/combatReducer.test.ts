@@ -6,7 +6,7 @@ vi.mock('../hooks/useLocalStorage', () => ({ loadCurrentEncounter: vi.fn(() => n
 
 import { combatReducer, initialCombatState } from './CombatContext';
 import { GALLEY, WARSHIP } from '../data/navalTemplates';
-import type { Creature, Vehicle } from '../types';
+import type { CombatState, Creature, Vehicle } from '../types';
 
 describe('wind on Environment', () => {
   it('SET_ENVIRONMENT sets and clears wind without touching other fields', () => {
@@ -344,5 +344,26 @@ describe('battle mode morale', () => {
       expect(k.id).not.toBe('k');
       expect(b.stack?.leaderId).toBeUndefined();
     });
+  });
+});
+
+describe('squad migration on load', () => {
+  it('LOAD_ENCOUNTER turns a v2.12 squad creature into a Squad holding a stack', () => {
+    const legacy = {
+      ...initialCombatState, phase: 'combat' as const, round: 2,
+      creatures: [
+        { id: 'k', name: 'Captain', currentHp: 39, tempHp: 0, conditions: [], initiative: 18, initiativeModifier: 0, faction: 'enemy', statblock: { type: 'humanoid', maxHp: 39 } },
+        { id: 'a', name: 'Hobgoblin ×8 (A)', currentHp: 11, tempHp: 0, conditions: [], initiative: 14, initiativeModifier: 1, faction: 'enemy', position: { x: 3, y: 4 }, statblock: { type: 'humanoid', maxHp: 11 }, squad: { size: 8, bodies: 6, leaderId: 'k' } },
+      ],
+      initiativeOrder: ['k', 'a'], currentTurnIndex: 1,
+    } as unknown as CombatState;
+    const out = combatReducer(initialCombatState, { type: 'LOAD_ENCOUNTER', payload: legacy });
+    expect(out.squads).toHaveLength(1);
+    const squad = out.squads[0];
+    expect(squad).toMatchObject({ name: 'Hobgoblin ×8 (A)', memberIds: ['a', 'k'], leaderId: 'k', startingCount: 9, position: { x: 3, y: 4 }, initiative: 14 });
+    expect(out.creatures[1].stack).toEqual({ size: 8, bodies: 6 });
+    // members are never re-added to initiative by the load safety net
+    expect(out.initiativeOrder).toEqual([squad.id]);
+    expect(out.currentTurnIndex).toBe(0);
   });
 });

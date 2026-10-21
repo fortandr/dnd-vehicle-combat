@@ -11,6 +11,7 @@ import { SCALES } from '../data/scaleConfig';
 import { getWeaponStationUpgrade, resolveZone } from '../data/vehicleTemplates';
 import { logAnalyticsEvent } from '../firebase';
 import { v4 as uuid } from 'uuid';
+import { migrateSquads, type SquadMigratable } from '../utils/migrateSquads';
 import { loadCurrentEncounter } from '../hooks/useLocalStorage';
 import { backfillNavalMovement } from '../utils/navalBackfill';
 import { isNavalVehicle } from '../data/navalUpgrades';
@@ -194,9 +195,11 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
   switch (action.type) {
     // ========== Encounter Management ==========
     case 'LOAD_ENCOUNTER': {
+      // v2.11/v2.12 squads → Squad containers (spec "Migration"); a no-op for current saves
+      const payload = { ...action.payload, ...migrateSquads(action.payload, () => uuid()) } as CombatState;
       // Migrate vehicles to add isSwappableStation flag to harpoon weapons
       // Also mark vehicles at 0 HP as inoperative
-      const migratedVehicles = (action.payload.vehicles || []).map((rawVehicle) => {
+      const migratedVehicles = (payload.vehicles || []).map((rawVehicle) => {
         const vehicle = backfillNavalMovement(rawVehicle);
         return {
         ...vehicle,
@@ -216,13 +219,13 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
         .map((v) => v.id);
 
       // Get incoming crew assignments and creatures
-      let migratedCrewAssignments = action.payload.crewAssignments || [];
+      let migratedCrewAssignments = payload.crewAssignments || [];
       // Migrate creatures to add faction field if missing
-      let migratedCreatures = (action.payload.creatures || []).map((creature: Creature) => ({
+      let migratedCreatures = (payload.creatures || []).map((creature: Creature) => ({
         ...creature,
         faction: creature.faction ?? (creature.statblock.type === 'pc' ? 'party' : 'enemy'),
       }));
-      let migratedInitiativeOrder = action.payload.initiativeOrder || [];
+      let migratedInitiativeOrder = payload.initiativeOrder || [];
       const ejectedCreatures: Creature[] = [];
 
       // Remove destroyed vehicles from initiative order
@@ -271,7 +274,7 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
           );
 
           // Add ejected creatures to initiative order (if combat is active)
-          if (action.payload.phase === 'combat' && ejectedCreatures.length > 0) {
+          if (payload.phase === 'combat' && ejectedCreatures.length > 0) {
             migratedInitiativeOrder = insertCreaturesIntoInitiative(
               migratedInitiativeOrder,
               ejectedCreatures,
@@ -284,10 +287,11 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
 
       // Safety net: Ensure any creature with a position (on battlefield) that isn't
       // assigned to a vehicle is in the initiative order during combat
-      if (action.payload.phase === 'combat') {
+      if (payload.phase === 'combat') {
         const assignedCreatureIds = new Set(migratedCrewAssignments.map((a) => a.creatureId));
+        const squadMemberIds = new Set((payload.squads ?? []).flatMap((s) => s.memberIds));
         const creaturesOnBattlefield = migratedCreatures.filter(
-          (c) => c.position && !assignedCreatureIds.has(c.id) && !migratedInitiativeOrder.includes(c.id)
+          (c) => c.position && !assignedCreatureIds.has(c.id) && !squadMemberIds.has(c.id) && !migratedInitiativeOrder.includes(c.id)
         );
         if (creaturesOnBattlefield.length > 0) {
           migratedInitiativeOrder = insertCreaturesIntoInitiative(
@@ -302,27 +306,27 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
       // Merge with initial state to ensure all required fields exist
       return {
         ...initialCombatState,
-        ...action.payload,
+        ...payload,
         // Ensure nested objects have defaults
         battlefield: {
           ...initialCombatState.battlefield,
-          ...(action.payload.battlefield || {}),
+          ...(payload.battlefield || {}),
         },
         environment: {
           ...initialCombatState.environment,
-          ...(action.payload.environment || {}),
+          ...(payload.environment || {}),
         },
         // Ensure arrays exist with migrations applied
         vehicles: migratedVehicles,
         creatures: migratedCreatures,
         crewAssignments: migratedCrewAssignments,
-        squads: action.payload.squads || [],
+        squads: payload.squads ?? [],
         initiativeOrder: migratedInitiativeOrder,
-        actionLog: action.payload.actionLog || [],
-        movementUsed: action.payload.movementUsed || {},
-        moveHistory: action.payload.moveHistory || [],
-        shipActionsUsed: action.payload.shipActionsUsed || {},
-        moralePrompts: action.payload.moralePrompts || [],
+        actionLog: payload.actionLog || [],
+        movementUsed: payload.movementUsed || {},
+        moveHistory: payload.moveHistory || [],
+        shipActionsUsed: payload.shipActionsUsed || {},
+        moralePrompts: payload.moralePrompts || [],
       };
     }
 
@@ -1996,7 +2000,9 @@ function getInitialState(providedState?: CombatState): CombatState {
     }
     if (saved && typeof saved === 'object') {
       // Merge with initial state to ensure all required fields exist
-      const loadedState = saved as Partial<CombatState>;
+      // v2.11/v2.12 squads → Squad containers (spec "Migration"); a no-op for current saves
+      const rawSaved = saved as SquadMigratable;
+      const loadedState = { ...rawSaved, ...migrateSquads(rawSaved, () => uuid()) } as Partial<CombatState>;
 
       // Migrate vehicles to fix weapon zones and add isSwappableStation flag
       const migratedVehicles = (loadedState.vehicles || []).map((rawVehicle) => {
@@ -2059,6 +2065,7 @@ function getInitialState(providedState?: CombatState): CombatState {
           faction: creature.faction ?? (creature.statblock.type === 'pc' ? 'party' : 'enemy'),
         })),
         crewAssignments: loadedState.crewAssignments || [],
+        squads: loadedState.squads ?? [],
         initiativeOrder: loadedState.initiativeOrder || [],
         actionLog: loadedState.actionLog || [],
       };
