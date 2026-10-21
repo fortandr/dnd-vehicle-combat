@@ -96,15 +96,18 @@ export function SquadTurnPanel({ attackerName, members, excludeIds }: { attacker
         continue;
       }
       const squad = r.targetKey.startsWith('s:') ? state.squads.find((s) => s.id === id) : undefined;
-      const victim = squad ? defaultHitTarget(squad, state.creatures) : state.creatures.find((c) => c.id === id);
-      if (!victim) continue;
-      const perHit = hitRolls.map((x) => x.damage.reduce((sum, d) => sum + adjustForDefenses(d.amount, d.type, victim.statblock), 0));
-      if (squad || victim.stack) {
-        // A squad target: no memberId, so the reducer picks its front stack from current state at apply time
-        // (a second line can't hit a stack the first line already wiped).
-        dispatch({ type: 'SQUAD_HIT', payload: squad ? { squadId: squad.id, hits: perHit, source } : { memberId: victim.id, hits: perHit, source } });
-      } else {
-        perHit.filter((a) => a > 0).forEach((amount) => dispatch({ type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: victim.id, amount, source } }));
+      const victim = squad ? undefined : state.creatures.find((c) => c.id === id);
+      if (squad || victim?.stack) {
+        // Typed parts, no memberId for a squad: the reducer picks the front stack from current state at apply time
+        // and meets each part with that member's defenses (a second line can't hit, or use the vulnerabilities of,
+        // a stack the first line already wiped).
+        const hits = hitRolls.map((x) => x.damage.map((d) => ({ amount: d.amount, type: d.type })));
+        dispatch({ type: 'SQUAD_HIT', payload: squad ? { squadId: squad.id, hits, source } : { memberId: id, hits, source } });
+      } else if (victim) {
+        hitRolls
+          .map((x) => x.damage.reduce((sum, d) => sum + adjustForDefenses(d.amount, d.type, victim.statblock), 0))
+          .filter((a) => a > 0)
+          .forEach((amount) => dispatch({ type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: victim.id, amount, source } }));
       }
     }
     setApplied(true);

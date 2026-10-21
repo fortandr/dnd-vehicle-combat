@@ -126,6 +126,17 @@ export function adjustForDefenses(amount: number, type: string, statblock: Statb
   return result;
 }
 
+/** One typed part of one hit; the reducer meets it with the defenses of the member it resolves (ruling P5). */
+export interface HitPart { amount: number; type: string; magical?: boolean }
+/** A hit: typed parts, or a plain number (untyped damage, taken as is). */
+export type SquadHit = number | HitPart[];
+
+/** Final damage of one hit against a statblock: each typed part through adjustForDefenses. */
+export function resolveHit(hit: SquadHit, statblock: Statblock): number {
+  if (typeof hit === 'number') return hit;
+  return hit.reduce((sum, p) => sum + adjustForDefenses(p.amount, p.type, statblock, p.magical ?? false), 0);
+}
+
 export function formatDamageTotals(totalByType: Record<string, number>): string {
   return Object.entries(totalByType).map(([type, amount]) => (type ? `${amount} ${type}` : `${amount}`)).join(' + ');
 }

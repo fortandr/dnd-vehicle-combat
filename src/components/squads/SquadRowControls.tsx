@@ -3,7 +3,7 @@ import { Box, Button, Checkbox, FormControlLabel, IconButton, MenuItem, TextFiel
 import AddIcon from '@mui/icons-material/Add';
 import { useCombat } from '../../context/CombatContext';
 import type { Creature } from '../../types';
-import { adjustForDefenses, DAMAGE_TYPES } from '../../utils/stack';
+import { DAMAGE_TYPES } from '../../utils/stack';
 import { SquadAreaDialog } from './SquadAreaDialog';
 
 /** Sidebar row controls for a squad: Hit [dmg] × [n] (single-target hits), Heal (front body), Area… */
@@ -21,8 +21,9 @@ export function SquadRowControls({ creature }: { creature: Creature }) {
 
   const handleHit = () => {
     if (!valid) return;
-    const each = adjustForDefenses(value, type, creature.statblock, magical);
-    dispatch({ type: 'SQUAD_HIT', payload: { memberId: creature.id, hits: Array(n).fill(each), source: type ? `${value} ${type} × ${n}` : undefined } });
+    // Typed parts: the reducer applies the creature's defenses (exactly once)
+    const hits = Array.from({ length: n }, () => [{ amount: value, type, magical }]);
+    dispatch({ type: 'SQUAD_HIT', payload: { memberId: creature.id, hits, source: type ? `${value} ${type} × ${n}` : undefined } });
     setAmount('');
     setCount('1');
   };

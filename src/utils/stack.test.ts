@@ -3,7 +3,7 @@ import {
   parseDamage, parseActionDamage, parseMultiattackCount, rollGroupAttack,
   adjustForDefenses, formatDamageTotals, formatGroupAttack, formatAttackRolls,
   applyStackHits, aoeTargetCount, aoeAdvice, saveBonus, resolveStackArea, healStack, normalizeStack,
-  nextStackName, formatStackHits, formatAreaSummary, damageNotation,
+  nextStackName, formatStackHits, formatAreaSummary, damageNotation, resolveHit,
 } from './stack';
 import type { Creature, Statblock, StatblockAction } from '../types';
 
@@ -92,6 +92,14 @@ describe('rollGroupAttack', () => {
   it('damage never goes below 0 per part', () => {
     const r = rollGroupAttack({ attackBonus: 5, ac: 10, damage: [{ count: 1, sides: 4, bonus: -3, type: '' }], attacks: 1, roll: dice(15, 1) });
     expect(r.rolls[0].damage).toEqual([{ type: '', amount: 0 }]);
+  });
+});
+
+describe('resolveHit', () => {
+  it('sums typed parts after defenses; a plain number is taken as is', () => {
+    const sb = statblock({ damageVulnerabilities: ['bludgeoning'], damageResistances: ['fire'] });
+    expect(resolveHit([{ amount: 5, type: 'bludgeoning' }, { amount: 7, type: 'fire' }], sb)).toBe(13);
+    expect(resolveHit(9, sb)).toBe(9);
   });
 });
 

@@ -18,7 +18,7 @@ import { backfillNavalMovement } from '../utils/navalBackfill';
 import { isNavalVehicle } from '../data/navalUpgrades';
 import { shipActionSummary, vehicleInitiative } from '../utils/shipTurn';
 import { detectMoraleTriggers } from '../utils/morale';
-import { applyStackHits, healStack, normalizeStack, formatStackHits } from '../utils/stack';
+import { applyStackHits, healStack, normalizeStack, formatStackHits, resolveHit, type SquadHit } from '../utils/stack';
 import { getEffectiveSpeed as computeEffectiveSpeed, speedContextFromState } from '../utils/vehicleSpeed';
 
 const AUTO_SAVE_KEY = 'avernus-current-encounter';
@@ -121,7 +121,7 @@ type CombatAction =
   | { type: 'SET_VEHICLE_COMPONENT_HP'; payload: { vehicleId: string; componentId: string; hp: number } }
   | { type: 'HEAL_VEHICLE'; payload: { vehicleId: string; amount: number } }
   | { type: 'DEAL_DAMAGE_TO_CREATURE'; payload: { creatureId: string; amount: number; source?: string } }
-  | { type: 'SQUAD_HIT'; payload: { squadId?: string; memberId?: string; hits: number[]; source?: string } }
+  | { type: 'SQUAD_HIT'; payload: { squadId?: string; memberId?: string; hits: SquadHit[]; source?: string } }
   | { type: 'SQUAD_AREA'; payload: { squadId?: string; members: SquadAreaMemberResult[]; summary: string; details?: string } }
 
   // Battle mode squads (v2.13.0)
@@ -1333,8 +1333,10 @@ function baseCombatReducer(state: CombatState, action: CombatAction): CombatStat
         ? state.creatures.find((c) => c.id === action.payload.memberId)
         : squadForHit && defaultHitTarget(squadForHit, state.creatures);
       if (!member) return state;
-      if (member.stack) return applyStackHitsToState(state, member, action.payload.hits, action.payload.source);
-      return action.payload.hits
+      // Defenses are applied here, against the member resolved at apply time — never by the dispatcher.
+      const hits = action.payload.hits.map((h) => resolveHit(h, member.statblock));
+      if (member.stack) return applyStackHitsToState(state, member, hits, action.payload.source);
+      return hits
         .filter((h) => h > 0)
         .reduce(
           (s, amount) => baseCombatReducer(s, { type: 'DEAL_DAMAGE_TO_CREATURE', payload: { creatureId: member.id, amount, source: action.payload.source } }),

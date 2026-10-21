@@ -581,6 +581,22 @@ describe('battle mode squads tab', () => {
     expect(second.creatures[1].stack?.bodies).toBe(1);
   });
 
+  it('P5: typed SQUAD_HIT parts meet the defenses of the member resolved at apply time', () => {
+    // Skeletons (bludgeoning-vulnerable) are the front rank; line 1 wipes them, line 2's bludgeoning lands on zombies.
+    const skel = ind('sk', { name: 'Skeleton ×3', currentHp: 13, stack: { size: 3, bodies: 3 },
+      statblock: { ...sb('Skeleton', 'undead', 13, 13), damageVulnerabilities: ['bludgeoning'] } });
+    const zomb = ind('zo', { name: 'Zombie ×2', currentHp: 22, stack: { size: 2, bodies: 2 },
+      statblock: { ...sb('Zombie', 'undead', 22, 8), damageResistances: ['bludgeoning from nonmagical attacks'] } });
+    const s = fight([skel, zomb], [sq('S', ['sk', 'zo'], { startingCount: 5 })], ['S']);
+    const club = [{ amount: 7, type: 'bludgeoning' }];
+    const first = combatReducer(s, { type: 'SQUAD_HIT', payload: { squadId: 'S', hits: [club, club, club] } });
+    expect(first.creatures[0].stack?.bodies).toBe(0);
+    const second = combatReducer(first, { type: 'SQUAD_HIT', payload: { squadId: 'S', hits: [club] } });
+    expect(second.creatures[1]).toMatchObject({ currentHp: 19, stack: { bodies: 2 } }); // halved, never doubled
+    const magic = combatReducer(first, { type: 'SQUAD_HIT', payload: { squadId: 'S', hits: [[{ amount: 7, type: 'bludgeoning', magical: true }]] } });
+    expect(magic.creatures[1].currentHp).toBe(15);
+  });
+
   it('commanding a squad mid-combat keeps the current turn on the same combatant', () => {
     const s = fight([pc('p'), ind('x'), stk('h', 8)], [sq('S', ['h'], { startingCount: 8 })], ['S', 'x', 'p'], 1);
     const out = combatReducer(s, { type: 'UPDATE_SQUAD', payload: { id: 'S', updates: { commanderId: 'p' } } });
