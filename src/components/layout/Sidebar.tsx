@@ -3,7 +3,7 @@
  * Initiative tracker and creature/vehicle list
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { v4 as uuid } from 'uuid';
 import {
   Box,
@@ -18,25 +18,18 @@ import {
   LinearProgress,
   IconButton,
   Collapse,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  List,
-  ListItem,
-  ListItemButton,
   ListItemText,
   ListItemIcon,
-  CircularProgress,
-  InputAdornment,
   Menu,
   MenuItem,
   ToggleButton,
   ToggleButtonGroup,
-  Switch,
-  FormControlLabel,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import { nextStackName } from '../../utils/stack';
+import { convertOpen5eToCreature, type Open5eMonster } from '../../services/open5e';
+import { MonsterSearchDialog } from '../creatures/MonsterSearchDialog';
+import { StatblockDialog } from '../statblocks/StatblockDialog';
+import { makeCustomNpc } from '../../utils/customNpc';
 import { SquadRowControls } from '../squads/SquadRowControls';
 import { MoraleRowControls } from '../morale/MoraleRowControls';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -73,186 +66,6 @@ const PC_CLASS_PRESETS: { name: string; hp: number; ac: number }[] = [
   { name: 'Barbarian', hp: 60, ac: 14 },
   { name: 'Paladin', hp: 52, ac: 18 },
 ];
-
-// Open5e API types
-interface Open5eAction {
-  name: string;
-  desc: string;
-  attack_bonus?: number;
-  damage_dice?: string;
-  damage_bonus?: number;
-}
-
-interface Open5eMonster {
-  slug: string;
-  name: string;
-  size: string;
-  type: string;
-  subtype?: string;
-  alignment: string;
-  armor_class: number;
-  armor_desc?: string;
-  hit_points: number;
-  hit_dice: string;
-  speed: {
-    walk?: number;
-    fly?: number;
-    swim?: number;
-    burrow?: number;
-    climb?: number;
-  };
-  strength: number;
-  dexterity: number;
-  constitution: number;
-  intelligence: number;
-  wisdom: number;
-  charisma: number;
-  strength_save?: number;
-  dexterity_save?: number;
-  constitution_save?: number;
-  intelligence_save?: number;
-  wisdom_save?: number;
-  charisma_save?: number;
-  perception?: number;
-  skills?: Record<string, number>;
-  damage_vulnerabilities: string;
-  damage_resistances: string;
-  damage_immunities: string;
-  condition_immunities: string;
-  senses: string;
-  languages: string;
-  challenge_rating: string;
-  cr?: number;
-  actions?: Open5eAction[];
-  bonus_actions?: Open5eAction[];
-  reactions?: Open5eAction[];
-  legendary_actions?: Open5eAction[];
-  legendary_desc?: string;
-  special_abilities?: Open5eAction[];
-  document__title: string;
-}
-
-interface Open5eResponse {
-  count: number;
-  results: Open5eMonster[];
-}
-
-// Convert Open5e size to our size format
-function mapOpen5eSize(size: string): 'tiny' | 'small' | 'medium' | 'large' | 'huge' | 'gargantuan' {
-  const sizeMap: Record<string, 'tiny' | 'small' | 'medium' | 'large' | 'huge' | 'gargantuan'> = {
-    'Tiny': 'tiny',
-    'Small': 'small',
-    'Medium': 'medium',
-    'Large': 'large',
-    'Huge': 'huge',
-    'Gargantuan': 'gargantuan',
-  };
-  return sizeMap[size] || 'medium';
-}
-
-// Convert Open5e action to our StatblockAction type
-function convertOpen5eAction(action: Open5eAction): { name: string; description: string; attackBonus?: number; damage?: string } {
-  return {
-    name: action.name,
-    description: action.desc,
-    attackBonus: action.attack_bonus,
-    damage: action.damage_dice ? `${action.damage_dice}${action.damage_bonus ? `+${action.damage_bonus}` : ''}` : undefined,
-  };
-}
-
-// Parse comma-separated string to array
-function parseStringToArray(str: string): string[] | undefined {
-  if (!str || str.trim() === '') return undefined;
-  return str.split(',').map(s => s.trim()).filter(s => s.length > 0);
-}
-
-// Convert Open5e monster to our Creature type
-function convertOpen5eToCreature(monster: Open5eMonster, position: { x: number; y: number }): Creature {
-  // Build saving throws object
-  const savingThrows: Partial<Record<'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha', number>> = {};
-  if (monster.strength_save !== undefined) savingThrows.str = monster.strength_save;
-  if (monster.dexterity_save !== undefined) savingThrows.dex = monster.dexterity_save;
-  if (monster.constitution_save !== undefined) savingThrows.con = monster.constitution_save;
-  if (monster.intelligence_save !== undefined) savingThrows.int = monster.intelligence_save;
-  if (monster.wisdom_save !== undefined) savingThrows.wis = monster.wisdom_save;
-  if (monster.charisma_save !== undefined) savingThrows.cha = monster.charisma_save;
-
-  const statblock: Statblock = {
-    id: uuid(),
-    name: monster.name,
-    source: 'srd', // Open5e serves SRD content
-    size: mapOpen5eSize(monster.size),
-    type: monster.type.toLowerCase(),
-    subtype: monster.subtype,
-    alignment: monster.alignment || 'neutral',
-    ac: monster.armor_class,
-    acType: monster.armor_desc,
-    maxHp: monster.hit_points,
-    hitDice: monster.hit_dice || `${Math.ceil(monster.hit_points / 5)}d8`,
-    speed: {
-      walk: monster.speed.walk || 30,
-      fly: monster.speed.fly,
-      swim: monster.speed.swim,
-      burrow: monster.speed.burrow,
-      climb: monster.speed.climb,
-    },
-    abilities: {
-      str: monster.strength,
-      dex: monster.dexterity,
-      con: monster.constitution,
-      int: monster.intelligence,
-      wis: monster.wisdom,
-      cha: monster.charisma,
-    },
-    savingThrows: Object.keys(savingThrows).length > 0 ? savingThrows : undefined,
-    skills: monster.skills,
-    damageVulnerabilities: parseStringToArray(monster.damage_vulnerabilities),
-    damageResistances: parseStringToArray(monster.damage_resistances),
-    damageImmunities: parseStringToArray(monster.damage_immunities),
-    conditionImmunities: parseStringToArray(monster.condition_immunities),
-    senses: monster.senses || 'passive Perception 10',
-    languages: monster.languages || 'None',
-    cr: monster.challenge_rating,
-    traits: monster.special_abilities?.map(a => ({ name: a.name, description: a.desc })),
-    actions: monster.actions?.map(convertOpen5eAction),
-    bonusActions: monster.bonus_actions?.map(convertOpen5eAction),
-    reactions: monster.reactions?.map(convertOpen5eAction),
-    legendaryActions: monster.legendary_actions?.map(convertOpen5eAction),
-  };
-
-  // Calculate initiative modifier from dexterity (but don't auto-roll)
-  const dexMod = Math.floor((monster.dexterity - 10) / 2);
-
-  return {
-    id: uuid(),
-    name: monster.name,
-    statblock,
-    currentHp: statblock.maxHp,
-    tempHp: 0,
-    conditions: [],
-    initiative: 0, // Don't auto-roll, use "Roll Init" button
-    initiativeModifier: dexMod,
-    faction: 'enemy', // Monsters from Open5e default to enemy
-    position,
-  };
-}
-
-// Fetch monsters from Open5e API
-async function searchOpen5e(query: string): Promise<Open5eMonster[]> {
-  if (!query || query.length < 2) return [];
-
-  try {
-    const response = await fetch(
-      `https://api.open5e.com/v1/monsters/?search=${encodeURIComponent(query)}&limit=20`
-    );
-    if (!response.ok) throw new Error('API request failed');
-    const data: Open5eResponse = await response.json();
-    return data.results;
-  } catch (error) {
-    console.error('Open5e search error:', error);
-    return [];
-  }
-}
 
 export function Sidebar() {
   const { state, addCreature, removeCreature, dispatch } = useCombat();
@@ -297,15 +110,6 @@ export function Sidebar() {
 
   // Open5e search state
   const [showOpen5eSearch, setShowOpen5eSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Open5eMonster[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Open5e quantity state
-  const [addQuantity, setAddQuantity] = useState(1);
-  const [addAsSquad, setAddAsSquad] = useState(false);
 
   // Add NPC menu state
   const [addNpcMenuAnchor, setAddNpcMenuAnchor] = useState<null | HTMLElement>(null);
@@ -313,85 +117,17 @@ export function Sidebar() {
   // Statblock modal state
   const [viewingCreature, setViewingCreature] = useState<Creature | null>(null);
 
-  // Cleanup debounce timer on unmount
-  useEffect(() => {
-    return () => {
-      if (searchDebounceRef.current) {
-        clearTimeout(searchDebounceRef.current);
-      }
-    };
-  }, []);
-
-  // Debounced search handler - waits 300ms after typing stops
-  const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
-
-    // Clear any pending search
-    if (searchDebounceRef.current) {
-      clearTimeout(searchDebounceRef.current);
-    }
-
-    if (query.length < 2) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    // Show loading indicator immediately
-    setIsSearching(true);
-    setSearchError(null);
-
-    // Debounce the actual API call
-    searchDebounceRef.current = setTimeout(async () => {
-      try {
-        const results = await searchOpen5e(query);
-        setSearchResults(results);
-        if (results.length === 0) {
-          setSearchError('No monsters found');
-        }
-      } catch {
-        setSearchError('Failed to search. Check your internet connection.');
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-  }, []);
-
-  // Add monster(s) from Open5e
-  const handleAddOpen5eMonster = (monster: Open5eMonster) => {
-    const qty = Math.max(1, Math.min(addQuantity, 20));
+  // Add monster(s) from Open5e: more than one adds separate numbered creatures (build squads in the Squads tab)
+  const handleAddOpen5eMonster = (monster: Open5eMonster, qty: number) => {
     const existingNpcCount = state.creatures.filter(c => c.statblock.type !== 'pc').length;
-
-    if (qty > 1 && addAsSquad) {
-      const offsetX = (existingNpcCount % 5) * 30 - 60;
-      const offsetY = Math.floor(existingNpcCount / 5) * 30 + 50;
-      const creature = convertOpen5eToCreature(monster, { x: offsetX, y: offsetY });
-      creature.name = nextStackName(monster.name, qty, state.creatures);
-      creature.stack = { size: qty, bodies: qty };
-      addCreature(creature);
-      setShowOpen5eSearch(false);
-      setSearchQuery('');
-      setSearchResults([]);
-      setAddQuantity(1);
-      return;
-    }
-
     for (let i = 0; i < qty; i++) {
       const index = existingNpcCount + i;
       const offsetX = (index % 5) * 30 - 60;
       const offsetY = Math.floor(index / 5) * 30 + 50;
-
       const creature = convertOpen5eToCreature(monster, { x: offsetX, y: offsetY });
-      // Number the creatures when adding more than one
-      if (qty > 1) {
-        creature.name = `${monster.name} ${i + 1}`;
-      }
+      if (qty > 1) creature.name = `${monster.name} ${i + 1}`;
       addCreature(creature);
     }
-    setShowOpen5eSearch(false);
-    setSearchQuery('');
-    setSearchResults([]);
-    setAddQuantity(1);
   };
 
   const handleAddPC = (classPreset?: { name: string; hp: number; ac: number }) => {
@@ -443,41 +179,19 @@ export function Sidebar() {
 
   const handleAddCreature = (preset?: Partial<Statblock>) => {
     const name = preset?.name || creatureName || 'Unknown';
-    const hp = preset?.maxHp || creatureHp;
-    const speed = preset?.speed?.walk || creatureSpeed;
-
-    const statblock: Statblock = {
-      id: uuid(),
-      name,
-      source: 'custom',
-      size: preset?.size || 'medium',
-      type: preset?.type || 'humanoid',
-      alignment: 'neutral',
-      ac: preset?.ac || creatureAc,
-      maxHp: hp,
-      hitDice: `${Math.ceil(hp / 5)}d8`,
-      speed: { walk: speed },
-      abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-      senses: 'passive Perception 10',
-      languages: 'Common',
-      cr: preset?.cr || '1',
-    };
-
     const npcCount = state.creatures.filter(c => c.statblock.type !== 'pc').length;
-    const offsetX = (npcCount % 5) * 30 - 60;
-    const offsetY = Math.floor(npcCount / 5) * 30 + 50;
-
     const creature: Creature = {
-      id: uuid(),
-      name,
-      statblock,
-      currentHp: statblock.maxHp,
-      tempHp: 0,
-      conditions: [],
-      initiative: creatureInit,
-      initiativeModifier: 0,
-      faction: 'enemy', // Generic creatures default to enemy
-      position: { x: offsetX, y: offsetY },
+      ...makeCustomNpc({
+        name,
+        hp: preset?.maxHp || creatureHp,
+        ac: preset?.ac || creatureAc,
+        speed: preset?.speed?.walk || creatureSpeed,
+        initiative: creatureInit,
+        size: preset?.size,
+        type: preset?.type,
+        cr: preset?.cr,
+      }),
+      position: { x: (npcCount % 5) * 30 - 60, y: Math.floor(npcCount / 5) * 30 + 50 },
     };
 
     addCreature(creature);
@@ -1106,181 +820,17 @@ export function Sidebar() {
       </Card>
 
       {/* Open5e Search Dialog */}
-      <Dialog
+      <MonsterSearchDialog
         open={showOpen5eSearch}
-        onClose={() => {
-          setShowOpen5eSearch(false);
-          setSearchQuery('');
-          setSearchResults([]);
-          setSearchError(null);
-          setAddQuantity(1);
-        }}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Search Open5e Monsters</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            placeholder="Search for monsters (e.g., 'goblin', 'dragon', 'devil')"
-            value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-            sx={{ mb: 2, mt: 1 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon color="action" />
-                </InputAdornment>
-              ),
-              endAdornment: isSearching ? (
-                <InputAdornment position="end">
-                  <CircularProgress size={20} />
-                </InputAdornment>
-              ) : null,
-            }}
-          />
-
-          {/* Quantity Selector */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-            <Typography variant="body2" color="text.secondary">Quantity:</Typography>
-            <IconButton
-              size="small"
-              onClick={() => setAddQuantity(q => Math.max(1, q - 1))}
-              disabled={addQuantity <= 1}
-            >
-              <RemoveIcon fontSize="small" />
-            </IconButton>
-            <Typography variant="body1" fontWeight={600} sx={{ minWidth: 24, textAlign: 'center' }}>
-              {addQuantity}
-            </Typography>
-            <IconButton
-              size="small"
-              onClick={() => setAddQuantity(q => Math.min(20, q + 1))}
-              disabled={addQuantity >= 20}
-            >
-              <AddIcon fontSize="small" />
-            </IconButton>
-            {addQuantity > 1 && (
-              <Box>
-                <FormControlLabel
-                  control={<Switch size="small" checked={addAsSquad} onChange={(e) => setAddAsSquad(e.target.checked)} />}
-                  label={<Typography variant="caption">Add as one squad</Typography>}
-                />
-                {addAsSquad ? (
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    One row and token; tracks bodies (e.g. 8/{addQuantity})
-                  </Typography>
-                ) : (
-                  <Typography variant="caption" color="text.secondary">
-                    (will be numbered, e.g. "Goblin 1", "Goblin 2")
-                  </Typography>
-                )}
-              </Box>
-            )}
-          </Box>
-
-          {searchError && searchResults.length === 0 && (
-            <Typography color="text.secondary" align="center" sx={{ py: 2 }}>
-              {searchError}
-            </Typography>
-          )}
-
-          {searchResults.length > 0 && (
-            <List sx={{ maxHeight: 400, overflow: 'auto' }}>
-              {searchResults.map((monster) => (
-                <ListItem key={monster.slug} disablePadding>
-                  <ListItemButton onClick={() => handleAddOpen5eMonster(monster)}>
-                    <ListItemText
-                      primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography fontWeight={600}>{monster.name}</Typography>
-                          <Chip
-                            label={`CR ${monster.challenge_rating}`}
-                            size="small"
-                            sx={{ height: 18, fontSize: '0.625rem' }}
-                          />
-                          {addQuantity > 1 && (
-                            <Chip
-                              label={`+${addQuantity}`}
-                              size="small"
-                              color="primary"
-                              sx={{ height: 18, fontSize: '0.625rem' }}
-                            />
-                          )}
-                        </Box>
-                      }
-                      secondary={
-                        <Typography variant="caption" color="text.secondary">
-                          {monster.size} {monster.type} • HP {monster.hit_points} • AC {monster.armor_class}
-                          {monster.document__title && ` • ${monster.document__title}`}
-                        </Typography>
-                      }
-                    />
-                  </ListItemButton>
-                </ListItem>
-              ))}
-            </List>
-          )}
-
-          {searchQuery.length > 0 && searchQuery.length < 2 && (
-            <Typography color="text.secondary" align="center" sx={{ py: 2 }}>
-              Type at least 2 characters to search
-            </Typography>
-          )}
-
-          {searchQuery.length === 0 && (
-            <Typography color="text.secondary" align="center" sx={{ py: 2 }}>
-              Search the Open5e database for SRD monsters.
-              <br />
-              <Typography variant="caption" component="span">
-                Includes monsters from the 5e SRD, Tome of Beasts, and more.
-              </Typography>
-            </Typography>
-          )}
-        </DialogContent>
-      </Dialog>
+        onClose={() => setShowOpen5eSearch(false)}
+        title="Search Open5e Monsters"
+        maxQuantity={20}
+        quantityHint={() => '(will be numbered, e.g. "Goblin 1", "Goblin 2")'}
+        onPick={handleAddOpen5eMonster}
+      />
 
       {/* Statblock Modal */}
-      <Dialog
-        open={!!viewingCreature}
-        onClose={() => setViewingCreature(null)}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{ sx: { maxHeight: '90vh' } }}
-      >
-        {viewingCreature && (
-          <>
-            <DialogTitle sx={{ borderBottom: 1, borderColor: 'divider', pb: 1 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="h5" fontWeight={700} sx={{ color: 'primary.main' }}>
-                    {viewingCreature.statblock.name}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {viewingCreature.statblock.size} {viewingCreature.statblock.type}
-                    {viewingCreature.statblock.subtype && ` (${viewingCreature.statblock.subtype})`}
-                    , {viewingCreature.statblock.alignment}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
-                  <Chip label={`CR ${viewingCreature.statblock.cr}`} color="primary" />
-                  <IconButton
-                    onClick={() => setViewingCreature(null)}
-                    size="small"
-                    sx={{ color: 'text.secondary' }}
-                  >
-                    <CloseIcon />
-                  </IconButton>
-                </Box>
-              </Box>
-            </DialogTitle>
-            <DialogContent sx={{ pt: 2 }}>
-              <StatblockDisplay statblock={viewingCreature.statblock} />
-            </DialogContent>
-          </>
-        )}
-      </Dialog>
+      <StatblockDialog creature={viewingCreature} onClose={() => setViewingCreature(null)} />
     </Box>
   );
 }
@@ -1653,218 +1203,4 @@ function getHPColor(current: number, max: number): 'success' | 'warning' | 'erro
   if (percent > 50) return 'success';
   if (percent > 25) return 'warning';
   return 'error';
-}
-
-// Statblock Display Component
-function StatblockDisplay({ statblock }: { statblock: Statblock }) {
-  const abilityNames = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
-
-  const getModifier = (score: number) => {
-    const mod = Math.floor((score - 10) / 2);
-    return mod >= 0 ? `+${mod}` : `${mod}`;
-  };
-
-  const formatSpeed = () => {
-    const speeds: string[] = [];
-    if (statblock.speed.walk) speeds.push(`${statblock.speed.walk} ft.`);
-    if (statblock.speed.fly) speeds.push(`fly ${statblock.speed.fly} ft.`);
-    if (statblock.speed.swim) speeds.push(`swim ${statblock.speed.swim} ft.`);
-    if (statblock.speed.burrow) speeds.push(`burrow ${statblock.speed.burrow} ft.`);
-    if (statblock.speed.climb) speeds.push(`climb ${statblock.speed.climb} ft.`);
-    return speeds.join(', ') || '0 ft.';
-  };
-
-  const formatSavingThrows = () => {
-    if (!statblock.savingThrows) return null;
-    const saves: string[] = [];
-    abilityNames.forEach(ability => {
-      const save = statblock.savingThrows?.[ability];
-      if (save !== undefined) {
-        saves.push(`${ability.toUpperCase()} ${save >= 0 ? '+' : ''}${save}`);
-      }
-    });
-    return saves.length > 0 ? saves.join(', ') : null;
-  };
-
-  const formatSkills = () => {
-    if (!statblock.skills || Object.keys(statblock.skills).length === 0) return null;
-    return Object.entries(statblock.skills)
-      .map(([skill, bonus]) => `${skill} ${bonus >= 0 ? '+' : ''}${bonus}`)
-      .join(', ');
-  };
-
-  return (
-    <Box sx={{ fontFamily: 'serif' }}>
-      {/* Basic Stats */}
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1a' }}>
-        <Stack spacing={0.5}>
-          <Typography variant="body2">
-            <strong>Armor Class</strong> {statblock.ac}{statblock.acType && ` (${statblock.acType})`}
-          </Typography>
-          <Typography variant="body2">
-            <strong>Hit Points</strong> {statblock.maxHp} ({statblock.hitDice})
-          </Typography>
-          <Typography variant="body2">
-            <strong>Speed</strong> {formatSpeed()}
-          </Typography>
-        </Stack>
-      </Paper>
-
-      {/* Ability Scores */}
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1a' }}>
-        <Stack direction="row" spacing={2} justifyContent="space-around">
-          {abilityNames.map(ability => (
-            <Box key={ability} sx={{ textAlign: 'center' }}>
-              <Typography variant="caption" fontWeight={700} sx={{ textTransform: 'uppercase' }}>
-                {ability}
-              </Typography>
-              <Typography variant="body1" fontFamily="monospace">
-                {statblock.abilities[ability]} ({getModifier(statblock.abilities[ability])})
-              </Typography>
-            </Box>
-          ))}
-        </Stack>
-      </Paper>
-
-      {/* Secondary Stats */}
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#1a1a1a' }}>
-        <Stack spacing={0.5}>
-          {formatSavingThrows() && (
-            <Typography variant="body2">
-              <strong>Saving Throws</strong> {formatSavingThrows()}
-            </Typography>
-          )}
-          {formatSkills() && (
-            <Typography variant="body2">
-              <strong>Skills</strong> {formatSkills()}
-            </Typography>
-          )}
-          {statblock.damageVulnerabilities && statblock.damageVulnerabilities.length > 0 && (
-            <Typography variant="body2">
-              <strong>Damage Vulnerabilities</strong> {statblock.damageVulnerabilities.join(', ')}
-            </Typography>
-          )}
-          {statblock.damageResistances && statblock.damageResistances.length > 0 && (
-            <Typography variant="body2">
-              <strong>Damage Resistances</strong> {statblock.damageResistances.join(', ')}
-            </Typography>
-          )}
-          {statblock.damageImmunities && statblock.damageImmunities.length > 0 && (
-            <Typography variant="body2">
-              <strong>Damage Immunities</strong> {statblock.damageImmunities.join(', ')}
-            </Typography>
-          )}
-          {statblock.conditionImmunities && statblock.conditionImmunities.length > 0 && (
-            <Typography variant="body2">
-              <strong>Condition Immunities</strong> {statblock.conditionImmunities.join(', ')}
-            </Typography>
-          )}
-          <Typography variant="body2">
-            <strong>Senses</strong> {statblock.senses}
-          </Typography>
-          <Typography variant="body2">
-            <strong>Languages</strong> {statblock.languages}
-          </Typography>
-          <Typography variant="body2">
-            <strong>Challenge</strong> {statblock.cr}
-          </Typography>
-        </Stack>
-      </Paper>
-
-      {/* Traits */}
-      {statblock.traits && statblock.traits.length > 0 && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="subtitle2" sx={{ color: 'primary.main', mb: 1, borderBottom: 1, borderColor: 'primary.main', pb: 0.5 }}>
-            Traits
-          </Typography>
-          <Stack spacing={1}>
-            {statblock.traits.map((trait, i) => (
-              <Box key={i}>
-                <Typography variant="body2">
-                  <strong><em>{trait.name}.</em></strong> {trait.description}
-                </Typography>
-              </Box>
-            ))}
-          </Stack>
-        </Box>
-      )}
-
-      {/* Actions */}
-      {statblock.actions && statblock.actions.length > 0 && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="subtitle2" sx={{ color: 'primary.main', mb: 1, borderBottom: 1, borderColor: 'primary.main', pb: 0.5 }}>
-            Actions
-          </Typography>
-          <Stack spacing={1}>
-            {statblock.actions.map((action, i) => (
-              <Box key={i}>
-                <Typography variant="body2">
-                  <strong><em>{action.name}.</em></strong> {action.description}
-                </Typography>
-              </Box>
-            ))}
-          </Stack>
-        </Box>
-      )}
-
-      {/* Bonus Actions */}
-      {statblock.bonusActions && statblock.bonusActions.length > 0 && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="subtitle2" sx={{ color: 'primary.main', mb: 1, borderBottom: 1, borderColor: 'primary.main', pb: 0.5 }}>
-            Bonus Actions
-          </Typography>
-          <Stack spacing={1}>
-            {statblock.bonusActions.map((action, i) => (
-              <Box key={i}>
-                <Typography variant="body2">
-                  <strong><em>{action.name}.</em></strong> {action.description}
-                </Typography>
-              </Box>
-            ))}
-          </Stack>
-        </Box>
-      )}
-
-      {/* Reactions */}
-      {statblock.reactions && statblock.reactions.length > 0 && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="subtitle2" sx={{ color: 'primary.main', mb: 1, borderBottom: 1, borderColor: 'primary.main', pb: 0.5 }}>
-            Reactions
-          </Typography>
-          <Stack spacing={1}>
-            {statblock.reactions.map((action, i) => (
-              <Box key={i}>
-                <Typography variant="body2">
-                  <strong><em>{action.name}.</em></strong> {action.description}
-                </Typography>
-              </Box>
-            ))}
-          </Stack>
-        </Box>
-      )}
-
-      {/* Legendary Actions */}
-      {statblock.legendaryActions && statblock.legendaryActions.length > 0 && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="subtitle2" sx={{ color: 'primary.main', mb: 1, borderBottom: 1, borderColor: 'primary.main', pb: 0.5 }}>
-            Legendary Actions
-          </Typography>
-          {statblock.legendaryActionsPerRound && (
-            <Typography variant="body2" sx={{ mb: 1, fontStyle: 'italic' }}>
-              The creature can take {statblock.legendaryActionsPerRound} legendary actions, choosing from the options below.
-            </Typography>
-          )}
-          <Stack spacing={1}>
-            {statblock.legendaryActions.map((action, i) => (
-              <Box key={i}>
-                <Typography variant="body2">
-                  <strong><em>{action.name}.</em></strong> {action.description}
-                </Typography>
-              </Box>
-            ))}
-          </Stack>
-        </Box>
-      )}
-    </Box>
-  );
 }
