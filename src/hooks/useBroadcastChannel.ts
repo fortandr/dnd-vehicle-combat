@@ -4,11 +4,12 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Vehicle, Creature, ScaleName, BackgroundImageConfig, CrewAssignment, CombatPhase, ElevationZone, CompassPoint } from '../types';
+import { Vehicle, Creature, Squad, ScaleName, BackgroundImageConfig, CrewAssignment, CombatPhase, ElevationZone, CompassPoint } from '../types';
 
 export interface BattlefieldSyncState {
   vehicles: Vehicle[];
   creatures: Creature[];
+  squads?: Squad[]; // Battle mode squads (v2.13.0); optional for older DM windows
   crewAssignments: CrewAssignment[];
   scale: ScaleName;
   backgroundImage?: BackgroundImageConfig;

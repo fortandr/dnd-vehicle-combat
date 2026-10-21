@@ -19,7 +19,12 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useCombat } from '../../context/CombatContext';
 import { useSettings } from '../../context/SettingsContext';
-import { Vehicle, VehicleTemplate, Position, ScaleName, Creature, CrewAssignment, ElevationZone, CompassPoint } from '../../types';
+import { Vehicle, VehicleTemplate, Position, ScaleName, Creature, CrewAssignment, ElevationZone, CompassPoint, Squad } from '../../types';
+import { Menu, MenuItem } from '@mui/material';
+import { squadMembers } from '../../utils/squads';
+import { SquadTokenFace } from '../squads/SquadToken';
+import { SquadHitDialog } from '../squads/SquadHitDialog';
+import { SquadAreaDialog } from '../squads/SquadAreaDialog';
 import { COMPASS_POINTS, encounterHasSailingShips } from '../../utils/navalMovement';
 import { WindIndicator } from './WindIndicator';
 import { SCALES, formatDistanceWithUnit, getScaleForDistance, calculateMovementPerRound } from '../../data/scaleConfig';
@@ -47,7 +52,7 @@ interface BattlefieldMapProps {
 }
 
 export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
-  const { state, updateVehiclePosition, updateVehicleFacing, setScale, setBackgroundImage, dispatch, currentTurnVehicle, currentTurnCreature } = useCombat();
+  const { state, updateVehiclePosition, updateVehicleFacing, setScale, setBackgroundImage, dispatch, currentTurnVehicle, currentTurnCreature, currentTurnSquad } = useCombat();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showBackgroundControls, setShowBackgroundControls] = useState(false);
   const [showLayersPanel, setShowLayersPanel] = useState(false);
@@ -508,6 +513,16 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
       if (editingZone?.id === zone.id) {
         setEditingZone({ ...editingZone, position: newPosition });
       }
+      return;
+    }
+
+    // Squad drag: free movement (squads aren't movement-tracked)
+    if (activeIdStr.startsWith('squad-')) {
+      const squad = state.squads.find((s) => `squad-${s.id}` === activeIdStr);
+      if (!squad?.position) return;
+      const worldDelta = screenDeltaToWorld(delta);
+      const position = constrainToImageBounds({ x: squad.position.x + worldDelta.x, y: squad.position.y + worldDelta.y });
+      dispatch({ type: 'UPDATE_SQUAD', payload: { id: squad.id, updates: { position } } });
       return;
     }
 
@@ -1358,6 +1373,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
     broadcast({
       vehicles: state.vehicles,
       creatures: state.creatures,
+      squads: state.squads,
       crewAssignments: state.crewAssignments,
       scale: state.scale,
       backgroundImage: state.battlefield.backgroundImage,
@@ -1378,6 +1394,7 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
   }, [
     state.vehicles,
     state.creatures,
+    state.squads,
     state.crewAssignments,
     state.scale,
     state.battlefield.backgroundImage,
@@ -2118,7 +2135,8 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
             .filter(c => {
               // Show creatures not assigned to any vehicle
               const isAssigned = state.crewAssignments.some(a => a.creatureId === c.id);
-              return !isAssigned && c.position;
+              const inSquad = state.squads.some((s) => s.memberIds.includes(c.id));
+              return !isAssigned && !inSquad && c.position;
             })
             .map((creature) => {
               const screenPos = worldToScreen(creature.position!);
@@ -2140,6 +2158,23 @@ export function BattlefieldMap({ height = 600 }: BattlefieldMapProps) {
                 />
               );
             })}
+
+          {/* Squad tokens (members have no tokens of their own) */}
+          {state.squads.filter((s) => s.position).map((squad) => {
+            const isThisSquadTurn = currentTurnSquad?.id === squad.id;
+            return (
+              <DraggableSquadToken
+                key={squad.id}
+                squad={squad}
+                creatures={state.creatures}
+                screenPosition={worldToScreen(squad.position!)}
+                pixelsPerFoot={pixelsPerFoot}
+                isCurrentTurn={isThisSquadTurn}
+                disabled={state.phase === 'combat' && !isThisSquadTurn && !repositionMode}
+                showLabel={showHpBars}
+              />
+            );
+          })}
 
           {/* Drag Overlay */}
           <DragOverlay>
@@ -4162,4 +4197,56 @@ function getWeaponRangesByArc(
   }
 
   return ranges;
+}
+
+// ==========================================
+// Squad Token (one per placed squad)
+// ==========================================
+
+function DraggableSquadToken({ squad, creatures, screenPosition, pixelsPerFoot, isCurrentTurn, disabled, showLabel }: {
+  squad: Squad; creatures: Creature[]; screenPosition: Position; pixelsPerFoot: number;
+  isCurrentTurn: boolean; disabled: boolean; showLabel: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: `squad-${squad.id}`, disabled });
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [hitOpen, setHitOpen] = useState(false);
+  const [areaOpen, setAreaOpen] = useState(false);
+  const drag = CSS.Translate.toString(transform);
+  return (
+    <>
+      <div
+        ref={setNodeRef}
+        {...listeners}
+        {...attributes}
+        className="creature-token"
+        onMouseDown={(e) => e.stopPropagation()}
+        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setMenu({ x: e.clientX, y: e.clientY }); }}
+        title={`${squad.name}\nRight-click: Hit… / Area…`}
+        style={{
+          position: 'absolute', left: screenPosition.x, top: screenPosition.y,
+          transform: [drag, 'translate(-50%, -50%)'].filter(Boolean).join(' '),
+          opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 1000 : isCurrentTurn ? 500 : 6,
+          cursor: disabled ? 'not-allowed' : 'grab',
+        }}
+      >
+        <SquadTokenFace squad={squad} creatures={creatures} pixelsPerFoot={pixelsPerFoot} isCurrentTurn={isCurrentTurn} showLabel={showLabel} />
+      </div>
+      <Menu
+        open={menu !== null}
+        onClose={() => setMenu(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={menu ? { top: menu.y, left: menu.x } : undefined}
+      >
+        <MenuItem onClick={() => { setMenu(null); setHitOpen(true); }}>Hit…</MenuItem>
+        <MenuItem onClick={() => { setMenu(null); setAreaOpen(true); }}>Area…</MenuItem>
+      </Menu>
+      {hitOpen && <SquadHitDialog squad={squad} open onClose={() => setHitOpen(false)} />}
+      {areaOpen && (
+        <SquadAreaDialog
+          squadId={squad.id} title={`Area effect on ${squad.name}`} members={squadMembers(squad, creatures)}
+          open onClose={() => setAreaOpen(false)}
+        />
+      )}
+    </>
+  );
 }

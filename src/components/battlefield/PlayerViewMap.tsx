@@ -12,6 +12,7 @@ import { resolveZone } from '../../data/vehicleTemplates';
 import { renderShipIcon } from './shipIcons';
 import { WindIndicator } from './WindIndicator';
 import { encounterHasSailingShips } from '../../utils/navalMovement';
+import { SquadTokenFace } from '../squads/SquadToken';
 import { SquadTokenOverlay } from '../squads/SquadTokenOverlay';
 import { MoraleTokenMarker } from '../morale/MoraleTokenMarker';
 
@@ -333,7 +334,8 @@ export function PlayerViewMap() {
         {state.creatures
           .filter((c) => {
             const isAssigned = state.crewAssignments.some((a) => a.creatureId === c.id);
-            return !isAssigned && c.position;
+            const inSquad = (state.squads ?? []).some((s) => s.memberIds.includes(c.id));
+            return !isAssigned && !inSquad && c.position;
           })
           .map((creature) => {
             const screenPos = worldToScreen(creature.position!);
@@ -407,6 +409,20 @@ export function PlayerViewMap() {
               </div>
             );
           })}
+
+        {/* Squad tokens: same face as the DM map, never a member breakdown */}
+        {(state.squads ?? []).filter((s) => s.position).map((squad) => {
+          const screenPos = worldToScreen(squad.position!);
+          return (
+            <div
+              key={squad.id}
+              className="player-view-token"
+              style={{ position: 'absolute', left: screenPos.x, top: screenPos.y, transform: 'translate(-50%, -50%)' }}
+            >
+              <SquadTokenFace squad={squad} creatures={state.creatures} pixelsPerFoot={pixelsPerFoot} showLabel={state.showHpBars !== false} />
+            </div>
+          );
+        })}
       </div>
     </div>
   );
