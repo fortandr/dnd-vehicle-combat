@@ -20,6 +20,7 @@ export const changelog: ChangelogEntry[] = [
       { type: 'feature', description: 'Morale (DMG 2014 optional rule): squads can have a Leader, and the app raises a morale card when a leader falls, a squad drops to half strength, or a single monster drops to half HP or below. Roll the DC 10 Wisdom save (with disadvantage for overwhelming odds), mark it as failing automatically, or dismiss it.' },
       { type: 'feature', description: 'Fleeing and Surrendered: shown on the creature\'s row, its turn panel and its token on both the DM map and the player view. A manual Morale button covers surprise and other judgement calls.' },
       { type: 'feature', description: 'DMG edition: the squad Area dialog can follow the 2014 (p. 249) or 2024 (p. 82) area-of-effect guidance. The choice is saved with the encounter.' },
+      { type: 'improvement', description: 'How to Use guide rewritten: new Ships, Avernus War Machines and Battle Mode sections, plus the vehicle library, wind, click-to-roll dice and other features added since 2.0.' },
     ],
   },
   {

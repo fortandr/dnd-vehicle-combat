@@ -21,10 +21,11 @@ import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import GroupIcon from '@mui/icons-material/Group';
 import MapIcon from '@mui/icons-material/Map';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import SailingIcon from '@mui/icons-material/Sailing';
+import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
+import GroupsIcon from '@mui/icons-material/Groups';
 import SaveIcon from '@mui/icons-material/Save';
 import CasinoIcon from '@mui/icons-material/Casino';
-import TerrainIcon from '@mui/icons-material/Terrain';
-import GpsFixedIcon from '@mui/icons-material/GpsFixed';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 
 interface HelpGuideProps {
@@ -66,6 +67,7 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
           </Typography>
         </Box>
 
+        {/* 1. Add Vehicles */}
         <Accordion defaultExpanded>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -75,201 +77,307 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" paragraph>
-              Use the <strong>"+ Vehicle"</strong> dropdown to add Party or Enemy vehicles. The picker
-              offers three kinds of vehicle:
+              Click <strong>+ Vehicle</strong> above the map and choose <strong>Add Party Vehicle</strong> or
+              <strong> Add Enemy Vehicle</strong>. Party vehicles are green; enemy vehicles are red. The picker lists:
             </Typography>
             <Typography variant="body2" component="div" sx={{ pl: 2 }}>
               • <strong>Avernus war machines</strong> — the infernal vehicles (Devil's Ride, Demon Grinder, …)<br />
-              • <strong>Ships</strong> — the six Ghosts of Saltmarsh vessels (rowboat, keelboat, longship, sailing ship, warship, galley)<br />
-              • <strong>Your custom vehicles</strong> — build one with <strong>"+ Create Custom Vehicle"</strong>, or
-                duplicate a built-in as a starting point. Custom vehicles are saved to your personal library.
+              • <strong>Ships</strong> — the six Ghosts of Saltmarsh vessels (rowboat, keelboat, longship, sailing
+                ship, warship, galley), each drawn as its own top-down boat token<br />
+              • <strong>Your custom vehicles</strong> — templates from your personal library, tagged <strong>Custom</strong>
             </Typography>
-            <Typography variant="body2" paragraph sx={{ mt: 1 }}>
-              • <strong>Party vehicles</strong> (green) are the players'; <strong>Enemy vehicles</strong> (red) are the DM's.
-            </Typography>
-            <Typography variant="body2" paragraph>
-              <strong>Managing Vehicles:</strong> Switch to the <strong>"Vehicles"</strong> tab for full vehicle cards.
-              The card adapts to the vehicle type — war machines show armor upgrades, magical gadgets, and mishaps;
-              ships show their components and Ship Upgrades. Both offer HP/damage controls, crew management, and weapons.
+            <Typography variant="body2" paragraph sx={{ mt: 1.5 }}>
+              <strong>Your vehicle library:</strong> in the same picker, click <strong>Create Custom Vehicle</strong> to
+              build a template from scratch, or <strong>Duplicate &amp; edit</strong> on any built-in vehicle to start
+              from a copy. Your own templates have <strong>edit</strong>, <strong>duplicate</strong> and
+              <strong> delete</strong> icons. The editor covers name, size, environment, core stats, and lists of
+              <strong> Components (per-part HP)</strong>, <strong>Crew Zones</strong> and <strong>Weapons</strong>. Leave
+              Components empty for a single-HP vehicle. A custom vehicle copied from a ship, or set to the water
+              environment, gets the ship features in section 5.
             </Typography>
             <Typography variant="body2">
-              <strong>Tip:</strong> Any dice shown (weapon damage, to-hit, effects) is clickable — click it to roll,
-              and the result is logged to the combat log.
+              <strong>Managing vehicles:</strong> the <strong>Vehicles</strong> tab shows a full card for each vehicle:
+              stats, crew positions, crew HP, damage and repair. The card adapts to the vehicle — war machines show
+              Customization and mishaps; ships show Components and Ship Upgrades.
             </Typography>
           </AccordionDetails>
         </Accordion>
 
+        {/* 2. Creatures & Crew */}
         <Accordion>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <GroupIcon color="primary" />
-              <Typography fontWeight={600}>2. Add Creatures & Assign Crew</Typography>
+              <Typography fontWeight={600}>2. Creatures &amp; Crew</Typography>
             </Box>
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" paragraph>
-              The left sidebar has two lists. Under <strong>Player Characters</strong>, click
-              <strong> "+ Add PC"</strong>; under <strong>NPCs / Enemies</strong>, click <strong>"+ Add"</strong>.
+              The left sidebar has two lists:
+            </Typography>
+            <Typography variant="body2" component="div" sx={{ pl: 2, mb: 1.5 }}>
+              • <strong>Player Characters → Add PC:</strong> pick a class under <strong>Quick Add by Class</strong>, or
+                fill in <strong>Or Custom PC</strong> (name, HP, AC, Init, Speed, DEX Save)<br />
+              • <strong>NPCs / Enemies → Add:</strong> choose <strong>Search Open5e</strong> to find a monster (set a
+                <strong> Quantity</strong> to add up to 20 at once), or <strong>Custom NPC</strong> for a quick preset or
+                your own stats
             </Typography>
             <Typography variant="body2" paragraph>
-              • For PCs, use <strong>Quick Add by Class</strong> for sensible defaults, or enter name, HP, AC,
-                speed, DEX save bonus, and initiative yourself<br />
-              • For NPCs, search the Open5e monster database or enter stats manually
+              <strong>Factions:</strong> each creature is <strong>Party</strong> or <strong>Enemy</strong>. PCs default to
+              Party and monsters to Enemy; change it with the edit (pencil) button on the creature's row.
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Factions:</strong> Each creature belongs to either the <strong>Party</strong> (blue) or
-              <strong> Enemy</strong> (red) faction. PCs default to Party, monsters default to Enemy.
-              You can change a creature's faction by clicking the edit button and toggling Party/Enemy.
+              <strong>Seat crew:</strong> on a vehicle card's <strong>Crew Positions</strong>, click the
+              <strong> +</strong> on a station and pick a creature, or choose <strong>+ New crew here</strong> (or
+              <strong> + New pilot here</strong> / <strong>+ New passenger here</strong>) to create a character directly
+              in that seat.
+              Click a seated creature to move it to another station, swap it with another crew member, or
+              <strong> Exit Vehicle</strong> to put it on the battlefield.
             </Typography>
-            <Typography variant="body2" paragraph>
-              <strong>Seat crew &amp; passengers:</strong> In a vehicle's <strong>Crew Positions</strong>, click the
-              <strong> +</strong> on any station to seat a creature — pick an existing one, or choose
-              <strong> "New … here"</strong> to create a character directly in that seat.
-            </Typography>
-            <Typography variant="body2">
-              • The <strong>Helm</strong> is the driver (required to steer)<br />
+            <Typography variant="body2" component="div">
+              • The <strong>Helm</strong> is the driver; a vehicle with crew needs someone at the Helm before combat<br />
               • <strong>Weapon stations</strong> let a crew member fire that weapon<br />
-              • Ships also have a <strong>Passengers</strong> zone for the party, plus a bulk
-                <strong> Deck Crew / Rowers</strong> station shown as a count
+              • Every ship has a <strong>Passengers</strong> zone for the party, separate from the working crew<br />
+              • Big stations such as a ship's <strong>Deck Crew / Rowers</strong> show a count (e.g. 5 / 73) instead of
+                one slot per sailor
             </Typography>
           </AccordionDetails>
         </Accordion>
 
+        {/* 3. Battlefield */}
         <Accordion>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <MapIcon color="primary" />
-              <Typography fontWeight={600}>3. Set Up the Battlefield</Typography>
+              <Typography fontWeight={600}>3. Battlefield</Typography>
             </Box>
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" paragraph>
-              Use the <strong>Map</strong> tab to view and position vehicles on the battlefield.
-              Drag vehicles to move them and use the rotation handle to change their facing.
+              On the <strong>Map</strong> tab, drag tokens to place them and use a vehicle's rotate buttons
+              (45° each) to change its facing. <strong>Layers</strong> toggles distance lines, weapon arcs, and HP bars
+              &amp; names.
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Background Image:</strong> Click <strong>BG</strong> above the map to upload a battlemap,
-              then set its scale (feet per pixel) and opacity. If you rescale the image after placing tokens,
-              a <strong>Map Resize</strong> dialog asks whether to move tokens with the image or leave their
-              coordinates alone. Tick <strong>Remember my choice</strong> to stop it asking; change it later
-              under Settings → "When the battlemap is rescaled".
+              <strong>Map image:</strong> click <strong>BG</strong> above the map, then <strong>Upload Image</strong>.
+              Set its opacity, size, and <strong>Feet per pixel</strong> (quick buttons 0.5 / 1 / 5 / 10) so the map
+              matches your vehicles.
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Zoom &amp; pan:</strong> Use <strong>−</strong> / <strong>+</strong>, <strong>Fit</strong> (frame every
-              token), and <strong>Reset</strong>. Drag empty map to pan. You can always pan or zoom out to any
-              token, even one that ends up outside the image edge, so nothing gets stranded.
+              <strong>Map resize:</strong> if you rescale the image after placing tokens, the <strong>Map Resize
+              Warning</strong> asks whether to <strong>Scale Positions</strong> (tokens move with the image) or
+              <strong> Keep Positions</strong>. Tick <strong>Remember my choice</strong> to stop it asking; change it
+              later under ☰ → Settings → "When the battlemap is rescaled" (Ask me each time / Scale token positions /
+              Keep token coordinates).
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Combat Scales:</strong> The scale bar shows the current range band and auto-adjusts
-              as vehicles close in. Movement per round scales with it:
+              <strong>Zoom &amp; pan:</strong> use <strong>−</strong> / <strong>+</strong>, <strong>Fit</strong> (frame every
+              token), and <strong>Reset</strong>. Drag empty map to pan. You can always pan or zoom out to any token,
+              even one outside the image edge, so nothing gets stranded.
             </Typography>
-            <Typography variant="body2" component="div" sx={{ pl: 2 }}>
+            <Typography variant="body2" paragraph>
+              <strong>Elevation zones</strong> represent hills, cliffs, and other high ground. Open <strong>BG</strong> →
+              <strong> Elevation</strong>, click <strong>+ Add Zone</strong>, then set its name, elevation, position, and
+              size (or drag it into place and resize it with the corner handles). When attacking between elevations:
+            </Typography>
+            <Typography variant="body2" component="div" sx={{ pl: 2, mb: 1 }}>
+              • <strong>High ground (10 ft or more above):</strong> +2 to attack rolls<br />
+              • <strong>Low ground (10 ft or more below):</strong> −2 to attack rolls<br />
+              • <strong>Firing downward</strong> extends weapon range by 10% per 10 ft of elevation
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <em>Elevation zones are locked during combat to prevent accidental changes.</em>
+            </Typography>
+            <Typography variant="body2">
+              <strong>Wind:</strong> when a sailing ship is on the map, the toolbar shows a <strong>Wind</strong> selector:
+              <strong> Calm</strong> or the compass direction it blows from. A wind arrow appears on the map and the
+              Player View. See section 5 for how wind changes ship speed.
+            </Typography>
+          </AccordionDetails>
+        </Accordion>
+
+        {/* 4. Run Combat */}
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <PlayArrowIcon color="primary" />
+              <Typography fontWeight={600}>4. Run Combat</Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Typography variant="body2" paragraph>
+              <strong>Initiative:</strong> the dice icon next to <strong>Player Characters</strong> rolls for every PC
+              (and party ship); the one next to <strong>NPCs / Enemies</strong> rolls for every NPC (and enemy ship). You
+              can also type a creature's Init in its edit form. A war machine acts on its driver's initiative; with no
+              driver it acts last. Ships roll their own (section 5).
+            </Typography>
+            <Typography variant="body2" paragraph>
+              Click <strong>Start Combat</strong>. If it's disabled, hover it to see what's missing: every PC needs
+              initiative, every driver needs a DEX save, and every crewed vehicle needs someone at the Helm.
+            </Typography>
+            <Typography variant="body2" component="div" sx={{ mb: 1.5 }}>
+              • <strong>Next Turn</strong> moves down the initiative order; <strong>Next Round</strong> starts a new round
+                once every turn is done<br />
+              • Only the active vehicle or creature can move. Tick <strong>Reposition Mode</strong> under
+                <strong> Layers</strong> to move any token freely, and <strong>↩ Undo</strong> reverts the last move<br />
+              • <strong>Back to Setup</strong> pauses combat to adjust positions; <strong>Finish Combat</strong> ends it and
+                shows a summary; ☰ → <strong>Reset Combat</strong> restores HP and turns but keeps vehicles and creatures
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Combat scales:</strong> the scale bar shows the current range band and adjusts as vehicles close in.
+              Movement per round scales with it:
+            </Typography>
+            <Typography variant="body2" component="div" sx={{ pl: 2, mb: 1.5 }}>
               • <strong>Point-Blank</strong> (under 100 ft): boarding and melee range<br />
               • <strong>Tactical</strong> (100–1,000 ft): standard weapon combat<br />
               • <strong>Approach</strong> (1,000 ft – 1 mile): closing distance<br />
               • <strong>Strategic</strong> (1 mile+): long-range pursuit
             </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Current Turn panel</strong> (right side): shows the active vehicle or creature, its speed, driver, and
+              every crew member with HP and AC. Click a manned weapon station to expand it and see the weapon's to-hit,
+              damage, and range.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Click-to-roll dice:</strong> any underlined dice notation (e.g. 5d10, 2d10+8, 1d20+6) in weapons,
+              traits, mishaps, gadgets, armor, and ship upgrades can be clicked. The result pops up and goes to the
+              combat log.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Target Status panel</strong> (right side, during combat) lists each opposing vehicle and its crew as
+              seen from the active vehicle or creature:
+            </Typography>
+            <Typography variant="body2" component="div" sx={{ pl: 2, mb: 1 }}>
+              • <strong>Cover:</strong> None, Half (+2 AC), Three-quarters (+5 AC), or Full<br />
+              • <strong>Attack arc:</strong> which side you're attacking from<br />
+              • <strong>Distance</strong> and <strong>In Range / Out of Range</strong> for your manned weapons<br />
+              • <strong>Elevation modifier:</strong> the high- or low-ground bonus or penalty<br />
+              • <strong>Ship components:</strong> for ships, each part (hull, helm, sails/oars, weapons) with its AC, HP,
+                and damage threshold
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Applying damage:</strong> type an amount in a target's <strong>Dmg</strong> box and click
+              <strong> Damage</strong> — on a war machine, a crew member, or an individual ship component. You can also
+              deal damage and heal from the <strong>Vehicles</strong> tab.
+            </Typography>
+            <Typography variant="body2">
+              <strong>Combat log:</strong> every roll, move, and complication is logged below the map. The export icon
+              offers <strong>Copy as Markdown</strong>, <strong>Copy as JSON</strong>, or <strong>Download .md</strong> —
+              handy for a session recap.
+            </Typography>
           </AccordionDetails>
         </Accordion>
 
+        {/* 5. Ships */}
         <Accordion>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <TerrainIcon color="primary" />
-              <Typography fontWeight={600}>4. Elevation Zones</Typography>
+              <SailingIcon color="primary" />
+              <Typography fontWeight={600}>5. Ships (Ghosts of Saltmarsh)</Typography>
             </Box>
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" paragraph>
-              Create elevation zones to represent hills, cliffs, and other terrain features.
-              Click <strong>Layers</strong> above the map to open the layer controls.
+              <strong>Components:</strong> ships take damage part by part instead of rolling mishaps. The hull, helm,
+              sails/oars, and each weapon station has its own AC and HP in the card's <strong>Components</strong> panel
+              (and in Target Status); damage below a part's damage threshold is ignored. A destroyed part has
+              consequences:
+            </Typography>
+            <Typography variant="body2" component="div" sx={{ pl: 2, mb: 1 }}>
+              • <strong>Hull</strong> — the ship is wrecked<br />
+              • <strong>Helm</strong> — the ship can't turn (its rotate buttons disappear)<br />
+              • <strong>Sails / oars</strong> — that propulsion is lost; speed drops to 0 if all of it is gone<br />
+              • <strong>Weapon</strong> — that weapon can no longer fire
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Creating Zones:</strong> Click <strong>"+ Add Zone"</strong>, then drag the zone into
-              place and resize it with the corner handles. Click a zone to select it and set its elevation.
+              Click <strong>Repair</strong> on a component to restore it to full HP.
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Elevation Effects:</strong> When attacking between different elevations:
+              <strong>Speed:</strong> a ship's speed is worked out from its sails and oars, and its card shows the current
+              speed and why (e.g. "with wind", "−10 ft (damage)"):
             </Typography>
-            <Typography variant="body2" component="div" sx={{ pl: 2 }}>
-              • <strong>High ground (+10 ft or more):</strong> +2 to attack rolls<br />
-              • <strong>Low ground (-10 ft or more):</strong> -2 to attack rolls<br />
-              • <strong>Range extension:</strong> Firing downward extends weapon range by 10% per 10 ft of elevation
+            <Typography variant="body2" component="div" sx={{ pl: 2, mb: 1 }}>
+              • <strong>Wind:</strong> sails use their with-wind speed when the ship heads within 45° of downwind, their
+                into-wind speed within 45° of upwind, and normal speed otherwise. Turning mid-move changes the remaining
+                movement right away<br />
+              • <strong>Damage:</strong> sails and oars lose speed as they take damage<br />
+              • <strong>Rowers:</strong> oars need their minimum crew (longships and warships 20, galleys 40). The
+                Passengers zone and fallen crew don't count; an <strong>Oars undermanned</strong> badge explains a stop
             </Typography>
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              <em>Note: Elevation zones are locked during combat to prevent accidental changes.</em>
+            <Typography variant="body2" paragraph>
+              <strong>Ship initiative:</strong> ships roll their own initiative (d20 + the ship's DEX + crew quality) with
+              the same dice icons you use for creatures: the NPC icon rolls enemy ships, the PC icon rolls party ships.
+              Before combat you can click a ship's <strong>Init</strong> chip in the sidebar's Vehicles list to edit it.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Crew quality:</strong> the <strong>Crew</strong> tile next to AC and Speed on the ship's card
+              (default +4, range −10 to +10) adds to ship initiative.
+            </Typography>
+            <Typography variant="body2" paragraph>
+              <strong>Ship actions:</strong> on a ship's turn, the Current Turn panel shows how many ship actions its crew
+              allows (e.g. a galley gets 3 with 40+ crew aboard). Moving the ship ticks <strong>Move</strong>, and rolling
+              a weapon from its station ticks that Fire action. Click a chip to tick or untick it by hand (Move stays
+              ticked once the ship has moved). Going over
+              budget is allowed; it just shows in red. Fallen crew and passengers don't count.
+            </Typography>
+            <Typography variant="body2">
+              <strong>Ship Upgrades:</strong> open <strong>Ship Upgrades</strong> on the card to install Superior Ship
+              Upgrades (hull, movement, weapon, figurehead, and miscellaneous), such as Reinforced Hull or Ever-Full
+              Sails. They're grouped by category so you can honour the book's limits; VVTT lets you toggle them freely.
             </Typography>
           </AccordionDetails>
         </Accordion>
 
+        {/* 6. Avernus War Machines */}
         <Accordion>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <PlayArrowIcon color="primary" />
-              <Typography fontWeight={600}>5. Run Combat</Typography>
+              <LocalFireDepartmentIcon color="primary" />
+              <Typography fontWeight={600}>6. Avernus War Machines</Typography>
             </Box>
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" paragraph>
-              Once vehicles and creatures are set up, click <strong>"Start Combat"</strong> to begin.
+              The built-in war machines have a <strong>Customization</strong> section on their card:
             </Typography>
+            <Typography variant="body2" component="div" sx={{ pl: 2, mb: 1.5 }}>
+              • <strong>Armor Upgrade</strong> — pick one (e.g. Canian Armor, Gilded Death Armor, Soul Spike Armor); its
+                defenses show on the card<br />
+              • <strong>Magical Gadgets</strong> — tick to install (e.g. Necrotic Smoke Screen, Teleporter)<br />
+              • <strong>Weapon Stations</strong> — on vehicles with a swappable station, choose which weapon it carries<br />
+              • <strong>Weapon Station Upgrade</strong> — add a custom weapon station (not available on the Devil's Ride)
+            </Typography>
+            <Typography variant="body2">
+              <strong>Mishaps:</strong> vehicles without per-part components (war machines and single-HP custom vehicles)
+              use the mishap system. When one hit deals damage at or above the vehicle's mishap threshold, a mishap is
+              rolled and applied automatically; <strong>Roll Mishap (d20)</strong> rolls one by hand. Active mishaps are
+              listed on the card with their repair check, and <strong>Repair</strong> clears a repairable mishap. Ships
+              and other component-based vehicles never roll mishaps.
+            </Typography>
+          </AccordionDetails>
+        </Accordion>
+
+        {/* 7. Battle Mode */}
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <GroupsIcon color="primary" />
+              <Typography fontWeight={600}>7. Battle Mode: Squads &amp; Morale</Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails>
             <Typography variant="body2" paragraph>
-              <strong>Requirements to start:</strong><br />
-              • All PCs must have initiative set (or use the dice button to roll)<br />
-              • All drivers must have DEX save bonus set<br />
-              • Each crewed vehicle needs a driver at the Helm
-            </Typography>
-            <Typography variant="body2" paragraph>
-              During combat:<br />
-              • The <strong>Current Turn</strong> panel shows the active vehicle/creature with crew and weapons<br />
-              • Use <strong>"Next Turn"</strong> to advance through the initiative order<br />
-              • Use <strong>"Next Round"</strong> when all turns are complete
-            </Typography>
-            <Typography variant="body2" paragraph>
-              Switch to the <strong>Vehicles</strong> tab to deal damage and track crew HP, or apply damage
-              straight from the <strong>Target Status</strong> panel. <strong>Undo</strong> above the map
-              reverts the last token move.
-            </Typography>
-            <Typography variant="body2" paragraph>
-              <strong>Combat log:</strong> every roll, move, and complication is logged below the map. The
-              export icon offers <strong>Copy as Markdown</strong>, <strong>Copy as JSON</strong>, or
-              <strong>Download Markdown</strong> — handy for a session recap.
-            </Typography>
-            <Typography variant="body2" paragraph>
-              <strong>Ships take component damage</strong> (not mishaps): each part — hull, helm, sails/oars, and
-              weapon stations — has its own HP in the <strong>Components</strong> panel, and destroying a part has
-              real effects. Knock out the sails/oars to cut its speed, the helm to stop it turning, a weapon to
-              silence it, or the hull to wreck the ship. Use <strong>Repair</strong> to restore a part.
-            </Typography>
-            <Typography variant="body2" paragraph>
-              <strong>Wind &amp; ship speed:</strong> when a sailing ship is on the map, the toolbar shows a
-              <strong> Wind</strong> selector (Calm or the direction it blows from). Sails run at their
-              with-wind speed when heading within 45° of downwind, their into-wind speed within 45° of upwind,
-              and normal speed otherwise. Turning mid-move changes the remaining movement right away. Sails and
-              oars also lose speed as they take damage, and oars need their minimum crew (the Passengers zone
-              doesn&apos;t count). A ship&apos;s speed is worked out from its parts, so its card shows the
-              current speed and why.
-            </Typography>
-            <Typography variant="body2" paragraph>
-              <strong>Ship turns:</strong> ships roll their own initiative (d20 + the ship&apos;s DEX + its crew
-              quality) when you press the same <strong>Roll Init</strong> buttons you use for creatures: NPC rolls
-              enemy ships, PC rolls party ships. Edit a ship&apos;s <strong>Init</strong> chip in the Vehicles list
-              before combat. Crew quality (+4 by default) sits next to AC and Speed on the ship&apos;s card. On a
-              ship&apos;s turn the panel shows how many ship actions it gets from the crew aboard. Moving the ship
-              ticks <strong>Move</strong>, and rolling a weapon from its station ticks that Fire action. Click a
-              chip to tick or untick it by hand. Going over is allowed; it just shows in red. Fallen crew don&apos;t count toward actions or rowing.
-            </Typography>
-            <Typography variant="body2" paragraph sx={{ mt: 2 }}>
-              <strong>Battle mode: squads.</strong> When adding several of the same monster, switch on
-              <strong> Add as one squad</strong> to get one row, one initiative slot and one token showing how many
-              are still standing (e.g. 8/10). On a squad&apos;s turn, the right panel&apos;s <strong>Squad attack</strong>
-              rolls every attack at once: a natural 20 is a critical hit and a natural 1 misses. Then <strong>Apply</strong>
-              sends each hit to the target. In the squad&apos;s row, <strong>Hit</strong> deals single-target hits,
-              and <strong>Area…</strong> handles spells like fireball. It suggests how many bodies are caught using the
+              <strong>Squads.</strong> When adding several of the same monster from <strong>Search Open5e</strong>, switch
+              on <strong>Add as one squad</strong> to get one row, one initiative slot and one token showing how many are
+              still standing (e.g. 8/10). On a squad&apos;s turn, the right panel&apos;s <strong>Squad attack</strong> rolls
+              every attack at once: a natural 20 is a critical hit and a natural 1 misses. Then <strong>Apply</strong>
+              sends each hit to the target. In the squad&apos;s row, <strong>Hit</strong> deals single-target hits, and
+              <strong> Area…</strong> handles spells like fireball. It suggests how many bodies are caught using the
               DMG&apos;s area-of-effect guidance — 2014 (p. 249) or 2024 (p. 82); pick the edition with the
               <strong> DMG rules</strong> toggle at the top of the dialog (the 2024 table catches more creatures) — which
-              you can adjust, then rolls each body&apos;s save. Healing restores the front body only and never brings back the fallen. Tick <strong>Magical</strong> when the damage comes from a magic
-              weapon or spell, so resistances to nonmagical attacks don&apos;t apply.
+              you can adjust, then rolls each body&apos;s save. Healing restores the front body only and never brings
+              back the fallen. Tick <strong>Magical</strong> when the damage comes from a magic weapon or spell, so
+              resistances to nonmagical attacks don&apos;t apply.
             </Typography>
             <Typography variant="body2" paragraph>
               <strong>Morale (DMG 2014 p. 273, optional rule; the 2024 DMG has none).</strong> Give a squad a
@@ -286,95 +394,71 @@ export function HelpGuide({ open, onClose }: HelpGuideProps) {
               <strong>VVTT rules</strong> (not in the books, to keep big fights fast): a squad acts as one creature
               on one initiative; only its front body is tracked, so a single hit can drop at most one body and
               overkill is lost; attackers default to every standing body; after an area effect the most wounded
-              survivor becomes the front body; squads don&apos;t use temporary HP; each morale trigger is asked only once per battle; a squad with no
-              leader standing saves with its own statblock; fleeing and surrendered creatures keep their place in
-              initiative; with the 2024 area table, sizes between rows use the row below.
+              survivor becomes the front body; squads don&apos;t use temporary HP; each morale trigger is asked only
+              once per battle; a squad with no leader standing saves with its own statblock; fleeing and surrendered
+              creatures keep their place in initiative; with the 2024 area table, sizes between rows use the row below.
             </Typography>
           </AccordionDetails>
         </Accordion>
 
-        <Accordion>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <GpsFixedIcon color="primary" />
-              <Typography fontWeight={600}>6. Target Status Panel</Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Typography variant="body2" paragraph>
-              During combat, the <strong>Target Status</strong> panel (right sidebar) shows tactical information
-              for attacking enemy targets from the current turn's vehicle.
-            </Typography>
-            <Typography variant="body2" paragraph>
-              <strong>For each target, you'll see:</strong>
-            </Typography>
-            <Typography variant="body2" component="div" sx={{ pl: 2 }}>
-              • <strong>Cover:</strong> None, Half (+2 AC), Three-quarters (+5 AC), or Full<br />
-              • <strong>Attack arc:</strong> Which direction you're attacking from<br />
-              • <strong>Distance:</strong> How far away the target is in feet<br />
-              • <strong>Range status:</strong> Whether your weapons can reach the target<br />
-              • <strong>Elevation modifier:</strong> Attack bonus/penalty based on height difference<br />
-              • <strong>Ship components:</strong> for ships, each targetable part (hull, helm, sails, weapons) with its AC &amp; HP
-            </Typography>
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              Range is automatically extended when firing from higher elevation (10% per 10 ft).
-            </Typography>
-          </AccordionDetails>
-        </Accordion>
-
+        {/* 8. Chase Complications */}
         <Accordion>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <CasinoIcon color="primary" />
-              <Typography fontWeight={600}>7. Chase Complications</Typography>
+              <Typography fontWeight={600}>8. Chase Complications</Typography>
             </Box>
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" paragraph>
-              Chase complications add random hazards to the encounter. Click the <strong>"Complication"</strong> button
-              to roll for a complication.
+              Chase complications add random hazards to the encounter. Click <strong>Complication</strong> →
+              <strong> Roll Random Complication</strong>. The table depends on the current combat scale.
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>"Auto-roll at End of Round"</strong> in the same menu makes the roll happen automatically
-              each time you click <strong>Next Round</strong>. It's off by default, saved with the encounter,
-              and shows a green check in the menu while it's on.
+              <strong>Auto-roll at End of Round</strong> in the same menu makes the roll happen automatically each time
+              you click <strong>Next Round</strong>. It's off by default, saved with the encounter, and shows a green
+              check in the menu while it's on.
             </Typography>
             <Typography variant="body2">
-              Complications may include terrain hazards, creature attacks, or environmental effects
-              that require skill checks to avoid.
+              Complications may include terrain hazards, creature attacks, or environmental effects. When one calls for
+              a check, a dialog lets you roll or enter each affected vehicle's save; a Creature Chase lets you add the
+              creature that joins the chase.
             </Typography>
           </AccordionDetails>
         </Accordion>
 
+        {/* 9. Saving & Loading */}
         <Accordion>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <SaveIcon color="primary" />
-              <Typography fontWeight={600}>8. Saving & Loading</Typography>
+              <Typography fontWeight={600}>9. Saving &amp; Loading</Typography>
             </Box>
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" paragraph>
-              <strong>Auto-save:</strong> Your current encounter is automatically saved locally
-              as you make changes.
+              <strong>Encounters:</strong> use ☰ → <strong>Save</strong> (and <strong>Save As...</strong>) to add the
+              encounter to your list, and <strong>Load Encounter</strong> to reopen one. When you're signed in, they're
+              saved to the cloud, so you can open them on any device. <strong>New Encounter</strong> starts fresh.
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Save to Cloud:</strong> Use the menu (☰) → <strong>"Save"</strong> to save
-              your encounter to the cloud. This allows you to access it from any device.
+              <strong>Auto-save:</strong> your current encounter is also saved in this browser as you play (on every turn,
+              round and phase change, and every 60 seconds); the header shows the last auto-save time.
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Party Presets:</strong> Save your party configuration as a preset to quickly load
-              into new encounters. Only <strong>Party faction</strong> creatures and party vehicles are
-              saved in presets (enemy creatures are not included).
+              <strong>Party presets:</strong> <strong>Party Preset</strong> → <strong>Save Party</strong> stores your party
+              vehicles, party-faction creatures, and their crew assignments (enemies are not included).
+              <strong> Load Party</strong> brings them into the current encounter, replacing its party vehicles and
+              keeping enemy vehicles.
             </Typography>
             <Typography variant="body2" paragraph>
-              <strong>Player View:</strong> Click <strong>Player View</strong> above the map (or open
-              <code> vvtt.lukantan.com/player-view</code>) in a second window or on a TV to show players a
-              synced battlefield without DM controls. Settings lets you hide vehicle HP from that view.
+              <strong>Player View:</strong> click <strong>Player View</strong> above the map to open a second window (put it
+              on a TV or second screen) that shows players a synced battlefield without DM controls. Settings →
+              <strong> Show Vehicle Health</strong> controls whether vehicle HP is shown there.
             </Typography>
             <Typography variant="body2">
-              <strong>Settings</strong> (☰ menu) also holds distance units (feet or metres) and the
-              map-resize behaviour described in step 3.
+              <strong>Settings</strong> (☰ menu) also holds distance units (feet or metres) and the map-resize behaviour
+              described in section 3. <strong>What&apos;s New</strong> lists recent changes.
             </Typography>
           </AccordionDetails>
         </Accordion>
